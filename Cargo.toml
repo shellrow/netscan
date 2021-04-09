@@ -1,0 +1,17 @@
+[package]
+name = "netscan"
+version = "0.0.1"
+authors = ["shellrow <81893184+shellrow@users.noreply.github.com>"]
+edition = "2018"
+description = "Cross-platform network scan library"
+repository = "https://github.com/shellrow/netscan"
+readme = "README.md"
+keywords = ["network","security","scan"]
+categories = ["network-programming"]
+license = "MIT"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+rayon = "1.5"
+rand = "0.8"
+pnet = "0.27"
