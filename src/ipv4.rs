@@ -1,4 +1,4 @@
-use std::net::{Ipv4Addr, UdpSocket};
+use std::net::Ipv4Addr;
 pub const IPV4_HEADER_LEN: usize = 20;
 
 #[allow(dead_code)]
@@ -8,30 +8,13 @@ pub enum IpNextHeaderProtocol {
     Icmp
 }
 
-pub fn get_local_ipaddr() -> Option<String> {
-    let socket = match UdpSocket::bind("0.0.0.0:0") {
-        Ok(s) => s,
-        Err(_) => return None,
-    };
-
-    match socket.connect("8.8.8.8:80") {
-        Ok(()) => (),
-        Err(_) => return None,
-    };
-
-    match socket.local_addr() {
-        Ok(addr) => return Some(addr.ip().to_string()),
-        Err(_) => return None,
-    };
-}
-
-pub fn build_ipv4_packet(ipv4_packet: &mut pnet::packet::ipv4::MutableIpv4Packet, src_ip_addr: Ipv4Addr, dst_ip_addr: Ipv4Addr, next_protocol: IpNextHeaderProtocol, ttl: u8){
+pub fn build_ipv4_packet(ipv4_packet: &mut pnet::packet::ipv4::MutableIpv4Packet, src_ip_addr: Ipv4Addr, dst_ip_addr: Ipv4Addr, next_protocol: IpNextHeaderProtocol){
     ipv4_packet.set_header_length(69);
     ipv4_packet.set_total_length(52);
     ipv4_packet.set_source(src_ip_addr);
     ipv4_packet.set_destination(dst_ip_addr);
     ipv4_packet.set_identification(rand::random::<u16>());
-    ipv4_packet.set_ttl(ttl);
+    ipv4_packet.set_ttl(64);
     ipv4_packet.set_version(4);
     ipv4_packet.set_flags(pnet::packet::ipv4::Ipv4Flags::DontFragment);
     match next_protocol {

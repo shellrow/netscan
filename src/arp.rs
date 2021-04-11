@@ -1,7 +1,23 @@
 use std::net::{IpAddr, Ipv4Addr};
 use pnet::packet::{Packet, MutablePacket};
 
-pub fn get_macaddr(interface: &pnet::datalink::NetworkInterface, target_ip: Ipv4Addr) -> pnet::datalink::MacAddr {
+#[allow(dead_code)]
+pub const ARP_HEADER_LEN: usize = 28;
+
+#[allow(dead_code)]
+pub fn build_arp_packet(arp_packet:&mut pnet::packet::arp::MutableArpPacket, sender_addr:Ipv4Addr, target_addr:Ipv4Addr){
+    arp_packet.set_hardware_type(pnet::packet::arp::ArpHardwareTypes::Ethernet);
+    arp_packet.set_protocol_type(pnet::packet::ethernet::EtherTypes::Ipv4);
+    arp_packet.set_hw_addr_len(6);
+    arp_packet.set_proto_addr_len(4);
+    arp_packet.set_operation(pnet::packet::arp::ArpOperations::Request);
+    arp_packet.set_sender_hw_addr(pnet::datalink::MacAddr(1,2,3,4,5,6));
+    arp_packet.set_sender_proto_addr(sender_addr);
+    arp_packet.set_target_hw_addr(pnet::datalink::MacAddr::zero());
+    arp_packet.set_target_proto_addr(target_addr);
+}
+
+pub fn get_mac_through_arp(interface: &pnet::datalink::NetworkInterface, target_ip: Ipv4Addr) -> pnet::datalink::MacAddr {
     let source_ip = interface
         .ips
         .iter()

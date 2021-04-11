@@ -1,5 +1,8 @@
 use std::net::Ipv4Addr;
 
+/// Type of port scan. 
+/// 
+/// Supports SynScan, FinScan, XmasScan, NullScan.
 #[derive(Clone, Copy)]
 pub enum PortScanType {
     SynScan = pnet::packet::tcp::TcpFlags::SYN as isize,
