@@ -54,6 +54,8 @@ pub struct PortScanner {
     start_port_num: u16,
     /// End port number of port range.  
     end_port_num: u16,
+    /// List of target host.  
+    target_ports: Vec<u16>,
     /// Type of port scan. Default is PortScanType::SynScan  
     scan_type: PortScanType,
     /// Source port number.  
@@ -155,6 +157,7 @@ impl PortScanner{
             target_ipaddr: Ipv4Addr::new(127, 0, 0, 1), 
             start_port_num: 1,
             end_port_num: 1000,
+            target_ports: vec![],
             scan_type: PortScanType::SynScan,
             src_port_num: 65432,
             timeout: Duration::from_millis(30000),
@@ -200,6 +203,10 @@ impl PortScanner{
         self.start_port_num = start;
         self.end_port_num = end;
     }
+    /// Add target port 
+    pub fn add_target_port(&mut self, port_num: u16){
+        self.target_ports.push(port_num);
+    }
     /// Set scan type. Default is PortScanType::SynScan
     pub fn set_scan_type(&mut self, scan_type: PortScanType){
         self.scan_type = scan_type;
@@ -239,7 +246,7 @@ impl PortScanner{
         if iface_ip == Ipv4Addr::new(127, 0, 0, 1) {
             error!("Error: Interface IP is IPv6 (or unknown) which is not currently supported");
         }
-        let tcp_options: port::TcpOptions = port::TcpOptions {
+        let tcp_options: port::PortScanOptions = port::PortScanOptions {
             sender_mac: interface.mac.unwrap(),
             target_mac: target_mac,
             src_ip: iface_ip,
@@ -247,6 +254,7 @@ impl PortScanner{
             src_port: self.src_port_num,
             min_port_num: self.start_port_num,
             max_port_num: self.end_port_num,
+            target_ports: self.target_ports.clone(),
             scan_type: self.scan_type,
             timeout: self.timeout,
         };

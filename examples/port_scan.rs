@@ -11,6 +11,9 @@ fn main() {
     };
     port_scanner.set_target_ipaddr("192.168.1.92");
     port_scanner.set_range(1, 1000);
+    for i in 1..1000{
+        port_scanner.add_target_port(i);
+    }
     port_scanner.set_scan_type(PortScanType::SynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
     port_scanner.run_scan();
