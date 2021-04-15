@@ -17,6 +17,7 @@ pub fn build_arp_packet(arp_packet:&mut pnet::packet::arp::MutableArpPacket, sen
     arp_packet.set_target_proto_addr(target_addr);
 }
 
+#[allow(dead_code)]
 pub fn get_mac_through_arp(interface: &pnet::datalink::NetworkInterface, target_ip: Ipv4Addr) -> pnet::datalink::MacAddr {
     let source_ip = interface
         .ips

@@ -50,10 +50,6 @@ pub struct PortScanner {
     if_name: String,
     /// IP Address of target host.  
     target_ipaddr: Ipv4Addr, 
-    /// Start port number of port range.  
-    start_port_num: u16,
-    /// End port number of port range.  
-    end_port_num: u16,
     /// List of target host.  
     target_ports: Vec<u16>,
     /// Type of port scan. Default is PortScanType::SynScan  
@@ -144,8 +140,8 @@ impl HostScanner{
 impl PortScanner{
     /// Construct new PortScanner. (with network interface index or name)
     /// 
-    /// Specify None for default. `PortScanner::new(None, None)`
-    pub fn new(_if_index: Option<u32>, _if_name: Option<&str>) -> NewPortScannerResult{
+    /// Specify None for default. `PortScanner::new(None)`
+    pub fn new(_if_name: Option<&str>) -> NewPortScannerResult{
         let ini_scan_result = PortScanResult{
             open_ports: vec![],
             scan_time: Duration::from_millis(1),
@@ -155,33 +151,26 @@ impl PortScanner{
             if_index: 0,
             if_name: String::new(),
             target_ipaddr: Ipv4Addr::new(127, 0, 0, 1), 
-            start_port_num: 1,
-            end_port_num: 1000,
             target_ports: vec![],
             scan_type: PortScanType::SynScan,
             src_port_num: 65432,
             timeout: Duration::from_millis(30000),
             scan_result: ini_scan_result,
         };
-        if _if_index == None && _if_name == None{
+        if let Some(if_name) = _if_name {
+            let if_index = interface::get_interface_index_by_name(if_name.to_string());
+            if let Some(if_index) = if_index{
+                port_scanner.if_index = if_index;
+                port_scanner.if_name = if_name.to_string();
+            }else{
+                return Err("Failed to get interface info by name.".to_string());
+            }
+        }else{
             let def_if_index = default_net::get_default_interface_index();
             if let Some(def_if_index) = def_if_index {
                 port_scanner.if_index = def_if_index;
             }else{
                 return Err("Failed to get default interface info.".to_string());
-            }
-        }else{
-            if let Some(if_index) = _if_index {
-                port_scanner.if_index = if_index;
-            }
-            if let Some(if_name) = _if_name {
-                let if_index = interface::get_interface_index_by_name(if_name.to_string());
-                if let Some(if_index) = if_index{
-                    port_scanner.if_index = if_index;
-                    port_scanner.if_name = if_name.to_string();
-                }else{
-                    return Err("Failed to get interface info by name.".to_string());
-                }
             }
         }
         Ok(port_scanner)
@@ -200,8 +189,9 @@ impl PortScanner{
     }
     /// Set range of target ports (by start and end)
     pub fn set_range(&mut self, start: u16, end: u16){
-        self.start_port_num = start;
-        self.end_port_num = end;
+        for i in start..end{
+            self.add_target_port(i);
+        }
     }
     /// Add target port 
     pub fn add_target_port(&mut self, port_num: u16){
@@ -223,9 +213,10 @@ impl PortScanner{
     /// 
     /// Results are stored in PortScanner::scan_result
     pub fn run_scan(&mut self){
+        let default_interface = default_net::get_default_interface().expect("Failed to get default interface information");
         let interfaces = pnet::datalink::interfaces();
         let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == self.if_index).next().expect("Failed to get Interface");
-        let target_mac: pnet::datalink::MacAddr = arp::get_mac_through_arp(&interface, self.target_ipaddr);
+        //let target_mac: pnet::datalink::MacAddr = arp::get_mac_through_arp(&interface, self.target_ipaddr);    
         let mut iface_ip: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
         for ip in &interface.ips{
             match ip.ip() {
@@ -248,12 +239,11 @@ impl PortScanner{
         }
         let tcp_options: port::PortScanOptions = port::PortScanOptions {
             sender_mac: interface.mac.unwrap(),
-            target_mac: target_mac,
+            target_mac: default_interface.gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap(),
+            //target_mac: target_mac,
             src_ip: iface_ip,
             dst_ip: self.target_ipaddr,    
             src_port: self.src_port_num,
-            min_port_num: self.start_port_num,
-            max_port_num: self.end_port_num,
             target_ports: self.target_ports.clone(),
             scan_type: self.scan_type,
             timeout: self.timeout,

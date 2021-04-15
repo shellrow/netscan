@@ -14,8 +14,6 @@ pub struct PortScanOptions {
     pub src_ip: Ipv4Addr,
     pub dst_ip: Ipv4Addr,    
     pub src_port: u16,
-    pub min_port_num: u16,
-    pub max_port_num: u16,
     pub target_ports: Vec<u16>,
     pub scan_type: tcp::PortScanType,
     pub timeout: Duration,

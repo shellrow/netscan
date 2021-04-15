@@ -5,15 +5,12 @@ use netscan::ScanStatus;
 use std::time::Duration;
 
 fn main() {
-    let mut port_scanner = match PortScanner::new(None, None) {
+    let mut port_scanner = match PortScanner::new(None) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     port_scanner.set_target_ipaddr("192.168.1.92");
     port_scanner.set_range(1, 1000);
-    for i in 1..1000{
-        port_scanner.add_target_port(i);
-    }
     port_scanner.set_scan_type(PortScanType::SynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
     port_scanner.run_scan();
