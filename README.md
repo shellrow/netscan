@@ -73,11 +73,11 @@ For more details see [Examples][examples-url]
         - [x] FIN 
         - [x] XMAS 
         - [x] NULL 
-    - [] UDP
+    - [ ] UDP
 - HOST SCAN
     - [x] ICMP
-    - [] TCP
-    - [] UDP
+    - [ ] TCP
+    - [ ] UDP
 
 ## Additional Notes
 This library requires the ability to create raw sockets.  Execute with root user privileges.  
