@@ -33,4 +33,7 @@ fn main(){
         println!("{}", host);
     }
     println!("Scan Time: {:?}", result.scan_time);
+    if host_scanner.get_wait_time() > Duration::from_millis(0) {
+        println!("(Including {:?} of wait time)", host_scanner.get_wait_time());
+    }
 }

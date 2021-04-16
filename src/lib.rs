@@ -36,6 +36,8 @@ pub struct HostScanner {
     target_hosts: Vec<IpAddr>,
     /// Timeout setting of host scan.  
     timeout: Duration,
+    /// Timeout setting of host scan.  
+    wait_time: Duration,
     /// Result of host scan.  
     scan_result: HostScanResult,
 }
@@ -58,6 +60,8 @@ pub struct PortScanner {
     src_port_num: u16,
     /// Timeout setting of port scan.   
     timeout: Duration,
+    /// Wait time setting of port scan.
+    wait_time: Duration,
     /// Result of port scan.  
     scan_result: PortScanResult,
 }
@@ -95,7 +99,8 @@ impl HostScanner{
         let host_scanner = HostScanner{
             src_ipaddr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             target_hosts: vec![],
-            timeout: Duration::from_millis(30000),
+            timeout: Duration::from_millis(10000),
+            wait_time: Duration::from_millis(300),
             scan_result: ini_scan_result,
         };
         Ok(host_scanner)
@@ -105,7 +110,6 @@ impl HostScanner{
         let addr = ipaddr.parse::<IpAddr>();
         match addr {
             Ok(valid_addr) => {
-                debug!("Address added {}", valid_addr);
                 self.target_hosts.push(valid_addr);
             }
             Err(e) => {
@@ -117,16 +121,41 @@ impl HostScanner{
     pub fn set_timeout(&mut self, timeout: Duration){
         self.timeout = timeout;
     }
+    /// Set scan wait time  
+    pub fn set_wait_time(&mut self, wait_time: Duration){
+        self.wait_time = wait_time;
+    }
     /// Set source IP Address 
     pub fn set_src_ipaddr(&mut self, src_ipaddr:IpAddr){
         self.src_ipaddr = src_ipaddr;
+    }
+    /// Get source IP Address
+    pub fn get_src_ipaddr(&mut self) -> IpAddr {
+        return self.src_ipaddr.clone();
+    }
+    /// Get target hosts
+    pub fn get_target_hosts(&mut self) -> Vec<IpAddr> {
+        return self.target_hosts.clone();
+    }
+    /// Get timeout 
+    pub fn get_timeout(&mut self) -> Duration {
+        return self.timeout.clone();
+    }
+    /// Get wait time
+    pub fn get_wait_time(&mut self) -> Duration {
+        return self.wait_time.clone();
     }
     /// Run scan with current settings. 
     /// 
     /// Results are stored in HostScanner::scan_result
     pub fn run_scan(&mut self){
+        let hs_options: host::HostScanOptions = host::HostScanOptions {
+            target_hosts: self.target_hosts.clone(),
+            timeout: self.timeout,
+            wait_time: self.wait_time,
+        };
         let start_time = Instant::now();
-        let (uphosts, status) = host::scan_hosts(&self.target_hosts, &self.timeout);
+        let (uphosts, status) = host::scan_hosts(&hs_options);
         self.scan_result.up_hosts = uphosts;
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);
@@ -155,6 +184,7 @@ impl PortScanner{
             scan_type: PortScanType::SynScan,
             src_port_num: 65432,
             timeout: Duration::from_millis(30000),
+            wait_time: Duration::from_millis(10),
             scan_result: ini_scan_result,
         };
         if let Some(if_name) = _if_name {
@@ -205,9 +235,45 @@ impl PortScanner{
     pub fn set_timeout(&mut self, timeout: Duration){
         self.timeout = timeout;
     }
+    /// Set scan timeout  
+    pub fn set_wait_time(&mut self, wait_time: Duration){
+        self.wait_time = wait_time;
+    }
     /// Set source port number 
     pub fn set_src_port(&mut self, src_port: u16){
         self.src_port_num = src_port;
+    }
+    /// Get network interface index
+    pub fn get_if_index(&mut self) -> u32 {
+        return self.if_index.clone();
+    }
+    /// Get network interface name
+    pub fn get_if_name(&mut self) -> String {
+        return self.if_name.clone();
+    }
+    /// Get target ip address
+    pub fn get_target_ipaddr(&mut self) -> Ipv4Addr {
+        return self.target_ipaddr.clone();
+    }
+    /// Get target ports
+    pub fn get_target_ports(&mut self) -> Vec<u16> {
+        return self.target_ports.clone();
+    }
+    /// Get port scan type
+    pub fn get_scan_type(&mut self) -> PortScanType {
+        return self.scan_type.clone();
+    }
+    /// Get source port number
+    pub fn get_src_port_num(&mut self) -> u16 {
+        return self.src_port_num.clone();
+    }
+    /// Get timeout
+    pub fn get_timeout(&mut self) -> Duration {
+        return self.timeout.clone();
+    }
+    /// Get wait time
+    pub fn get_wait_time(&mut self) -> Duration {
+        return self.wait_time.clone();
     }
     /// Run scan with current settings. 
     /// 
@@ -215,8 +281,7 @@ impl PortScanner{
     pub fn run_scan(&mut self){
         let default_interface = default_net::get_default_interface().expect("Failed to get default interface information");
         let interfaces = pnet::datalink::interfaces();
-        let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == self.if_index).next().expect("Failed to get Interface");
-        //let target_mac: pnet::datalink::MacAddr = arp::get_mac_through_arp(&interface, self.target_ipaddr);    
+        let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == self.if_index).next().expect("Failed to get Interface");    
         let mut iface_ip: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
         for ip in &interface.ips{
             match ip.ip() {
@@ -237,19 +302,19 @@ impl PortScanner{
         if iface_ip == Ipv4Addr::new(127, 0, 0, 1) {
             error!("Error: Interface IP is IPv6 (or unknown) which is not currently supported");
         }
-        let tcp_options: port::PortScanOptions = port::PortScanOptions {
+        let ps_options: port::PortScanOptions = port::PortScanOptions {
             sender_mac: interface.mac.unwrap(),
             target_mac: default_interface.gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap(),
-            //target_mac: target_mac,
             src_ip: iface_ip,
             dst_ip: self.target_ipaddr,    
             src_port: self.src_port_num,
             target_ports: self.target_ports.clone(),
             scan_type: self.scan_type,
             timeout: self.timeout,
+            wait_time: self.wait_time,
         };
         let start_time = Instant::now();
-        let (open_ports, status) = port::scan_ports(&interface, &tcp_options);
+        let (open_ports, status) = port::scan_ports(&interface, &ps_options);
         self.scan_result.open_ports = open_ports;
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);

@@ -8,7 +8,13 @@ use pnet::transport::TransportChannelType::Layer4;
 use pnet::transport::TransportProtocol::Ipv4;
 use pnet::transport::icmp_packet_iter;
 
-pub fn scan_hosts(target_hosts: &Vec<IpAddr>, timeout: &Duration) ->(Vec<String>, ScanStatus)
+pub struct HostScanOptions {
+    pub target_hosts: Vec<IpAddr>,
+    pub timeout: Duration,
+    pub wait_time: Duration,
+}
+
+pub fn scan_hosts(scan_options: &HostScanOptions) ->(Vec<String>, ScanStatus)
 {
     let mut result = vec![];
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
@@ -19,8 +25,8 @@ pub fn scan_hosts(target_hosts: &Vec<IpAddr>, timeout: &Duration) ->(Vec<String>
         Ok((tx, rx)) => (tx, rx),
         Err(e) => panic!("Error happened {}", e),
     };
-    rayon::join(|| send_icmp_packet(&mut tx, &target_hosts, &stop),
-                || receive_packets(&mut rx, &target_hosts, &stop, &up_hosts, &timeout, &scan_status)
+    rayon::join(|| send_icmp_packet(&mut tx, &scan_options, &stop),
+                || receive_packets(&mut rx, &scan_options, &stop, &up_hosts, &scan_status)
     );
     up_hosts.lock().unwrap().sort();
     for host in up_hosts.lock().unwrap().iter(){
@@ -29,24 +35,24 @@ pub fn scan_hosts(target_hosts: &Vec<IpAddr>, timeout: &Duration) ->(Vec<String>
     return (result, *scan_status.lock().unwrap());
 }
 
-fn send_icmp_packet(tx: &mut pnet::transport::TransportSender, target_hosts: &Vec<IpAddr>, stop: &Arc<Mutex<bool>>){
-    for host in target_hosts{
+fn send_icmp_packet(tx: &mut pnet::transport::TransportSender, scan_options: &HostScanOptions, stop: &Arc<Mutex<bool>>){
+    for host in &scan_options.target_hosts{
         thread::sleep(time::Duration::from_millis(1));
         let mut buf = vec![0; 16];
         let mut icmp_packet = pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
         icmp::build_icmp_packet(&mut icmp_packet);
         let _result = tx.send_to(icmp_packet, *host);
     }
+    thread::sleep(scan_options.wait_time);
     *stop.lock().unwrap() = true;
 }
 
 #[cfg(any(unix, macos))]
 fn receive_packets(
     rx: &mut pnet::transport::TransportReceiver, 
-    target_hosts: &Vec<IpAddr>, 
+    scan_options: &HostScanOptions,
     stop: &Arc<Mutex<bool>>, 
     up_hosts: &Arc<Mutex<Vec<IpAddr>>>, 
-    timeout: &Duration,
     scan_status: &Arc<Mutex<ScanStatus>>){
     let mut iter = icmp_packet_iter(rx);
     let start_time = Instant::now();
@@ -54,7 +60,7 @@ fn receive_packets(
         match iter.next_with_timeout(time::Duration::from_millis(100)) {
             Ok(r) => {
                 if let Some((_packet, addr)) = r {
-                    if target_hosts.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
+                    if scan_options.target_hosts.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
                         up_hosts.lock().unwrap().push(addr);
                     }
                 }else{
@@ -69,7 +75,7 @@ fn receive_packets(
             *scan_status.lock().unwrap() = ScanStatus::Done;
             break;
         }
-        if Instant::now().duration_since(start_time) > *timeout {
+        if Instant::now().duration_since(start_time) > scan_options.timeout {
             *scan_status.lock().unwrap() = ScanStatus::Timeout;
             break;
         }
@@ -79,17 +85,16 @@ fn receive_packets(
 #[cfg(target_os = "windows")]
 fn receive_packets(
     rx: &mut pnet::transport::TransportReceiver, 
-    target_hosts: &Vec<IpAddr>, 
+    scan_options: &HostScanOptions,
     stop: &Arc<Mutex<bool>>, 
     up_hosts: &Arc<Mutex<Vec<IpAddr>>>, 
-    timeout: &Duration,
     scan_status: &Arc<Mutex<ScanStatus>>){
     let mut iter = icmp_packet_iter(rx);
     let start_time = Instant::now();
     loop {
         match iter.next() {
             Ok((_packet, addr)) => {
-                if target_hosts.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
+                if scan_options.target_hosts.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
                     up_hosts.lock().unwrap().push(addr);
                 }
             },
@@ -101,7 +106,7 @@ fn receive_packets(
             *scan_status.lock().unwrap() = ScanStatus::Done;
             break;
         }
-        if Instant::now().duration_since(start_time) > *timeout {
+        if Instant::now().duration_since(start_time) > scan_options.timeout {
             *scan_status.lock().unwrap() = ScanStatus::Timeout;
             break;
         }
