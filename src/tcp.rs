@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-/// Type of port scan. 
+/// Type of port scan 
 /// 
 /// Supports SynScan, FinScan, XmasScan, NullScan.
 #[derive(Clone, Copy)]

@@ -30,48 +30,48 @@ pub type NewPortScannerResult = Result<PortScanner, String>;
 /// 
 /// Should be constructed using HostScanner::new 
 pub struct HostScanner {
-    /// Source IP Address.  
+    /// Source IP Address  
     src_ipaddr: IpAddr,
-    /// List of target host.  
+    /// List of target host  
     target_hosts: Vec<IpAddr>,
-    /// Timeout setting of host scan.  
+    /// Timeout setting of host scan  
     timeout: Duration,
-    /// Timeout setting of host scan.  
+    /// Timeout setting of host scan  
     wait_time: Duration,
-    /// Result of host scan.  
+    /// Result of host scan  
     scan_result: HostScanResult,
 }
 
-/// Structure for port scan.  
+/// Structure for port scan  
 /// 
 /// Should be constructed using PortScanner::new 
 pub struct PortScanner {
-    /// Index of network interface.  
+    /// Index of network interface  
     if_index: u32,
-    /// Name of network interface.  
+    /// Name of network interface  
     if_name: String,
-    /// IP Address of target host.  
+    /// IP Address of target host  
     target_ipaddr: Ipv4Addr, 
-    /// List of target host.  
+    /// List of target host  
     target_ports: Vec<u16>,
     /// Type of port scan. Default is PortScanType::SynScan  
     scan_type: PortScanType,
-    /// Source port number.  
+    /// Source port number  
     src_port_num: u16,
-    /// Timeout setting of port scan.   
+    /// Timeout setting of port scan   
     timeout: Duration,
-    /// Wait time setting of port scan.
+    /// Wait time setting of port scan
     wait_time: Duration,
-    /// Result of port scan.  
+    /// Result of port scan  
     scan_result: PortScanResult,
 }
 
 /// Result of HostScanner::run_scan  
 #[derive(Clone)]
 pub struct HostScanResult {
-    /// List of up host.  
+    /// List of up host  
     pub up_hosts: Vec<String>,
-    /// Time from start to end of scan.  
+    /// Time from start to end of scan  
     pub scan_time: Duration,
     /// Scan job status
     pub scan_status: ScanStatus,
@@ -80,9 +80,9 @@ pub struct HostScanResult {
 /// Result of PortScanner::run_scan  
 #[derive(Clone)]
 pub struct PortScanResult {
-    /// List of open port.  
+    /// List of open port  
     pub open_ports: Vec<String>,
-    /// Time from start to end of scan.  
+    /// Time from start to end of scan  
     pub scan_time: Duration,
     /// Scan job status
     pub scan_status: ScanStatus,
@@ -105,7 +105,7 @@ impl HostScanner{
         };
         Ok(host_scanner)
     }
-    /// Add target host to list.
+    /// Add target host to list
     pub fn add_ipaddr(&mut self, ipaddr: &str) {
         let addr = ipaddr.parse::<IpAddr>();
         match addr {
@@ -145,7 +145,7 @@ impl HostScanner{
     pub fn get_wait_time(&mut self) -> Duration {
         return self.wait_time.clone();
     }
-    /// Run scan with current settings. 
+    /// Run scan with current settings 
     /// 
     /// Results are stored in HostScanner::scan_result
     pub fn run_scan(&mut self){
@@ -160,14 +160,14 @@ impl HostScanner{
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);
     }
-    /// Return scan result.
+    /// Return scan result
     pub fn get_result(&mut self) -> HostScanResult{
         return self.scan_result.clone();
     }
 }
 
 impl PortScanner{
-    /// Construct new PortScanner. (with network interface index or name)
+    /// Construct new PortScanner (with network interface index or name)
     /// 
     /// Specify None for default. `PortScanner::new(None)`
     pub fn new(_if_name: Option<&str>) -> NewPortScannerResult{
@@ -275,7 +275,7 @@ impl PortScanner{
     pub fn get_wait_time(&mut self) -> Duration {
         return self.wait_time.clone();
     }
-    /// Run scan with current settings. 
+    /// Run scan with current settings 
     /// 
     /// Results are stored in PortScanner::scan_result
     pub fn run_scan(&mut self){
@@ -319,7 +319,7 @@ impl PortScanner{
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);
     }
-    /// Return scan result.
+    /// Return scan result
     pub fn get_result(&mut self) -> PortScanResult{
         return self.scan_result.clone();
     }
