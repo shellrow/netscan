@@ -1,15 +1,5 @@
 use std::net::Ipv4Addr;
-
-/// Type of port scan 
-/// 
-/// Supports SynScan, FinScan, XmasScan, NullScan.
-#[derive(Clone, Copy)]
-pub enum PortScanType {
-    SynScan = pnet::packet::tcp::TcpFlags::SYN as isize,
-    FinScan = pnet::packet::tcp::TcpFlags::FIN as isize,
-    XmasScan = pnet::packet::tcp::TcpFlags::FIN as isize | pnet::packet::tcp::TcpFlags::URG as isize | pnet::packet::tcp::TcpFlags::PSH as isize,
-    NullScan = 0
-}
+use super::port::PortScanType;
 
 pub fn build_tcp_packet(tcp_packet:&mut pnet::packet::tcp::MutableTcpPacket, src_ip_addr: Ipv4Addr, src_port:u16, dst_ip_addr: Ipv4Addr, dst_port:u16, scan_type:&PortScanType){
     tcp_packet.set_source(src_port);
@@ -35,7 +25,10 @@ pub fn build_tcp_packet(tcp_packet:&mut pnet::packet::tcp::MutableTcpPacket, src
         },
         PortScanType::NullScan => {
             tcp_packet.set_flags(0);
-        }
+        },
+        _ => {
+            tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
+        },
     }
     let checksum = pnet::packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip_addr, &dst_ip_addr);
     tcp_packet.set_checksum(checksum);

@@ -17,7 +17,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 use default_net;
 
-pub use tcp::PortScanType;
+pub use port::PortScanType;
 pub use status::ScanStatus;
 
 /// Result of HostScanner::new
@@ -219,7 +219,7 @@ impl PortScanner{
     }
     /// Set range of target ports (by start and end)
     pub fn set_range(&mut self, start: u16, end: u16){
-        for i in start..end{
+        for i in start..end + 1{
             self.add_target_port(i);
         }
     }
