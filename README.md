@@ -66,18 +66,5 @@ For more details see [Examples][examples-url]
 - macOS(OS X)
 - Windows
 
-## TODO
-- PORT SCAN
-    - [x] TCP 
-        - [x] SYN 
-        - [x] FIN 
-        - [x] XMAS 
-        - [x] NULL 
-    - [ ] UDP
-- HOST SCAN
-    - [x] ICMP
-    - [ ] TCP
-    - [ ] UDP
-
 ## Additional Notes
 This library requires the ability to create raw sockets.  Execute with root user privileges.  

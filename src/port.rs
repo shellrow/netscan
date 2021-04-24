@@ -47,8 +47,21 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scan_options: &P
     rayon::join(|| send_packets(&mut tx, &scan_options, &stop),
                 || receive_packets(&mut rx, &scan_options, &open_ports, &close_ports, &stop, &scan_status)
     );
-    for port in open_ports.lock().unwrap().iter(){
-        result.push(port.to_string());
+    match scan_options.scan_type {
+        PortScanType::SynScan | PortScanType::FinScan => {
+            for port in open_ports.lock().unwrap().iter(){
+                result.push(port.to_string());
+            }
+        },
+        PortScanType::XmasScan | PortScanType::NullScan | PortScanType::UdpScan => {
+            if close_ports.lock().unwrap().len() > 0 {
+                for port in &scan_options.target_ports {
+                    if !close_ports.lock().unwrap().contains(&port.to_string()){
+                        result.push(port.to_string());
+                    }
+                }
+            }
+        },
     }
     return (result, *scan_status.lock().unwrap());
 }
@@ -200,28 +213,14 @@ fn icmp_handler(packet: &dyn EndPoints, scan_options: &PortScanOptions, close_po
 
 fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scan_options: &PortScanOptions, open_ports: &Arc<Mutex<Vec<String>>>, close_ports: &Arc<Mutex<Vec<String>>>) {
     match scan_options.scan_type {
-        PortScanType::SynScan => {
+        PortScanType::SynScan | PortScanType::FinScan => {
             if l4.get_destination() == scan_options.src_port.to_string() {
                 if !open_ports.lock().unwrap().contains(&l4.get_source()){
                     open_ports.lock().unwrap().push(l4.get_source());
                 }
             }
         },
-        PortScanType::FinScan => {
-            if l4.get_destination() == scan_options.src_port.to_string() {
-                if !open_ports.lock().unwrap().contains(&l4.get_source()){
-                    open_ports.lock().unwrap().push(l4.get_source());
-                }
-            }
-        },
-        PortScanType::XmasScan => {
-            if l4.get_destination() == scan_options.src_port.to_string() {
-                if !close_ports.lock().unwrap().contains(&l4.get_source()){
-                    close_ports.lock().unwrap().push(l4.get_source());
-                }
-            }
-        },
-        PortScanType::NullScan => {
+        PortScanType::XmasScan | PortScanType::NullScan => {
             if l4.get_destination() == scan_options.src_port.to_string() {
                 if !close_ports.lock().unwrap().contains(&l4.get_source()){
                     close_ports.lock().unwrap().push(l4.get_source());

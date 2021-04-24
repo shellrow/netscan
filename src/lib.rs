@@ -184,7 +184,7 @@ impl PortScanner{
             scan_type: PortScanType::SynScan,
             src_port_num: 65432,
             timeout: Duration::from_millis(30000),
-            wait_time: Duration::from_millis(10),
+            wait_time: Duration::from_millis(100),
             scan_result: ini_scan_result,
         };
         if let Some(if_name) = _if_name {
