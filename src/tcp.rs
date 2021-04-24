@@ -26,9 +26,6 @@ pub fn build_tcp_packet(tcp_packet:&mut pnet::packet::tcp::MutableTcpPacket, src
         PortScanType::NullScan => {
             tcp_packet.set_flags(0);
         },
-        _ => {
-            tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
-        },
     }
     let checksum = pnet::packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip_addr, &dst_ip_addr);
     tcp_packet.set_checksum(checksum);

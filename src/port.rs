@@ -1,4 +1,4 @@
-use crate::{tcp, udp, ipv4, ethernet};
+use crate::{tcp, ipv4, ethernet};
 use crate::packet::EndPoints;
 use crate::status::ScanStatus;
 use std::{thread, time};
@@ -17,7 +17,6 @@ pub enum PortScanType {
     FinScan = pnet::packet::tcp::TcpFlags::FIN as isize,
     XmasScan = pnet::packet::tcp::TcpFlags::FIN as isize | pnet::packet::tcp::TcpFlags::URG as isize | pnet::packet::tcp::TcpFlags::PSH as isize,
     NullScan = 0,
-    UdpScan = 9,
 }
 
 pub struct PortScanOptions {
@@ -53,7 +52,7 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scan_options: &P
                 result.push(port.to_string());
             }
         },
-        PortScanType::XmasScan | PortScanType::NullScan | PortScanType::UdpScan => {
+        PortScanType::XmasScan | PortScanType::NullScan => {
             if close_ports.lock().unwrap().len() > 0 {
                 for port in &scan_options.target_ports {
                     if !close_ports.lock().unwrap().contains(&port.to_string()){
@@ -72,14 +71,7 @@ fn build_packet(scan_options: &PortScanOptions, tmp_packet: &mut [u8], target_po
     ethernet::build_ethernet_packet(&mut eth_header, scan_options.sender_mac, scan_options.target_mac, ethernet::EtherType::Ipv4);
     // Setup IP header
     let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(&mut tmp_packet[ethernet::ETHERNET_HEADER_LEN..(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)]).unwrap();
-    //ipv4::build_ipv4_packet(&mut ip_header, scan_options.src_ip, scan_options.dst_ip, ipv4::IpNextHeaderProtocol::Tcp);
     match scan_options.scan_type {
-        PortScanType::UdpScan => {
-            ipv4::build_ipv4_packet(&mut ip_header, scan_options.src_ip, scan_options.dst_ip, ipv4::IpNextHeaderProtocol::Udp);
-            // Setup UDP header
-            let mut udp_header = pnet::packet::udp::MutableUdpPacket::new(&mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
-            udp::build_udp_packet(&mut udp_header, scan_options.src_ip, scan_options.src_port, scan_options.dst_ip, target_port, &scan_options.scan_type);
-        },
         _ => {
             ipv4::build_ipv4_packet(&mut ip_header, scan_options.src_ip, scan_options.dst_ip, ipv4::IpNextHeaderProtocol::Tcp);
             // Setup TCP header
@@ -146,12 +138,7 @@ fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, scan_options:
             pnet::packet::ip::IpNextHeaderProtocols::Udp => {
                 udp_handler(&packet, &scan_options, &open_ports, &close_ports);
             },
-            pnet::packet::ip::IpNextHeaderProtocols::Icmp => {
-                icmp_handler(&packet, &scan_options, &close_ports);
-            },
-            _ => {
-                
-            }
+            _ => {}
         }
     }
 }
@@ -164,9 +151,6 @@ fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, scan_options:
             },
             pnet::packet::ip::IpNextHeaderProtocols::Udp => {
                 udp_handler(&packet, &scan_options, &open_ports, &close_ports);
-            },
-            pnet::packet::ip::IpNextHeaderProtocols::Icmp => {
-
             },
             _ => {}
         }
@@ -187,30 +171,6 @@ fn udp_handler(packet: &dyn EndPoints, scan_options: &PortScanOptions, open_port
     }
 }
 
-fn icmp_handler(packet: &dyn EndPoints, scan_options: &PortScanOptions, close_ports: &Arc<Mutex<Vec<String>>>){
-    let icmp = pnet::packet::icmp::IcmpPacket::new(packet.get_payload());
-    if let Some(icmp) = icmp {
-        match scan_options.scan_type {
-            PortScanType::UdpScan => {
-                match icmp.get_icmp_type(){
-                    pnet::packet::icmp::IcmpTypes::DestinationUnreachable => {
-                        if packet.get_source() == scan_options.dst_ip.to_string() {
-                            let udp = pnet::packet::udp::UdpPacket::new(packet.get_payload());
-                            if let Some(udp) = udp {
-                                if !close_ports.lock().unwrap().contains(&udp.get_destination().to_string()){
-                                    close_ports.lock().unwrap().push(udp.get_destination().to_string());
-                                }
-                            }
-                        }
-                    },
-                    _ => {},
-                }
-            },
-            _ => {},
-        }
-    }
-}
-
 fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scan_options: &PortScanOptions, open_ports: &Arc<Mutex<Vec<String>>>, close_ports: &Arc<Mutex<Vec<String>>>) {
     match scan_options.scan_type {
         PortScanType::SynScan | PortScanType::FinScan => {
@@ -227,6 +187,5 @@ fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scan_options: &Po
                 }
             }
         },
-        _ => {},
     }
 }
