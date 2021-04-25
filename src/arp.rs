@@ -69,6 +69,7 @@ pub fn get_mac_through_arp(interface: &pnet::datalink::NetworkInterface, target_
         let arp = pnet::packet::arp::ArpPacket::new(&buf[pnet::packet::ethernet::MutableEthernetPacket::minimum_packet_size()..]).unwrap();
         if arp.get_sender_hw_addr() != interface.mac.unwrap() {
             target_mac_addr = arp.get_sender_hw_addr();
+            break;
         }
     }
     return target_mac_addr;

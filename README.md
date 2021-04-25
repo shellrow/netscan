@@ -15,7 +15,7 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.1.1"
+netscan = "0.1.2"
 ```
 
 ## Example
