@@ -60,8 +60,10 @@ pub struct PortScanner {
     src_port_num: u16,
     /// Timeout setting of port scan   
     timeout: Duration,
-    /// Wait time setting of port scan
+    /// Wait time after send task is finished
     wait_time: Duration,
+    /// Packet send rate
+    send_rate: Duration,
     /// Result of port scan  
     scan_result: PortScanResult,
 }
@@ -185,6 +187,7 @@ impl PortScanner{
             src_port_num: 65432,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(100),
+            send_rate: Duration::from_millis(1),
             scan_result: ini_scan_result,
         };
         if let Some(if_name) = _if_name {
@@ -312,6 +315,7 @@ impl PortScanner{
             scan_type: self.scan_type,
             timeout: self.timeout,
             wait_time: self.wait_time,
+            send_rate: self.send_rate,
         };
         let start_time = Instant::now();
         let (open_ports, status) = port::scan_ports(&interface, &ps_options);

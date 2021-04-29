@@ -1,7 +1,7 @@
 use crate::{tcp, ipv4, ethernet};
 use crate::packet::EndPoints;
 use crate::status::ScanStatus;
-use std::{thread, time};
+use std::thread;
 use std::sync::{Arc, Mutex};
 use std::net::Ipv4Addr;
 use pnet::datalink::MacAddr;
@@ -29,6 +29,7 @@ pub struct PortScanOptions {
     pub scan_type: PortScanType,
     pub timeout: Duration,
     pub wait_time: Duration,
+    pub send_rate: Duration,
 }
 
 pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scan_options: &PortScanOptions) -> (Vec<String>, ScanStatus)
@@ -83,7 +84,7 @@ fn build_packet(scan_options: &PortScanOptions, tmp_packet: &mut [u8], target_po
 
 fn send_packets(tx: &mut Box<dyn pnet::datalink::DataLinkSender>, scan_options: &PortScanOptions, stop: &Arc<Mutex<bool>>) {
     for port in &scan_options.target_ports {
-        thread::sleep(time::Duration::from_millis(1));
+        thread::sleep(scan_options.send_rate);
         tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
             build_packet(&scan_options, packet, *port);
         });
