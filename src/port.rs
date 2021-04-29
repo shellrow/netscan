@@ -7,16 +7,19 @@ use std::net::Ipv4Addr;
 use pnet::datalink::MacAddr;
 use pnet::packet::Packet;
 use std::time::{Duration, Instant};
+use rayon::prelude::*;
+use std::net::{ToSocketAddrs,TcpStream};
 
 /// Type of port scan 
 /// 
-/// Supports SynScan, FinScan, XmasScan, NullScan, UdpScan.
+/// Supports SynScan, FinScan, XmasScan, NullScan, ConnectScan
 #[derive(Clone, Copy)]
 pub enum PortScanType {
     SynScan = pnet::packet::tcp::TcpFlags::SYN as isize,
     FinScan = pnet::packet::tcp::TcpFlags::FIN as isize,
     XmasScan = pnet::packet::tcp::TcpFlags::FIN as isize | pnet::packet::tcp::TcpFlags::URG as isize | pnet::packet::tcp::TcpFlags::PSH as isize,
     NullScan = 0,
+    ConnectScan = 401,
 }
 
 pub struct PortScanOptions {
@@ -39,16 +42,25 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scan_options: &P
     let open_ports: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
     let close_ports: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(vec![]));
     let scan_status: Arc<Mutex<ScanStatus>> = Arc::new(Mutex::new(ScanStatus::Ready));
-    let (mut tx, mut rx) = match pnet::datalink::channel(&interface, Default::default()) {
-        Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => panic!("Unknown channel type"),
-        Err(e) => panic!("Error happened {}", e),
-    };
-    rayon::join(|| send_packets(&mut tx, &scan_options, &stop),
-                || receive_packets(&mut rx, &scan_options, &open_ports, &close_ports, &stop, &scan_status)
-    );
+    // run port scan
     match scan_options.scan_type {
-        PortScanType::SynScan | PortScanType::FinScan => {
+        PortScanType::ConnectScan => {
+            run_connect_scan(scan_options, &open_ports, &stop, &scan_status);
+        },
+        _ => {
+            let (mut tx, mut rx) = match pnet::datalink::channel(&interface, Default::default()) {
+                Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+                Ok(_) => panic!("Unknown channel type"),
+                Err(e) => panic!("Error happened {}", e),
+            };
+            rayon::join(|| send_packets(&mut tx, &scan_options, &stop),
+                        || receive_packets(&mut rx, &scan_options, &open_ports, &close_ports, &stop, &scan_status)
+            );
+        },
+    }
+    // parse results
+    match scan_options.scan_type {
+        PortScanType::SynScan | PortScanType::FinScan | PortScanType::ConnectScan => {
             for port in open_ports.lock().unwrap().iter(){
                 result.push(port.to_string());
             }
@@ -188,5 +200,34 @@ fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scan_options: &Po
                 }
             }
         },
+        _ => {},
     }
+}
+
+fn run_connect_scan(scan_options: &PortScanOptions, open_ports: &Arc<Mutex<Vec<String>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>){
+    let ip_addr = scan_options.dst_ip.clone();
+    let ports = scan_options.target_ports.clone();
+    let conn_timeout = Duration::from_millis(50);
+    let start_time = Instant::now();
+    ports.into_par_iter().for_each(|port| 
+        {
+            let socket_addr_str = format!("{}:{}", ip_addr, port);
+            let mut addrs = socket_addr_str.to_socket_addrs().unwrap();
+            if let Some(addr) = addrs.find(|x| (*x).is_ipv4()) {
+                match TcpStream::connect_timeout(&addr, conn_timeout) {
+                    Ok(_) => {
+                        open_ports.lock().unwrap().push(port.to_string());
+                    },
+                    Err(_) => {},
+                }
+            }
+            if Instant::now().duration_since(start_time) > scan_options.timeout {
+                *scan_status.lock().unwrap() = ScanStatus::Timeout;
+                *stop.lock().unwrap() = true;
+                return;
+            }
+        }
+    );
+    *scan_status.lock().unwrap() = ScanStatus::Done;
+    *stop.lock().unwrap() = true;
 }

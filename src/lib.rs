@@ -230,7 +230,7 @@ impl PortScanner{
     pub fn add_target_port(&mut self, port_num: u16){
         self.target_ports.push(port_num);
     }
-    /// Set scan type. Default is PortScanType::SynScan
+    /// Set PortScanType. Default is PortScanType::SynScan
     pub fn set_scan_type(&mut self, scan_type: PortScanType){
         self.scan_type = scan_type;
     }
@@ -238,9 +238,13 @@ impl PortScanner{
     pub fn set_timeout(&mut self, timeout: Duration){
         self.timeout = timeout;
     }
-    /// Set scan timeout  
+    /// Set scan wait-time  
     pub fn set_wait_time(&mut self, wait_time: Duration){
         self.wait_time = wait_time;
+    }
+    /// Set packet send rate
+    pub fn set_send_rate(&mut self, send_rate: Duration){
+        self.send_rate = send_rate;
     }
     /// Set source port number 
     pub fn set_src_port(&mut self, src_port: u16){
@@ -262,7 +266,7 @@ impl PortScanner{
     pub fn get_target_ports(&mut self) -> Vec<u16> {
         return self.target_ports.clone();
     }
-    /// Get port scan type
+    /// Get PortScanType
     pub fn get_scan_type(&mut self) -> PortScanType {
         return self.scan_type.clone();
     }
@@ -274,15 +278,29 @@ impl PortScanner{
     pub fn get_timeout(&mut self) -> Duration {
         return self.timeout.clone();
     }
-    /// Get wait time
+    /// Get wait-time
     pub fn get_wait_time(&mut self) -> Duration {
         return self.wait_time.clone();
+    }
+    /// Get send rate
+    pub fn get_send_rate(&mut self) -> Duration {
+        return self.send_rate.clone();
     }
     /// Run scan with current settings 
     /// 
     /// Results are stored in PortScanner::scan_result
     pub fn run_scan(&mut self){
-        let default_interface = default_net::get_default_interface().expect("Failed to get default interface information");
+        let dst_mac = match self.scan_type {
+            PortScanType::ConnectScan => {
+                pnet::datalink::MacAddr::zero()
+            },
+            _ => {
+                let default_interface = default_net::get_default_interface().expect("Failed to get default interface information");
+                default_interface.gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap()
+            },
+        };
+        //let default_interface = default_net::get_default_interface().expect("Failed to get default interface information");
+        //let gateway_mac = default_interface.gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap();
         let interfaces = pnet::datalink::interfaces();
         let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == self.if_index).next().expect("Failed to get Interface");    
         let mut iface_ip: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
@@ -307,7 +325,7 @@ impl PortScanner{
         }
         let ps_options: port::PortScanOptions = port::PortScanOptions {
             sender_mac: interface.mac.unwrap(),
-            target_mac: default_interface.gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap(),
+            target_mac: dst_mac,
             src_ip: iface_ip,
             dst_ip: self.target_ipaddr,    
             src_port: self.src_port_num,

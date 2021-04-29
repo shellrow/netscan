@@ -30,7 +30,12 @@ fn main() {
         println!("{}", port);
     }
     println!("Scan Time: {:?}", result.scan_time);
-    if port_scanner.get_wait_time() > Duration::from_millis(0) {
-        println!("(Including {:?} of wait time)", port_scanner.get_wait_time());
+    match port_scanner.get_scan_type() {
+        PortScanType::ConnectScan => {},
+        _=> {
+            if port_scanner.get_wait_time() > Duration::from_millis(0) {
+                println!("(Including {:?} of wait time)", port_scanner.get_wait_time());
+            }
+        },
     }
 }
