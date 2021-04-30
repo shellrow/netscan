@@ -83,7 +83,7 @@ pub struct HostScanResult {
 #[derive(Clone)]
 pub struct PortScanResult {
     /// List of open port  
-    pub open_ports: Vec<String>,
+    pub open_ports: Vec<u16>,
     /// Time from start to end of scan  
     pub scan_time: Duration,
     /// Scan job status
