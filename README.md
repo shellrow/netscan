@@ -15,7 +15,7 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.1.2"
+netscan = "0.2.0"
 ```
 
 ## Example
@@ -53,8 +53,13 @@ fn main() {
         println!("{}", port);
     }
     println!("Scan Time: {:?}", result.scan_time);
-    if port_scanner.get_wait_time() > Duration::from_millis(0) {
-        println!("(Including {:?} of wait time)", port_scanner.get_wait_time());
+    match port_scanner.get_scan_type() {
+        PortScanType::ConnectScan => {},
+        _=> {
+            if port_scanner.get_wait_time() > Duration::from_millis(0) {
+                println!("(Including {:?} of wait time)", port_scanner.get_wait_time());
+            }
+        },
     }
 }
 ```
@@ -67,4 +72,5 @@ For more details see [Examples][examples-url]
 - Windows
 
 ## Additional Notes
-This library requires the ability to create raw sockets.  Execute with root user privileges.  
+This library requires the ability to create raw sockets.  Execute with administrator privileges.  
+(The default SYN SCAN is recommended, but CONNECT SCAN without administrator privileges is also possible.)
