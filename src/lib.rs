@@ -174,7 +174,7 @@ impl HostScanner{
 }
 
 impl PortScanner{
-    /// Construct new PortScanner (with network interface index or name)
+    /// Construct new PortScanner (with network interface name)
     /// 
     /// Specify None for default. `PortScanner::new(None)`
     pub fn new(_if_name: Option<&str>) -> NewPortScannerResult{
