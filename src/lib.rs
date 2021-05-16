@@ -16,6 +16,7 @@ mod host;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 use default_net;
+use pnet::datalink::MacAddr;
 
 pub use port::PortScanType;
 pub use status::ScanStatus;
@@ -29,6 +30,7 @@ pub type NewPortScannerResult = Result<PortScanner, String>;
 /// Structure for host scan  
 /// 
 /// Should be constructed using HostScanner::new 
+#[derive(Clone)]
 pub struct HostScanner {
     /// Source IP Address  
     src_ipaddr: IpAddr,
@@ -45,19 +47,26 @@ pub struct HostScanner {
 /// Structure for port scan  
 /// 
 /// Should be constructed using PortScanner::new 
+#[derive(Clone)]
 pub struct PortScanner {
     /// Index of network interface  
     if_index: u32,
     /// Name of network interface  
     if_name: String,
-    /// IP Address of target host  
-    target_ipaddr: Ipv4Addr, 
-    /// List of target host  
-    target_ports: Vec<u16>,
+    /// Source MAC Address
+    sender_mac: MacAddr,
+    /// Destination MAC Address
+    target_mac: MacAddr,
+    /// Source IP Address  
+    src_ipaddr: Ipv4Addr,
+    /// Destination IP Address  
+    dst_ipaddr: Ipv4Addr,
+    /// Source port
+    src_port: u16,
+    /// Destination port  
+    dst_ports: Vec<u16>,
     /// Type of port scan. Default is PortScanType::SynScan  
     scan_type: PortScanType,
-    /// Source port number  
-    src_port_num: u16,
     /// Timeout setting of port scan   
     timeout: Duration,
     /// Wait time after send task is finished
@@ -102,7 +111,7 @@ impl HostScanner{
             src_ipaddr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             target_hosts: vec![],
             timeout: Duration::from_millis(10000),
-            wait_time: Duration::from_millis(300),
+            wait_time: Duration::from_millis(200),
             scan_result: ini_scan_result,
         };
         Ok(host_scanner)
@@ -151,13 +160,9 @@ impl HostScanner{
     /// 
     /// Results are stored in HostScanner::scan_result
     pub fn run_scan(&mut self){
-        let hs_options: host::HostScanOptions = host::HostScanOptions {
-            target_hosts: self.target_hosts.clone(),
-            timeout: self.timeout,
-            wait_time: self.wait_time,
-        };
+        let temp_scanner = self.clone();
         let start_time = Instant::now();
-        let (uphosts, status) = host::scan_hosts(&hs_options);
+        let (uphosts, status) = host::scan_hosts(&temp_scanner);
         self.scan_result.up_hosts = uphosts;
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);
@@ -181,10 +186,13 @@ impl PortScanner{
         let mut port_scanner = PortScanner{
             if_index: 0,
             if_name: String::new(),
-            target_ipaddr: Ipv4Addr::new(127, 0, 0, 1), 
-            target_ports: vec![],
+            sender_mac: MacAddr::zero(),
+            target_mac: MacAddr::zero(),
+            src_ipaddr: Ipv4Addr::new(127, 0, 0, 1),
+            dst_ipaddr: Ipv4Addr::new(127, 0, 0, 1), 
+            src_port: 65432,
+            dst_ports: vec![],
             scan_type: PortScanType::SynScan,
-            src_port_num: 65432,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(100),
             send_rate: Duration::from_millis(1),
@@ -213,7 +221,7 @@ impl PortScanner{
         let ipv4addr = ipaddr.parse::<Ipv4Addr>();
         match ipv4addr {
             Ok(valid_ipaddr) => {
-                self.target_ipaddr = valid_ipaddr;
+                self.dst_ipaddr = valid_ipaddr;
             }
             Err(e) => {
                 error!("Error setting IP Address {}. Error: {}", ipaddr, e);
@@ -228,7 +236,7 @@ impl PortScanner{
     }
     /// Add target port 
     pub fn add_target_port(&mut self, port_num: u16){
-        self.target_ports.push(port_num);
+        self.dst_ports.push(port_num);
     }
     /// Set PortScanType. Default is PortScanType::SynScan
     pub fn set_scan_type(&mut self, scan_type: PortScanType){
@@ -248,7 +256,7 @@ impl PortScanner{
     }
     /// Set source port number 
     pub fn set_src_port(&mut self, src_port: u16){
-        self.src_port_num = src_port;
+        self.src_port = src_port;
     }
     /// Get network interface index
     pub fn get_if_index(&mut self) -> u32 {
@@ -260,11 +268,11 @@ impl PortScanner{
     }
     /// Get target ip address
     pub fn get_target_ipaddr(&mut self) -> Ipv4Addr {
-        return self.target_ipaddr.clone();
+        return self.dst_ipaddr.clone();
     }
     /// Get target ports
     pub fn get_target_ports(&mut self) -> Vec<u16> {
-        return self.target_ports.clone();
+        return self.dst_ports.clone();
     }
     /// Get PortScanType
     pub fn get_scan_type(&mut self) -> PortScanType {
@@ -272,7 +280,7 @@ impl PortScanner{
     }
     /// Get source port number
     pub fn get_src_port_num(&mut self) -> u16 {
-        return self.src_port_num.clone();
+        return self.src_port.clone();
     }
     /// Get timeout
     pub fn get_timeout(&mut self) -> Duration {
@@ -295,12 +303,10 @@ impl PortScanner{
                 pnet::datalink::MacAddr::zero()
             },
             _ => {
-                let default_interface = default_net::get_default_interface().expect("Failed to get default interface information");
-                default_interface.gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap()
+                let default_gateway = default_net::get_default_gateway();
+                default_gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap()
             },
         };
-        //let default_interface = default_net::get_default_interface().expect("Failed to get default interface information");
-        //let gateway_mac = default_interface.gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap();
         let interfaces = pnet::datalink::interfaces();
         let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == self.if_index).next().expect("Failed to get Interface");    
         let mut iface_ip: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
@@ -320,23 +326,12 @@ impl PortScanner{
                 },
             }
         }
-        if iface_ip == Ipv4Addr::new(127, 0, 0, 1) {
-            error!("Error: Interface IP is IPv6 (or unknown) which is not currently supported");
-        }
-        let ps_options: port::PortScanOptions = port::PortScanOptions {
-            sender_mac: interface.mac.unwrap(),
-            target_mac: dst_mac,
-            src_ip: iface_ip,
-            dst_ip: self.target_ipaddr,    
-            src_port: self.src_port_num,
-            target_ports: self.target_ports.clone(),
-            scan_type: self.scan_type,
-            timeout: self.timeout,
-            wait_time: self.wait_time,
-            send_rate: self.send_rate,
-        };
+        self.sender_mac = interface.mac.unwrap();
+        self.target_mac = dst_mac;
+        self.src_ipaddr = iface_ip;
+        let temp_scanner = self.clone();
         let start_time = Instant::now();
-        let (open_ports, status) = port::scan_ports(&interface, &ps_options);
+        let (open_ports, status) = port::scan_ports(&interface, &temp_scanner);
         self.scan_result.open_ports = open_ports;
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);

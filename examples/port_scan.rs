@@ -10,7 +10,7 @@ fn main() {
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     port_scanner.set_target_ipaddr("192.168.1.8");
-    port_scanner.set_range(1, 1024);
+    port_scanner.set_range(1, 1000);
     //port_scanner.add_target_port(22);
     //port_scanner.add_target_port(80);
     //port_scanner.add_target_port(443);
