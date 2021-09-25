@@ -11,7 +11,7 @@ pub fn get_interface_index_by_name(if_name: String) -> Option<u32> {
 }
 
 #[cfg(target_os="windows")]
-pub fn get_default_gateway_macaddr() {
+pub fn get_default_gateway_macaddr() -> MacAddr {
     let default_gateway = default_net::get_default_gateway();
     default_gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap()
 }
