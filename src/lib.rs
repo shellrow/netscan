@@ -306,8 +306,7 @@ impl PortScanner{
                 pnet::datalink::MacAddr::zero()
             },
             _ => {
-                let default_gateway = default_net::get_default_gateway();
-                default_gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap()
+                interface::get_default_gateway_macaddr()
             },
         };
         let interfaces = pnet::datalink::interfaces();
