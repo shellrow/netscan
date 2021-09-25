@@ -15,7 +15,7 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.3.0"
+netscan = "0.4.0"
 ```
 
 ## Example
@@ -32,7 +32,7 @@ fn main() {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    port_scanner.set_target_ipaddr("192.168.1.8");
+    port_scanner.set_target_ipaddr("192.168.1.1");
     port_scanner.set_range(1, 1024);
     //port_scanner.add_target_port(22);
     //port_scanner.add_target_port(80);
@@ -68,7 +68,7 @@ For more details see [Examples][examples-url]
 
 ## Supported platform
 - Linux
-- macOS(OS X)
+- macOS
 - Windows
 
 ## Additional Notes
