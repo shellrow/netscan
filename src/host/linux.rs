@@ -42,7 +42,6 @@ fn send_icmp_packet(tx: &mut pnet::transport::TransportSender, stop: &Arc<Mutex<
     *stop.lock().unwrap() = true;
 }
 
-#[cfg(any(unix, macos))]
 fn receive_packets(
     rx: &mut pnet::transport::TransportReceiver, 
     scanner: &HostScanner,
@@ -60,37 +59,6 @@ fn receive_packets(
                     }
                 }else{
                     error!("Failed to read packet");
-                }
-            },
-            Err(e) => {
-                error!("An error occurred while reading: {}", e);
-            }
-        }
-        if *stop.lock().unwrap(){
-            *scan_status.lock().unwrap() = ScanStatus::Done;
-            break;
-        }
-        if Instant::now().duration_since(start_time) > scanner.timeout {
-            *scan_status.lock().unwrap() = ScanStatus::Timeout;
-            break;
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn receive_packets(
-    rx: &mut pnet::transport::TransportReceiver, 
-    scanner: &HostScanner,
-    stop: &Arc<Mutex<bool>>, 
-    up_hosts: &Arc<Mutex<Vec<IpAddr>>>, 
-    scan_status: &Arc<Mutex<ScanStatus>>){
-    let mut iter = icmp_packet_iter(rx);
-    let start_time = Instant::now();
-    loop {
-        match iter.next() {
-            Ok((_packet, addr)) => {
-                if scanner.target_hosts.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
-                    up_hosts.lock().unwrap().push(addr);
                 }
             },
             Err(e) => {
