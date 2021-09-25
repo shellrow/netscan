@@ -16,7 +16,7 @@ use crate::PortScanner;
 
 /// Type of port scan 
 /// 
-/// Supports SynScan, FinScan, XmasScan, NullScan, ConnectScan
+/// Supports SynScan, ConnectScan
 #[derive(Clone, Copy)]
 pub enum PortScanType {
     SynScan = pnet::packet::tcp::TcpFlags::SYN as isize,
