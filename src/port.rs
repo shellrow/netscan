@@ -1,9 +1,5 @@
+#[cfg(target_os = "windows")]
 use crate::{tcp, ipv4, ethernet};
-use crate::packet::EndPoints;
-use crate::status::ScanStatus;
-use std::thread;
-use std::sync::{Arc, Mutex};
-use pnet::packet::Packet;
 
 #[cfg(any(unix, macos))]
 use pnet::packet::ip::IpNextHeaderProtocols;
@@ -18,6 +14,11 @@ use pnet::transport::{TransportSender, transport_channel};
 #[cfg(any(unix, macos))]
 use std::net::{IpAddr, Ipv4Addr};
 
+use crate::packet::EndPoints;
+use crate::status::ScanStatus;
+use std::thread;
+use std::sync::{Arc, Mutex};
+use pnet::packet::Packet;
 use std::time::{Duration, Instant};
 use rayon::prelude::*;
 use std::net::{ToSocketAddrs,TcpStream};
@@ -139,34 +140,6 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
     return (result, *scan_status.lock().unwrap());
 }
 
-fn build_packet(scanner: &PortScanner, tmp_packet: &mut [u8], target_port: u16){
-    // Setup Ethernet header
-    let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(&mut tmp_packet[..ethernet::ETHERNET_HEADER_LEN]).unwrap();
-    ethernet::build_ethernet_packet(&mut eth_header, scanner.sender_mac, scanner.target_mac, ethernet::EtherType::Ipv4);
-    // Setup IP header
-    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(&mut tmp_packet[ethernet::ETHERNET_HEADER_LEN..(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)]).unwrap();
-    match scanner.scan_type {
-        _ => {
-            ipv4::build_ipv4_packet(&mut ip_header, scanner.src_ipaddr, scanner.dst_ipaddr, ipv4::IpNextHeaderProtocol::Tcp);
-            // Setup TCP header
-            let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(&mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
-            tcp::build_tcp_packet(&mut tcp_header, scanner.src_ipaddr, scanner.src_port, scanner.dst_ipaddr, target_port, &scanner.scan_type);
-        },
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn send_packets(tx: &mut Box<dyn pnet::datalink::DataLinkSender>, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
-    for port in scanner.dst_ports.clone() {
-        thread::sleep(scanner.send_rate);
-        tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
-            build_packet(scanner, packet, port);
-        });
-    }
-    thread::sleep(scanner.wait_time);
-    *stop.lock().unwrap() = true;
-}
-
 #[cfg(any(unix, macos))]
 fn send_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
     for port in scanner.dst_ports.clone() {
@@ -191,11 +164,40 @@ fn send_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mute
 
         match tx.send_to(tcp_packet, IpAddr::V4(dst_ip_addr)) {
             Ok(_) => {},
-            Err(e) => {
-                println!("Error!: {}", e);
-            },
+            Err(_) => {},
         }
+        thread::sleep(scanner.send_rate);
     }
+    thread::sleep(scanner.wait_time);
+    *stop.lock().unwrap() = true;
+}
+
+#[cfg(target_os = "windows")]
+fn build_packet(scanner: &PortScanner, tmp_packet: &mut [u8], target_port: u16){
+    // Setup Ethernet header
+    let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(&mut tmp_packet[..ethernet::ETHERNET_HEADER_LEN]).unwrap();
+    ethernet::build_ethernet_packet(&mut eth_header, scanner.sender_mac, scanner.target_mac, ethernet::EtherType::Ipv4);
+    // Setup IP header
+    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(&mut tmp_packet[ethernet::ETHERNET_HEADER_LEN..(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)]).unwrap();
+    match scanner.scan_type {
+        _ => {
+            ipv4::build_ipv4_packet(&mut ip_header, scanner.src_ipaddr, scanner.dst_ipaddr, ipv4::IpNextHeaderProtocol::Tcp);
+            // Setup TCP header
+            let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(&mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
+            tcp::build_tcp_packet(&mut tcp_header, scanner.src_ipaddr, scanner.src_port, scanner.dst_ipaddr, target_port, &scanner.scan_type);
+        },
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn send_packets(tx: &mut Box<dyn pnet::datalink::DataLinkSender>, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
+    for port in scanner.dst_ports.clone() {
+        tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
+            build_packet(scanner, packet, port);
+        });
+        thread::sleep(scanner.send_rate);
+    }
+    thread::sleep(scanner.wait_time);
     *stop.lock().unwrap() = true;
 }
 

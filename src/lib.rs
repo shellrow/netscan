@@ -3,10 +3,13 @@ extern crate log;
 
 mod interface;
 mod arp;
+#[cfg(target_os = "windows")]
 mod ethernet;
+#[cfg(target_os = "windows")]
 mod ipv4;
-mod icmp;
+#[cfg(target_os = "windows")]
 mod tcp;
+mod icmp;
 mod udp;
 mod packet;
 mod status;
@@ -195,7 +198,7 @@ impl PortScanner{
             scan_type: PortScanType::SynScan,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(100),
-            send_rate: Duration::from_millis(1),
+            send_rate: Duration::from_millis(0),
             scan_result: ini_scan_result,
         };
         if let Some(if_name) = _if_name {
