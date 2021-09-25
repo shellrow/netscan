@@ -4,6 +4,13 @@ use crate::status::ScanStatus;
 use std::thread;
 use std::sync::{Arc, Mutex};
 use pnet::packet::Packet;
+use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet::packet::tcp::MutableTcpPacket;
+use pnet::transport::TransportChannelType::Layer4;
+use pnet::transport::TransportProtocol::Ipv4;
+use pnet::transport::{transport_channel};
+use pnet::transport::{TransportSender};
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 use rayon::prelude::*;
 use std::net::{ToSocketAddrs,TcpStream};
@@ -33,16 +40,27 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
         PortScanType::ConnectScan => {
             run_connect_scan(scanner, &open_ports, &stop, &scan_status);
         },
-        _ => {
-            let (mut tx, mut rx) = match pnet::datalink::channel(&interface, Default::default()) {
+        PortScanType::SynScan => {
+            let (mut _tx, mut rx) = match pnet::datalink::channel(&interface, Default::default()) {
                 Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
                 Ok(_) => panic!("Unknown channel type"),
                 Err(e) => panic!("Error happened {}", e),
             };
-            rayon::join(|| send_packets(&mut tx, scanner, &stop),
+            let protocol = Layer4(Ipv4(IpNextHeaderProtocols::Tcp));
+            let (mut tx, mut _rx) = match transport_channel(4096, protocol) {
+                Ok((tx, rx)) => (tx, rx),
+                Err(e) => panic!(
+                    "An error occurred when creating the transport channel: {}",
+                    e
+                ),
+            };
+            rayon::join(|| send_packets2(&mut tx, scanner, &stop),
                         || receive_packets(&mut rx, scanner, &open_ports, &close_ports, &stop, &scan_status)
             );
         },
+        _ => {
+
+        }
     }
     // parse results
     match scanner.scan_type {
@@ -89,6 +107,37 @@ fn send_packets(tx: &mut Box<dyn pnet::datalink::DataLinkSender>, scanner: &Port
         });
     }
     thread::sleep(scanner.wait_time);
+    *stop.lock().unwrap() = true;
+}
+
+fn send_packets2(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
+    for port in scanner.dst_ports.clone() {
+        let src_ip_addr: Ipv4Addr = scanner.src_ipaddr;
+        let dst_ip_addr: Ipv4Addr = scanner.dst_ipaddr;
+        let mut vec: Vec<u8> = vec![0; 1024];
+        let mut tcp_packet = MutableTcpPacket::new(&mut vec[..]).unwrap();
+        tcp_packet.set_source(scanner.src_port);
+        tcp_packet.set_destination(port);
+        tcp_packet.set_window(64240);
+        tcp_packet.set_data_offset(8);
+        tcp_packet.set_urgent_ptr(0);
+        tcp_packet.set_sequence(0);
+        tcp_packet.set_options(&[pnet::packet::tcp::TcpOption::mss(1460)
+        , pnet::packet::tcp::TcpOption::sack_perm()
+        , pnet::packet::tcp::TcpOption::nop()
+        , pnet::packet::tcp::TcpOption::nop()
+        , pnet::packet::tcp::TcpOption::wscale(7)]);
+        tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
+        let checksum = pnet::packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip_addr, &dst_ip_addr);
+        tcp_packet.set_checksum(checksum);
+
+        match tx.send_to(tcp_packet, IpAddr::V4(dst_ip_addr)) {
+            Ok(_) => {},
+            Err(e) => {
+                println!("Error!: {}", e);
+            },
+        }
+    }
     *stop.lock().unwrap() = true;
 }
 
