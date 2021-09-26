@@ -21,7 +21,7 @@ fn main() {
     let result = port_scanner.get_result();
     print!("Status: ");
     match result.scan_status {
-        ScanStatus::Done => {println!("Normal end")},
+        ScanStatus::Done => {println!("Done")},
         ScanStatus::Timeout => {println!("Timed out")},
         _ => {println!("Error")},
     }
