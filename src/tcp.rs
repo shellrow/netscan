@@ -17,15 +17,6 @@ pub fn build_tcp_packet(tcp_packet:&mut pnet::packet::tcp::MutableTcpPacket, src
         PortScanType::SynScan => {
             tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
         },
-        PortScanType::FinScan => {
-            tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::FIN);
-        },
-        PortScanType::XmasScan => {
-            tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::FIN | pnet::packet::tcp::TcpFlags::URG | pnet::packet::tcp::TcpFlags::PSH);
-        },
-        PortScanType::NullScan => {
-            tcp_packet.set_flags(0);
-        },
         _ => {
             tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
         },

@@ -15,9 +15,6 @@ use crate::PortScanner;
 #[derive(Clone, Copy)]
 pub enum PortScanType {
     SynScan = pnet::packet::tcp::TcpFlags::SYN as isize,
-    FinScan = pnet::packet::tcp::TcpFlags::FIN as isize,
-    XmasScan = pnet::packet::tcp::TcpFlags::FIN as isize | pnet::packet::tcp::TcpFlags::URG as isize | pnet::packet::tcp::TcpFlags::PSH as isize,
-    NullScan = 0,
     ConnectScan = 401,
 }
 
@@ -26,7 +23,6 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
     let mut result = vec![];
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     let open_ports: Arc<Mutex<Vec<u16>>> = Arc::new(Mutex::new(vec![]));
-    let close_ports: Arc<Mutex<Vec<u16>>> = Arc::new(Mutex::new(vec![]));
     let scan_status: Arc<Mutex<ScanStatus>> = Arc::new(Mutex::new(ScanStatus::Ready));
     // run port scan
     match scanner.scan_type {
@@ -34,35 +30,28 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
             run_connect_scan(scanner, &open_ports, &stop, &scan_status);
         },
         PortScanType::SynScan => {
-            let (mut tx, mut rx) = match pnet::datalink::channel(&interface, Default::default()) {
+            let config = pnet::datalink::Config {
+                write_buffer_size: 4096,
+                read_buffer_size: 4096,
+                read_timeout: None,
+                write_timeout: None,
+                channel_type: pnet::datalink::ChannelType::Layer2,
+                bpf_fd_attempts: 1000,
+                linux_fanout: None,
+                promiscuous: false,
+            };
+            let (mut tx, mut rx) = match pnet::datalink::channel(&interface, config) {
                 Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
                 Ok(_) => panic!("Unknown channel type"),
                 Err(e) => panic!("Error happened {}", e),
             };
             rayon::join(|| send_packets(&mut tx, scanner, &stop),
-                        || receive_packets(&mut rx, scanner, &open_ports, &close_ports, &stop, &scan_status)
+                        || receive_packets(&mut rx, scanner, &open_ports, &stop, &scan_status)
             );
-        },
-        _ => {
-
         }
     }
-    // parse results
-    match scanner.scan_type {
-        PortScanType::SynScan | PortScanType::FinScan | PortScanType::ConnectScan => {
-            for port in open_ports.lock().unwrap().iter(){
-                result.push(port.clone());
-            }
-        },
-        PortScanType::XmasScan | PortScanType::NullScan => {
-            if close_ports.lock().unwrap().len() > 0 {
-                for port in &scanner.dst_ports {
-                    if !close_ports.lock().unwrap().contains(&port){
-                        result.push(port.clone());
-                    }
-                }
-            }
-        },
+    for port in open_ports.lock().unwrap().iter(){
+        result.push(port.clone());
     }
     result.sort();
     return (result, *scan_status.lock().unwrap());
@@ -98,8 +87,7 @@ fn send_packets(tx: &mut Box<dyn pnet::datalink::DataLinkSender>, scanner: &Port
 fn receive_packets(
     rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, 
     scanner: &PortScanner, 
-    open_ports: &Arc<Mutex<Vec<u16>>>, 
-    close_ports: &Arc<Mutex<Vec<u16>>>, 
+    open_ports: &Arc<Mutex<Vec<u16>>>,  
     stop: &Arc<Mutex<bool>>, 
     scan_status: &Arc<Mutex<ScanStatus>>) {
     let start_time = Instant::now();
@@ -109,10 +97,10 @@ fn receive_packets(
                 let frame = pnet::packet::ethernet::EthernetPacket::new(frame).unwrap();
                 match frame.get_ethertype() {
                     pnet::packet::ethernet::EtherTypes::Ipv4 => {
-                        ipv4_handler(&frame, scanner, &open_ports, &close_ports);
+                        ipv4_handler(&frame, scanner, &open_ports);
                     },
                     pnet::packet::ethernet::EtherTypes::Ipv6 => {
-                        ipv6_handler(&frame, scanner, &open_ports, &close_ports);
+                        ipv6_handler(&frame, scanner, &open_ports);
                     },
                     _ => {},
                 }
@@ -132,76 +120,64 @@ fn receive_packets(
     }
 }
 
-fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, close_ports: &Arc<Mutex<Vec<u16>>>) {
+fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
     if let Some(packet) = pnet::packet::ipv4::Ipv4Packet::new(ethernet.payload()){
         match packet.get_next_level_protocol() {
             pnet::packet::ip::IpNextHeaderProtocols::Tcp => {
-                tcp_handler(&packet, scanner, &open_ports, &close_ports);
+                tcp_handler(&packet, scanner, &open_ports);
             },
             pnet::packet::ip::IpNextHeaderProtocols::Udp => {
-                udp_handler(&packet, scanner, &open_ports, &close_ports);
+                udp_handler(&packet, scanner, &open_ports);
             },
             _ => {}
         }
     }
 }
 
-fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, close_ports: &Arc<Mutex<Vec<u16>>>) {
+fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
     if let Some(packet) = pnet::packet::ipv6::Ipv6Packet::new(ethernet.payload()){
         match packet.get_next_header() {
             pnet::packet::ip::IpNextHeaderProtocols::Tcp => {
-                tcp_handler(&packet, scanner, &open_ports, &close_ports);
+                tcp_handler(&packet, scanner, &open_ports);
             },
             pnet::packet::ip::IpNextHeaderProtocols::Udp => {
-                udp_handler(&packet, scanner, &open_ports, &close_ports);
+                udp_handler(&packet, scanner, &open_ports);
             },
             _ => {}
         }
     }
 }
 
-fn tcp_handler(packet: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, close_ports: &Arc<Mutex<Vec<u16>>>) {
+fn tcp_handler(packet: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
     let tcp = pnet::packet::tcp::TcpPacket::new(packet.get_payload());
     if let Some(tcp) = tcp {
         match scanner.scan_type {
             PortScanType::SynScan => {
                 if tcp.get_flags() == pnet::packet::tcp::TcpFlags::SYN | pnet::packet::tcp::TcpFlags::ACK {
-                    append_packet_info(packet, &tcp, scanner, &open_ports, &close_ports);
+                    append_packet_info(packet, &tcp, scanner, &open_ports);
                 }
             },
             _ => {
                 if tcp.get_flags() == pnet::packet::tcp::TcpFlags::RST {
-                    append_packet_info(packet, &tcp, scanner, &open_ports, &close_ports);
+                    append_packet_info(packet, &tcp, scanner, &open_ports);
                 }
             },
         }
     }
 }
 
-fn udp_handler(packet: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, close_ports: &Arc<Mutex<Vec<u16>>>) {
+fn udp_handler(packet: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
     let udp = pnet::packet::udp::UdpPacket::new(packet.get_payload());
     if let Some(udp) = udp {
-        append_packet_info(packet, &udp, scanner, &open_ports, &close_ports);
+        append_packet_info(packet, &udp, scanner, &open_ports);
     }
 }
 
-fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, close_ports: &Arc<Mutex<Vec<u16>>>) {
-    match scanner.scan_type {
-        PortScanType::SynScan | PortScanType::FinScan => {
-            if l4.get_destination() == scanner.src_port.to_string() {
-                if !open_ports.lock().unwrap().contains(&l4.get_source().parse::<u16>().unwrap()){
-                    open_ports.lock().unwrap().push(l4.get_source().parse::<u16>().unwrap());
-                }
-            }
-        },
-        PortScanType::XmasScan | PortScanType::NullScan => {
-            if l4.get_destination() == scanner.src_port.to_string() {
-                if !close_ports.lock().unwrap().contains(&l4.get_source().parse::<u16>().unwrap()){
-                    close_ports.lock().unwrap().push(l4.get_source().parse::<u16>().unwrap());
-                }
-            }
-        },
-        _ => {},
+fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
+    if l4.get_destination() == scanner.src_port.to_string() {
+        if !open_ports.lock().unwrap().contains(&l4.get_source().parse::<u16>().unwrap()){
+            open_ports.lock().unwrap().push(l4.get_source().parse::<u16>().unwrap());
+        }
     }
 }
 
