@@ -13,15 +13,7 @@ use std::net::{ToSocketAddrs,TcpStream};
 use crate::packet::EndPoints;
 use crate::status::ScanStatus;
 use crate::PortScanner;
-
-/// Type of port scan 
-/// 
-/// Supports SynScan, ConnectScan
-#[derive(Clone, Copy)]
-pub enum PortScanType {
-    SynScan = pnet::packet::tcp::TcpFlags::SYN as isize,
-    ConnectScan = 401,
-}
+use crate::scanner::shared::PortScanType;
 
 pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner) -> (Vec<u16>, ScanStatus)
 {
@@ -35,32 +27,7 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
             run_connect_scan(scanner, &open_ports, &stop, &scan_status);
         },
         PortScanType::SynScan => {
-            let config = pnet::datalink::Config {
-                write_buffer_size: 4096,
-                read_buffer_size: 4096,
-                read_timeout: None,
-                write_timeout: None,
-                channel_type: pnet::datalink::ChannelType::Layer2,
-                bpf_fd_attempts: 1000,
-                linux_fanout: None,
-                promiscuous: false,
-            };
-            let (mut _tx, mut rx) = match pnet::datalink::channel(&interface, config) {
-                Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-                Ok(_) => panic!("Unknown channel type"),
-                Err(e) => panic!("Error happened {}", e),
-            };
-            let protocol = Layer4(Ipv4(IpNextHeaderProtocols::Tcp));
-            let (mut tx, mut _rx) = match transport_channel(4096, protocol) {
-                Ok((tx, rx)) => (tx, rx),
-                Err(e) => panic!(
-                    "An error occurred when creating the transport channel: {}",
-                    e
-                ),
-            };
-            rayon::join(|| send_packets(&mut tx, scanner, &stop),
-                        || receive_packets(&mut rx, scanner, &open_ports, &stop, &scan_status)
-            );
+            run_syn_scan(interface, scanner, &open_ports, &stop, &scan_status);
         }
     }
     for port in open_ports.lock().unwrap().iter(){
@@ -68,6 +35,64 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
     }
     result.sort();
     return (result, *scan_status.lock().unwrap());
+}
+
+fn run_syn_scan(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner,open_ports: &Arc<Mutex<Vec<u16>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>) {
+    let config = pnet::datalink::Config {
+        write_buffer_size: 4096,
+        read_buffer_size: 4096,
+        read_timeout: None,
+        write_timeout: None,
+        channel_type: pnet::datalink::ChannelType::Layer2,
+        bpf_fd_attempts: 1000,
+        linux_fanout: None,
+        promiscuous: false,
+    };
+    let (mut _tx, mut rx) = match pnet::datalink::channel(&interface, config) {
+        Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+        Ok(_) => panic!("Unknown channel type"),
+        Err(e) => panic!("Error happened {}", e),
+    };
+    let protocol = Layer4(Ipv4(IpNextHeaderProtocols::Tcp));
+    let (mut tx, mut _rx) = match transport_channel(4096, protocol) {
+        Ok((tx, rx)) => (tx, rx),
+        Err(e) => panic!(
+            "An error occurred when creating the transport channel: {}",
+            e
+        ),
+    };
+    rayon::join(|| send_packets(&mut tx, scanner, &stop),
+                || receive_packets(&mut rx, scanner, &open_ports, &stop, &scan_status)
+    );
+}
+
+fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>){
+    let ip_addr = scanner.dst_ipaddr.clone();
+    let ports = scanner.dst_ports.clone();
+    let timeout = scanner.timeout.clone();
+    let conn_timeout = Duration::from_millis(50);
+    let start_time = Instant::now();
+    ports.into_par_iter().for_each(|port| 
+        {
+            let socket_addr_str = format!("{}:{}", ip_addr, port);
+            let mut addrs = socket_addr_str.to_socket_addrs().unwrap();
+            if let Some(addr) = addrs.find(|x| (*x).is_ipv4()) {
+                match TcpStream::connect_timeout(&addr, conn_timeout) {
+                    Ok(_) => {
+                        open_ports.lock().unwrap().push(port);
+                    },
+                    Err(_) => {},
+                }
+            }
+            if Instant::now().duration_since(start_time) > timeout {
+                *scan_status.lock().unwrap() = ScanStatus::Timeout;
+                *stop.lock().unwrap() = true;
+                return;
+            }
+        }
+    );
+    *scan_status.lock().unwrap() = ScanStatus::Done;
+    *stop.lock().unwrap() = true;
 }
 
 fn send_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
@@ -189,31 +214,3 @@ fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scanner: &PortSca
     }
 }
 
-fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>){
-    let ip_addr = scanner.dst_ipaddr.clone();
-    let ports = scanner.dst_ports.clone();
-    let timeout = scanner.timeout.clone();
-    let conn_timeout = Duration::from_millis(50);
-    let start_time = Instant::now();
-    ports.into_par_iter().for_each(|port| 
-        {
-            let socket_addr_str = format!("{}:{}", ip_addr, port);
-            let mut addrs = socket_addr_str.to_socket_addrs().unwrap();
-            if let Some(addr) = addrs.find(|x| (*x).is_ipv4()) {
-                match TcpStream::connect_timeout(&addr, conn_timeout) {
-                    Ok(_) => {
-                        open_ports.lock().unwrap().push(port);
-                    },
-                    Err(_) => {},
-                }
-            }
-            if Instant::now().duration_since(start_time) > timeout {
-                *scan_status.lock().unwrap() = ScanStatus::Timeout;
-                *stop.lock().unwrap() = true;
-                return;
-            }
-        }
-    );
-    *scan_status.lock().unwrap() = ScanStatus::Done;
-    *stop.lock().unwrap() = true;
-}

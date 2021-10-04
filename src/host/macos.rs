@@ -1,6 +1,6 @@
 use crate::icmp;
 use crate::status::ScanStatus;
-use crate::HostScanner;
+use crate::scanner::blocking::HostScanner;
 use std::{thread, time};
 use std::time::Instant;
 use std::net::IpAddr;
