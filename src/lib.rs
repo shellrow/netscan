@@ -12,13 +12,11 @@ mod tcp;
 mod icmp;
 mod udp;
 mod packet;
-mod status;
 mod port;
 mod host;
 mod scanner;
 
-pub use status::ScanStatus;
-pub use scanner::shared::PortScanType;
+pub use scanner::shared::{PortScanType, ScanStatus};
 pub use scanner::shared::{PortScanResult, HostScanResult};
 pub use scanner::blocking::{PortScanner, HostScanner};
 pub use scanner::async_sc::{AsyncPortScanner, AsyncHostScanner};

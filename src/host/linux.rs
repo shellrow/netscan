@@ -1,5 +1,5 @@
 use crate::icmp;
-use crate::status::ScanStatus;
+use crate::scanner::shared::{ScanStatus};
 use crate::scanner::blocking::HostScanner;
 use std::{thread, time};
 use std::time::Instant;

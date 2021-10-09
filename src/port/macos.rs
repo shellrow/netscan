@@ -11,11 +11,10 @@ use std::time::{Duration, Instant};
 use rayon::prelude::*;
 use std::net::{ToSocketAddrs,TcpStream};
 use crate::packet::EndPoints;
-use crate::status::ScanStatus;
 use crate::PortScanner;
-use crate::scanner::shared::PortScanType;
+use crate::scanner::shared::{PortScanType, PortStatus, PortInfo, ScanStatus};
 
-pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner) -> (Vec<u16>, ScanStatus)
+pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner) -> (Vec<PortInfo>, ScanStatus)
 {
     let mut result = vec![];
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
@@ -30,10 +29,14 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
             run_syn_scan(interface, scanner, &open_ports, &stop, &scan_status);
         }
     }
-    for port in open_ports.lock().unwrap().iter(){
-        result.push(port.clone());
+    open_ports.lock().unwrap().sort();
+    for port in open_ports.lock().unwrap().iter() {
+        let port_info = PortInfo {
+            port: port.clone(),
+            status: PortStatus::Open,
+        };
+        result.push(port_info);
     }
-    result.sort();
     return (result, *scan_status.lock().unwrap());
 }
 

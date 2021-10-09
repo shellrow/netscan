@@ -1,13 +1,36 @@
 use std::time::Duration;
-use crate::status::ScanStatus;
+
+pub const DEFAULT_SRC_PORT: u16 = 53443;
+
+/// Scan status of current scanner 
+#[derive(Clone, Copy, Debug)]
+pub enum ScanStatus {
+    Ready,
+    Done,
+    Timeout,
+    Error,
+}
 
 /// Type of port scan 
 /// 
 /// Supports SynScan, ConnectScan
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum PortScanType {
     SynScan,
     ConnectScan,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PortStatus {
+    Open,
+    Closed,
+    Filtered,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct PortInfo {
+    pub port: u16,
+    pub status: PortStatus,
 }
 
 /// Result of HostScanner::run_scan  
@@ -21,13 +44,33 @@ pub struct HostScanResult {
     pub scan_status: ScanStatus,
 }
 
+impl HostScanResult {
+    pub fn new() -> HostScanResult {
+        HostScanResult{
+            up_hosts: vec![],
+            scan_time: Duration::from_millis(0),
+            scan_status: ScanStatus::Ready,
+        }
+    }
+}
+
 /// Result of PortScanner::run_scan  
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PortScanResult {
     /// List of open port  
-    pub open_ports: Vec<u16>,
+    pub ports: Vec<PortInfo>,
     /// Time from start to end of scan  
     pub scan_time: Duration,
     /// Scan job status
     pub scan_status: ScanStatus,
+}
+
+impl PortScanResult {
+    pub fn new() -> PortScanResult {
+        PortScanResult{
+            ports: vec![],
+            scan_time: Duration::from_millis(0),
+            scan_status: ScanStatus::Ready,
+        }
+    }
 }

@@ -3,11 +3,11 @@ use std::time::{Duration, Instant};
 use default_net;
 use pnet::datalink::MacAddr;
 //use crate::port::PortScanType;
-use crate::status::ScanStatus;
+//use crate::status::ScanStatus;
 use crate::interface;
 use crate::port;
 use crate::host;
-use crate::scanner::shared::{PortScanType, HostScanResult, PortScanResult};
+use crate::scanner::shared::{PortScanType, HostScanResult, PortScanResult, ScanStatus, DEFAULT_SRC_PORT};
 
 /// Structure for host scan  
 /// 
@@ -141,7 +141,7 @@ impl PortScanner{
     /// Specify None for default. `PortScanner::new(None)`
     pub fn new(_if_name: Option<&str>) -> Result<PortScanner, String> {
         let ini_scan_result = PortScanResult{
-            open_ports: vec![],
+            ports: vec![],
             scan_time: Duration::from_millis(1),
             scan_status: ScanStatus::Ready,
         };
@@ -152,7 +152,7 @@ impl PortScanner{
             target_mac: MacAddr::zero(),
             src_ipaddr: Ipv4Addr::new(127, 0, 0, 1),
             dst_ipaddr: Ipv4Addr::new(127, 0, 0, 1), 
-            src_port: 65432,
+            src_port: DEFAULT_SRC_PORT,
             dst_ports: vec![],
             scan_type: PortScanType::SynScan,
             timeout: Duration::from_millis(30000),
@@ -293,7 +293,7 @@ impl PortScanner{
         let temp_scanner = self.clone();
         let start_time = Instant::now();
         let (open_ports, status) = port::scan_ports(&interface, &temp_scanner);
-        self.scan_result.open_ports = open_ports;
+        self.scan_result.ports = open_ports;
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);
     }
