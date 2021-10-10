@@ -19,3 +19,5 @@ pub use scanner::blocking::{PortScanner, HostScanner};
 
 #[cfg(not(target_os="windows"))]
 pub use scanner::async_sc::{AsyncPortScanner, AsyncHostScanner};
+
+pub use scanner::async_sc2::{AsyncPortScanner2, AsyncHostScanner2};

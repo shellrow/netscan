@@ -19,6 +19,7 @@ log = "0.4"
 pnet = "0.28.0"
 socket2 = { version = "0.4", features = ["all"] }
 tokio = { version = "1.7.0", features = ["rt", "rt-multi-thread", "net", "time", "macros", "sync"] }
+async-io = "1.6.0"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [ "std" ] }
