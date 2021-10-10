@@ -3,22 +3,13 @@ use std::sync::{Arc, Mutex};
 use pnet::packet::Packet;
 use std::time::{Duration, Instant};
 use rayon::prelude::*;
-use std::net::{ToSocketAddrs,TcpStream};
+use std::net::{IpAddr, ToSocketAddrs, TcpStream};
 use crate::{tcp, ipv4, ethernet};
 use crate::packet::EndPoints;
-use crate::status::ScanStatus;
+use crate::scanner::shared::{PortScanType, ScanStatus, PortInfo, PortStatus};
 use crate::PortScanner;
 
-/// Type of port scan 
-/// 
-/// Supports SynScan, ConnectScan
-#[derive(Clone, Copy)]
-pub enum PortScanType {
-    SynScan = pnet::packet::tcp::TcpFlags::SYN as isize,
-    ConnectScan = 401,
-}
-
-pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner) -> (Vec<u16>, ScanStatus)
+pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner) -> (Vec<PortInfo>, ScanStatus)
 {
     let mut result = vec![];
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
@@ -50,26 +41,36 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
             );
         }
     }
-    for port in open_ports.lock().unwrap().iter(){
-        result.push(port.clone());
+    open_ports.lock().unwrap().sort();
+    for port in open_ports.lock().unwrap().iter() {
+        let port_info = PortInfo {
+            port: port.clone(),
+            status: PortStatus::Open,
+        };
+        result.push(port_info);
     }
-    result.sort();
     return (result, *scan_status.lock().unwrap());
 }
 
 fn build_packet(scanner: &PortScanner, tmp_packet: &mut [u8], target_port: u16){
     // Setup Ethernet header
     let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(&mut tmp_packet[..ethernet::ETHERNET_HEADER_LEN]).unwrap();
-    ethernet::build_ethernet_packet(&mut eth_header, scanner.sender_mac, scanner.target_mac, ethernet::EtherType::Ipv4);
+    ethernet::build_ethernet_packet(&mut eth_header, scanner.src_mac, scanner.dst_mac, ethernet::EtherType::Ipv4);
     // Setup IP header
     let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(&mut tmp_packet[ethernet::ETHERNET_HEADER_LEN..(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)]).unwrap();
-    match scanner.scan_type {
-        _ => {
-            ipv4::build_ipv4_packet(&mut ip_header, scanner.src_ipaddr, scanner.dst_ipaddr, ipv4::IpNextHeaderProtocol::Tcp);
-            // Setup TCP header
-            let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(&mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
-            tcp::build_tcp_packet(&mut tcp_header, scanner.src_ipaddr, scanner.src_port, scanner.dst_ipaddr, target_port, &scanner.scan_type);
+    match scanner.src_ip {
+        IpAddr::V4(src_ip) => {
+            match scanner.dst_ip {
+                IpAddr::V4(dst_ip) => {
+                    ipv4::build_ipv4_packet(&mut ip_header, src_ip, dst_ip, ipv4::IpNextHeaderProtocol::Tcp);
+                    // Setup TCP header
+                    let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(&mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
+                    tcp::build_tcp_packet(&mut tcp_header, src_ip, scanner.src_port, dst_ip, target_port);
+                },
+                IpAddr::V6(_ip) => {},
+            }
         },
+        IpAddr::V6(_ip) => {},
     }
 }
 
@@ -182,7 +183,7 @@ fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scanner: &PortSca
 }
 
 fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>){
-    let ip_addr = scanner.dst_ipaddr.clone();
+    let ip_addr = scanner.dst_ip.clone();
     let ports = scanner.dst_ports.clone();
     let timeout = scanner.timeout.clone();
     let conn_timeout = Duration::from_millis(50);

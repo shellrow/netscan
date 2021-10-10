@@ -11,7 +11,7 @@ fn main(){
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     //Get network address
-    let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 2), 24).unwrap();
+    let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 0), 24).unwrap();
     assert_eq!(Ok(net.network()), "192.168.1.0".parse());
     let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
     //Get host list

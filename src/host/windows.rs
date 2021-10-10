@@ -1,5 +1,5 @@
 use crate::icmp;
-use crate::status::ScanStatus;
+use crate::scanner::shared::ScanStatus;
 use crate::HostScanner;
 use std::{thread, time};
 use std::time::Instant;
@@ -31,7 +31,7 @@ pub fn scan_hosts(scanner: &HostScanner) ->(Vec<String>, ScanStatus)
 }
 
 fn send_icmp_packet(tx: &mut pnet::transport::TransportSender, stop: &Arc<Mutex<bool>>, scanner: &HostScanner){
-    for host in &scanner.target_hosts{
+    for host in &scanner.dst_ips {
         thread::sleep(time::Duration::from_millis(1));
         let mut buf = vec![0; 16];
         let mut icmp_packet = pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
@@ -53,7 +53,7 @@ fn receive_packets(
     loop {
         match iter.next() {
             Ok((_packet, addr)) => {
-                if scanner.target_hosts.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
+                if scanner.dst_ips.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
                     up_hosts.lock().unwrap().push(addr);
                 }
             },
