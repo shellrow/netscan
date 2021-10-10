@@ -13,6 +13,9 @@ use std::net::{ToSocketAddrs,TcpStream};
 use crate::packet::EndPoints;
 use crate::PortScanner;
 use crate::scanner::shared::{PortScanType, PortStatus, PortInfo, ScanStatus};
+use crate::ethernet;
+use crate::ipv4;
+
 
 pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner) -> (Vec<PortInfo>, ScanStatus)
 {
@@ -102,8 +105,8 @@ fn send_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mute
     for port in scanner.dst_ports.clone() {
         let src_ip_addr: Ipv4Addr = scanner.src_ipaddr;
         let dst_ip_addr: Ipv4Addr = scanner.dst_ipaddr;
-        let mut vec: Vec<u8> = vec![0; 1024];
-        let mut tcp_packet = MutableTcpPacket::new(&mut vec[..]).unwrap();
+        let mut vec: Vec<u8> = vec![0; 66];
+        let mut tcp_packet = MutableTcpPacket::new(&mut vec[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
         tcp_packet.set_source(scanner.src_port);
         tcp_packet.set_destination(port);
         tcp_packet.set_window(64240);

@@ -11,6 +11,8 @@ use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::io::unix::AsyncFd;
 use crate::scanner::shared::{self, PortScanType, HostScanResult, PortScanResult, PortStatus, PortInfo, ScanStatus};
 use crate::packet::EndPoints;
+use crate::ethernet;
+use crate::ipv4;
 
 #[derive(Clone, Debug)]
 pub struct AsyncSocket {
@@ -240,8 +242,8 @@ impl AsyncPortScanner {
 }
 
 async fn build_syn_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16) -> Vec<u8> {
-    let mut vec: Vec<u8> = vec![0; 1024];
-    let mut tcp_packet = tcp::MutableTcpPacket::new(&mut vec[..]).unwrap();
+    let mut vec: Vec<u8> = vec![0; 66];
+    let mut tcp_packet = tcp::MutableTcpPacket::new(&mut vec[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
     tcp_packet.set_source(src_port);
     tcp_packet.set_destination(dst_port);
     tcp_packet.set_window(64240);

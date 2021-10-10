@@ -3,9 +3,7 @@ extern crate log;
 
 mod interface;
 mod arp;
-#[cfg(target_os = "windows")]
 mod ethernet;
-#[cfg(target_os = "windows")]
 mod ipv4;
 #[cfg(target_os = "windows")]
 mod tcp;
