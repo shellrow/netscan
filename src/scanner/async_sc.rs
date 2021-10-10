@@ -182,7 +182,7 @@ impl AsyncPortScanner {
         self.dst_ports.push(port);
     }
     pub fn set_dst_port_range(&mut self, start_port: u16, end_port: u16) {
-        for i in start_port..end_port + 1{
+        for i in start_port..end_port + 1 {
             self.add_dst_port(i);
         }
     }
@@ -417,7 +417,6 @@ fn handle_tcp_packet(tcp_packet: pnet::packet::tcp::TcpPacket, port_results: &Ar
                 status: PortStatus::Open,
             }
         );
-        //println!("Open: {}", tcp_packet.get_source());
     }else if tcp_packet.get_flags() == pnet::packet::tcp::TcpFlags::RST | pnet::packet::tcp::TcpFlags::ACK {
         port_results.lock().unwrap().push(
             PortInfo{
@@ -425,7 +424,6 @@ fn handle_tcp_packet(tcp_packet: pnet::packet::tcp::TcpPacket, port_results: &Ar
                 status: PortStatus::Closed,
             }
         );
-        //println!("Close: {}", tcp_packet.get_source());
     }
 }
 

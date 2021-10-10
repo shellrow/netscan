@@ -5,7 +5,6 @@ mod interface;
 mod arp;
 mod ethernet;
 mod ipv4;
-#[cfg(target_os = "windows")]
 mod tcp;
 mod icmp;
 mod udp;

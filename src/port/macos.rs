@@ -3,7 +3,7 @@ use pnet::packet::tcp::MutableTcpPacket;
 use pnet::transport::TransportChannelType::Layer4;
 use pnet::transport::TransportProtocol::Ipv4;
 use pnet::transport::{TransportSender, transport_channel};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::thread;
 use std::sync::{Arc, Mutex};
 use pnet::packet::Packet;
@@ -73,7 +73,7 @@ fn run_syn_scan(interface: &pnet::datalink::NetworkInterface, scanner: &PortScan
 }
 
 fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>){
-    let ip_addr = scanner.dst_ipaddr.clone();
+    let ip_addr = scanner.dst_ip.clone();
     let ports = scanner.dst_ports.clone();
     let timeout = scanner.timeout.clone();
     let conn_timeout = Duration::from_millis(50);
@@ -103,8 +103,8 @@ fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, st
 
 fn send_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
     for port in scanner.dst_ports.clone() {
-        let src_ip_addr: Ipv4Addr = scanner.src_ipaddr;
-        let dst_ip_addr: Ipv4Addr = scanner.dst_ipaddr;
+        let src_ip: IpAddr = scanner.src_ip;
+        let dst_ip: IpAddr = scanner.dst_ip;
         let mut vec: Vec<u8> = vec![0; 66];
         let mut tcp_packet = MutableTcpPacket::new(&mut vec[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
         tcp_packet.set_source(scanner.src_port);
@@ -119,10 +119,27 @@ fn send_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mute
         , pnet::packet::tcp::TcpOption::nop()
         , pnet::packet::tcp::TcpOption::wscale(7)]);
         tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
-        let checksum = pnet::packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip_addr, &dst_ip_addr);
+        let checksum: u16 = match src_ip {
+            IpAddr::V4(src_ipv4) => {
+                match dst_ip {
+                    IpAddr::V4(dst_ipv4) => {
+                        pnet::packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ipv4, &dst_ipv4)
+                    },
+                    IpAddr::V6(_) => 0,
+                }
+            },
+            IpAddr::V6(src_ipv6) => {
+                match dst_ip {
+                    IpAddr::V4(_) => 0,
+                    IpAddr::V6(dst_ipv6) => {
+                        pnet::packet::tcp::ipv6_checksum(&tcp_packet.to_immutable(), &src_ipv6, &dst_ipv6)
+                    },
+                }
+            },
+        };
         tcp_packet.set_checksum(checksum);
 
-        match tx.send_to(tcp_packet, IpAddr::V4(dst_ip_addr)) {
+        match tx.send_to(tcp_packet, dst_ip) {
             Ok(_) => {},
             Err(_) => {},
         }

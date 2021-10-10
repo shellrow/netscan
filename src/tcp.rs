@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
-use super::port::PortScanType;
 
-pub fn build_tcp_packet(tcp_packet:&mut pnet::packet::tcp::MutableTcpPacket, src_ip_addr: Ipv4Addr, src_port:u16, dst_ip_addr: Ipv4Addr, dst_port:u16, scan_type:&PortScanType){
+#[allow(dead_code)]
+pub fn build_tcp_packet(tcp_packet:&mut pnet::packet::tcp::MutableTcpPacket, src_ip_addr: Ipv4Addr, src_port:u16, dst_ip_addr: Ipv4Addr, dst_port:u16) {
     tcp_packet.set_source(src_port);
     tcp_packet.set_destination(dst_port);
     tcp_packet.set_window(64240);
@@ -13,14 +13,7 @@ pub fn build_tcp_packet(tcp_packet:&mut pnet::packet::tcp::MutableTcpPacket, src
     , pnet::packet::tcp::TcpOption::nop()
     , pnet::packet::tcp::TcpOption::nop()
     , pnet::packet::tcp::TcpOption::wscale(7)]);
-    match scan_type {
-        PortScanType::SynScan => {
-            tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
-        },
-        _ => {
-            tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
-        },
-    }
+    tcp_packet.set_flags(pnet::packet::tcp::TcpFlags::SYN);
     let checksum = pnet::packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip_addr, &dst_ip_addr);
     tcp_packet.set_checksum(checksum);
 }

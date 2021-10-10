@@ -3,13 +3,14 @@ use netscan::PortScanner;
 use netscan::PortScanType;
 use netscan::ScanStatus;
 use std::time::Duration;
+use std::net::{IpAddr, Ipv4Addr};
 
 fn main() {
     let mut port_scanner = match PortScanner::new(None) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    port_scanner.set_target_ipaddr("192.168.1.1");
+    port_scanner.set_target_ipaddr(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)));
     port_scanner.set_range(1, 1000);
     //port_scanner.add_target_port(22);
     //port_scanner.add_target_port(80);
