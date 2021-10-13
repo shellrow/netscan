@@ -16,7 +16,7 @@ fn main() {
     //port_scanner.add_target_port(443);
     port_scanner.set_scan_type(PortScanType::SynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
-    //port_scanner.set_wait_time(Duration::from_millis(10));
+    //port_scanner.set_wait_time(Duration::from_millis(200));
     port_scanner.run_scan();
     let result = port_scanner.get_result();
     print!("Status: ");
