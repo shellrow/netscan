@@ -7,6 +7,7 @@ pub enum EtherType {
     Ipv6
 }
 
+#[allow(dead_code)]
 pub fn build_ethernet_packet(eth_packet: &mut pnet::packet::ethernet::MutableEthernetPacket
     , src_mac_addr: pnet::datalink::MacAddr
     , dst_mac_addr: pnet::datalink::MacAddr

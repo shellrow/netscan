@@ -8,6 +8,7 @@ pub enum IpNextHeaderProtocol {
     Icmp
 }
 
+#[allow(dead_code)]
 pub fn build_ipv4_packet(ipv4_packet: &mut pnet::packet::ipv4::MutableIpv4Packet, src_ip_addr: Ipv4Addr, dst_ip_addr: Ipv4Addr, next_protocol: IpNextHeaderProtocol){
     ipv4_packet.set_header_length(69);
     ipv4_packet.set_total_length(52);
