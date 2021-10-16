@@ -7,11 +7,13 @@ use tokio::io::unix::AsyncFd;
 use std::thread;
 use std::sync::Mutex;
 use tokio::sync::Mutex as TokioMutex;
-use pnet::packet::{tcp, Packet};
+use pnet::packet::Packet;
+use pnet::packet::tcp::MutableTcpPacket;
 use crate::base_type::{PortStatus, PortInfo, ScanStatus};
 use crate::packet::endpoint::EndPoints;
 use crate::packet::ethernet;
 use crate::packet::ipv4;
+use crate::packet::tcp;
 use crate::async_scanner::AsyncPortScanner;
 
 #[derive(Clone, Debug)]
@@ -54,38 +56,8 @@ impl AsyncSocket {
 
 async fn build_syn_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16) -> Vec<u8> {
     let mut vec: Vec<u8> = vec![0; 66];
-    let mut tcp_packet = tcp::MutableTcpPacket::new(&mut vec[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
-    tcp_packet.set_source(src_port);
-    tcp_packet.set_destination(dst_port);
-    tcp_packet.set_window(64240);
-    tcp_packet.set_data_offset(8);
-    tcp_packet.set_urgent_ptr(0);
-    tcp_packet.set_sequence(0);
-    tcp_packet.set_options(&[tcp::TcpOption::mss(1460)
-    , tcp::TcpOption::sack_perm()
-    , tcp::TcpOption::nop()
-    , tcp::TcpOption::nop()
-    , tcp::TcpOption::wscale(7)]);
-    tcp_packet.set_flags(tcp::TcpFlags::SYN);
-    let checksum: u16 = match src_ip {
-        IpAddr::V4(src_ipv4) => {
-            match dst_ip {
-                IpAddr::V4(dst_ipv4) => {
-                    tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ipv4, &dst_ipv4)
-                },
-                IpAddr::V6(_) => return tcp_packet.packet().to_vec(),
-            }
-        },
-        IpAddr::V6(src_ipv6) => {
-            match dst_ip {
-                IpAddr::V4(_) => return tcp_packet.packet().to_vec(),
-                IpAddr::V6(dst_ipv6) => {
-                    tcp::ipv6_checksum(&tcp_packet.to_immutable(), &src_ipv6, &dst_ipv6)
-                },
-            }
-        },
-    };
-    tcp_packet.set_checksum(checksum);
+    let mut tcp_packet = MutableTcpPacket::new(&mut vec[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
+    tcp::build_tcp_packet(&mut tcp_packet, src_ip, src_port, dst_ip, dst_port);
     tcp_packet.packet().to_vec()
 }
 
@@ -121,7 +93,7 @@ pub async fn scan_ports(scanner: AsyncPortScanner) -> (Vec<PortInfo>, ScanStatus
     let stop_receive = Arc::clone(&stop);
     let port_results_receive = Arc::clone(&port_results);
     tokio::spawn(async move {
-        receive_packets(&mut rx, &stop_receive, &port_results_receive).await;
+        receive_tcp_packets(&mut rx, &stop_receive, &port_results_receive).await;
     });
     for port in scanner.dst_ports.clone() {
         let socket = async_socket.clone();
@@ -143,7 +115,7 @@ pub async fn scan_ports(scanner: AsyncPortScanner) -> (Vec<PortInfo>, ScanStatus
     (result, ScanStatus::Done)
 }
 
-async fn receive_packets(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, stop: &Arc<TokioMutex<bool>>, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
+async fn receive_tcp_packets(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, stop: &Arc<TokioMutex<bool>>, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
     loop {
         match rx.next() {
             Ok(frame) => {
