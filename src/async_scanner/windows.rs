@@ -3,7 +3,6 @@ use std::mem::MaybeUninit;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
-use tokio::io::unix::AsyncFd;
 use std::thread;
 use std::sync::Mutex;
 use tokio::sync::Mutex as TokioMutex;
@@ -16,7 +15,7 @@ use crate::async_scanner::AsyncPortScanner;
 
 #[derive(Clone, Debug)]
 pub struct AsyncSocket {
-    inner: Arc<AsyncFd<Socket>>,
+    inner: Arc<Socket>,
 }
 
 impl AsyncSocket {
@@ -27,14 +26,13 @@ impl AsyncSocket {
         };
         socket.set_nonblocking(true)?;
         Ok(AsyncSocket {
-            inner: Arc::new(AsyncFd::new(socket)?),
+            inner: Arc::new(socket),
         })
     }
     pub async fn send_to(&self, buf: &mut [u8], target: &SockAddr) -> io::Result<usize> {
         loop {
-            let mut guard = self.inner.writable().await?;
-            match guard.try_io(|inner| inner.get_ref().send_to(buf, target)) {
-                Ok(n) => return n,
+            match self.inner.send_to(buf, target) {
+                Ok(n) => return Ok(n),
                 Err(_) => continue,
             }
         }
@@ -42,10 +40,8 @@ impl AsyncSocket {
     #[allow(dead_code)]
     pub async fn recv(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         loop {
-            let mut guard = self.inner.readable().await?;
-
-            match guard.try_io(|inner| inner.get_ref().recv(buf)) {
-                Ok(result) => return result,
+            match self.inner.recv(buf) {
+                Ok(result) => return Ok(result),
                 Err(_would_block) => continue,
             }
         }
