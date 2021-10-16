@@ -7,11 +7,12 @@ use pnet::transport::TransportChannelType::Layer4;
 use pnet::transport::TransportProtocol::Ipv4;
 use pnet::transport::icmp_packet_iter;
 use pnet::packet::Packet;
+use pnet::packet::ethernet::EtherTypes;
+use pnet::packet::ip::IpNextHeaderProtocols;
 use rayon::prelude::*;
-use crate::icmp;
 use crate::base_type::{PortScanType, ScanStatus, PortInfo, PortStatus};
 use crate::scanner::shared::HostScanner;
-use crate::{tcp, ipv4, ethernet};
+use crate::packet::{icmp, tcp, ipv4, ethernet};
 use crate::packet::endpoint::EndPoints;
 use crate::PortScanner;
 
@@ -157,23 +158,23 @@ fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, st
 fn build_tcp_packet(scanner: &PortScanner, tmp_packet: &mut [u8], target_port: u16){
     // Setup Ethernet header
     let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(&mut tmp_packet[..ethernet::ETHERNET_HEADER_LEN]).unwrap();
-    ethernet::build_ethernet_packet(&mut eth_header, scanner.src_mac, scanner.dst_mac, ethernet::EtherType::Ipv4);
+    ethernet::build_ethernet_packet(&mut eth_header, scanner.src_mac, scanner.dst_mac, EtherTypes::Ipv4);
     // Setup IP header
     let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(&mut tmp_packet[ethernet::ETHERNET_HEADER_LEN..(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)]).unwrap();
     match scanner.src_ip {
         IpAddr::V4(src_ip) => {
             match scanner.dst_ip {
                 IpAddr::V4(dst_ip) => {
-                    ipv4::build_ipv4_packet(&mut ip_header, src_ip, dst_ip, ipv4::IpNextHeaderProtocol::Tcp);
-                    // Setup TCP header
-                    let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(&mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
-                    tcp::build_tcp_packet(&mut tcp_header, src_ip, scanner.src_port, dst_ip, target_port);
+                    ipv4::build_ipv4_packet(&mut ip_header, src_ip, dst_ip, IpNextHeaderProtocols::Tcp);
                 },
                 IpAddr::V6(_ip) => {},
             }
         },
         IpAddr::V6(_ip) => {},
     }
+    // Setup TCP header
+    let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(&mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..]).unwrap();
+    tcp::build_tcp_packet(&mut tcp_header, scanner.src_ip, scanner.src_port, scanner.dst_ip, target_port);
 }
 
 fn send_tcp_packets(tx: &mut Box<dyn pnet::datalink::DataLinkSender>, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
