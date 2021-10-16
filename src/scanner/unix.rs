@@ -1,13 +1,16 @@
-use pnet::packet::ip::IpNextHeaderProtocols;
-use pnet::packet::tcp::MutableTcpPacket;
+use crate::icmp;
+use crate::scanner::shared::HostScanner;
+use std::{thread, time};
+use std::time::{Duration, Instant};
+use std::net::IpAddr;
+use std::sync::{Arc, Mutex};
 use pnet::transport::TransportChannelType::Layer4;
 use pnet::transport::TransportProtocol::Ipv4;
+use pnet::transport::icmp_packet_iter;
+use pnet::packet::ip::IpNextHeaderProtocols;
+use pnet::packet::tcp::MutableTcpPacket;
 use pnet::transport::{TransportSender, transport_channel};
-use std::net::IpAddr;
-use std::thread;
-use std::sync::{Arc, Mutex};
 use pnet::packet::Packet;
-use std::time::{Duration, Instant};
 use rayon::prelude::*;
 use std::net::{ToSocketAddrs,TcpStream};
 use crate::packet::endpoint::EndPoints;
@@ -16,6 +19,72 @@ use crate::base_type::{PortScanType, PortStatus, PortInfo, ScanStatus};
 use crate::ethernet;
 use crate::ipv4;
 
+pub fn scan_hosts(scanner: &HostScanner) ->(Vec<String>, ScanStatus)
+{
+    let mut result = vec![];
+    let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
+    let up_hosts:Arc<Mutex<Vec<IpAddr>>> = Arc::new(Mutex::new(vec![]));
+    let scan_status: Arc<Mutex<ScanStatus>> = Arc::new(Mutex::new(ScanStatus::Ready));
+    let protocol = Layer4(Ipv4(pnet::packet::ip::IpNextHeaderProtocols::Icmp));
+    let (mut tx, mut rx) = match pnet::transport::transport_channel(4096, protocol) {
+        Ok((tx, rx)) => (tx, rx),
+        Err(e) => panic!("Error happened {}", e),
+    };
+    rayon::join(|| send_icmp_packet(&mut tx, &stop, scanner),
+                || receive_icmp_packets(&mut rx, scanner, &stop, &up_hosts, &scan_status)
+    );
+    up_hosts.lock().unwrap().sort();
+    for host in up_hosts.lock().unwrap().iter(){
+        result.push(host.to_string());
+    }
+    return (result, *scan_status.lock().unwrap());
+}
+
+fn send_icmp_packet(tx: &mut pnet::transport::TransportSender, stop: &Arc<Mutex<bool>>, scanner: &HostScanner){
+    for host in &scanner.dst_ips {
+        thread::sleep(time::Duration::from_millis(1));
+        let mut buf = vec![0; 16];
+        let mut icmp_packet = pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
+        icmp::build_icmp_packet(&mut icmp_packet);
+        let _result = tx.send_to(icmp_packet, *host);
+    }
+    thread::sleep(scanner.wait_time);
+    *stop.lock().unwrap() = true;
+}
+
+fn receive_icmp_packets(
+    rx: &mut pnet::transport::TransportReceiver, 
+    scanner: &HostScanner,
+    stop: &Arc<Mutex<bool>>, 
+    up_hosts: &Arc<Mutex<Vec<IpAddr>>>, 
+    scan_status: &Arc<Mutex<ScanStatus>>){
+    let mut iter = icmp_packet_iter(rx);
+    let start_time = Instant::now();
+    loop {
+        match iter.next_with_timeout(time::Duration::from_millis(100)) {
+            Ok(r) => {
+                if let Some((_packet, addr)) = r {
+                    if scanner.dst_ips.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
+                        up_hosts.lock().unwrap().push(addr);
+                    }
+                }else{
+                    error!("Failed to read packet");
+                }
+            },
+            Err(e) => {
+                error!("An error occurred while reading: {}", e);
+            }
+        }
+        if *stop.lock().unwrap(){
+            *scan_status.lock().unwrap() = ScanStatus::Done;
+            break;
+        }
+        if Instant::now().duration_since(start_time) > scanner.timeout {
+            *scan_status.lock().unwrap() = ScanStatus::Timeout;
+            break;
+        }
+    }
+}
 
 pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner) -> (Vec<PortInfo>, ScanStatus)
 {
@@ -67,8 +136,8 @@ fn run_syn_scan(interface: &pnet::datalink::NetworkInterface, scanner: &PortScan
             e
         ),
     };
-    rayon::join(|| send_packets(&mut tx, scanner, &stop),
-                || receive_packets(&mut rx, scanner, &open_ports, &stop, &scan_status)
+    rayon::join(|| send_tcp_packets(&mut tx, scanner, &stop),
+                || receive_tcp_packets(&mut rx, scanner, &open_ports, &stop, &scan_status)
     );
 }
 
@@ -101,7 +170,7 @@ fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, st
     *stop.lock().unwrap() = true;
 }
 
-fn send_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
+fn send_tcp_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mutex<bool>>) {
     for port in scanner.dst_ports.clone() {
         let src_ip: IpAddr = scanner.src_ip;
         let dst_ip: IpAddr = scanner.dst_ip;
@@ -149,7 +218,7 @@ fn send_packets(tx: &mut TransportSender, scanner: &PortScanner, stop: &Arc<Mute
     *stop.lock().unwrap() = true;
 }
 
-fn receive_packets(
+fn receive_tcp_packets(
     rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, 
     scanner: &PortScanner, 
     open_ports: &Arc<Mutex<Vec<u16>>>, 
@@ -236,4 +305,3 @@ fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scanner: &PortSca
         }
     }
 }
-

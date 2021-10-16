@@ -21,7 +21,7 @@ pub fn scan_hosts(scanner: &HostScanner) ->(Vec<String>, ScanStatus)
         Err(e) => panic!("Error happened {}", e),
     };
     rayon::join(|| send_icmp_packet(&mut tx, &stop, scanner),
-                || receive_packets(&mut rx, scanner, &stop, &up_hosts, &scan_status)
+                || receive_icmp_packets(&mut rx, scanner, &stop, &up_hosts, &scan_status)
     );
     up_hosts.lock().unwrap().sort();
     for host in up_hosts.lock().unwrap().iter(){
@@ -42,7 +42,7 @@ fn send_icmp_packet(tx: &mut pnet::transport::TransportSender, stop: &Arc<Mutex<
     *stop.lock().unwrap() = true;
 }
 
-fn receive_packets(
+fn receive_icmp_packets(
     rx: &mut pnet::transport::TransportReceiver, 
     scanner: &HostScanner,
     stop: &Arc<Mutex<bool>>, 
@@ -51,14 +51,10 @@ fn receive_packets(
     let mut iter = icmp_packet_iter(rx);
     let start_time = Instant::now();
     loop {
-        match iter.next_with_timeout(time::Duration::from_millis(100)) {
-            Ok(r) => {
-                if let Some((_packet, addr)) = r {
-                    if scanner.dst_ips.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
-                        up_hosts.lock().unwrap().push(addr);
-                    }
-                }else{
-                    error!("Failed to read packet");
+        match iter.next() {
+            Ok((_packet, addr)) => {
+                if scanner.dst_ips.contains(&addr) && !up_hosts.lock().unwrap().contains(&addr) {
+                    up_hosts.lock().unwrap().push(addr);
                 }
             },
             Err(e) => {

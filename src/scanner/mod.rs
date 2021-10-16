@@ -1,5 +1,11 @@
 pub mod shared;
-pub mod blocking;
+
 #[cfg(not(target_os="windows"))]
-pub mod async_sc;
-pub mod async_sc2;
+pub mod unix;
+#[cfg(not(target_os="windows"))]
+pub use self::unix::*;
+
+#[cfg(target_os="windows")]
+pub mod windows;
+#[cfg(target_os="windows")]
+pub use self::windows::*;

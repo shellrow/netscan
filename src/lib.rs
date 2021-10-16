@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate log;
 
+mod base_type;
+mod define;
 mod interface;
 mod arp;
 mod ethernet;
@@ -12,12 +14,12 @@ mod packet;
 mod port;
 mod host;
 mod scanner;
+mod async_scanner;
 
-pub use scanner::shared::{PortScanType, ScanStatus};
-pub use scanner::shared::{PortScanResult, HostScanResult};
-pub use scanner::blocking::{PortScanner, HostScanner};
+pub use base_type::{PortScanType, ScanStatus};
+pub use base_type::{PortScanResult, HostScanResult};
+pub use scanner::shared::{PortScanner, HostScanner};
 
 #[cfg(not(target_os="windows"))]
-pub use scanner::async_sc::{AsyncPortScanner, AsyncHostScanner};
+pub use async_scanner::unix::{AsyncPortScanner, AsyncHostScanner};
 
-pub use scanner::async_sc2::{AsyncPortScanner2, AsyncHostScanner2};
