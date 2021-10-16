@@ -1,11 +1,10 @@
-use std::net::{IpAddr, Ipv4Addr};
-use std::time::Duration;
-use netscan::AsyncPortScanner;
-use netscan::PortScanType;
-use netscan::ScanStatus;
-
-#[tokio::main]
-async fn main() {
+#[cfg(not(target_os="windows"))]
+async fn unix_main() {
+    use std::net::{IpAddr, Ipv4Addr};
+    use std::time::Duration;
+    use netscan::AsyncPortScanner;
+    use netscan::PortScanType;
+    use netscan::ScanStatus;
     let src_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4));
     let dst_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
     let mut port_scanner = match AsyncPortScanner::new(src_ip) {
@@ -35,5 +34,18 @@ async fn main() {
                 println!("(Including {:?} of wait time)", port_scanner.get_wait_time());
             }
         },
+    }
+}
+
+#[tokio::main]
+async fn main() {
+    #[cfg(not(target_os="windows"))]
+    {
+        unix_main().await;
+    }
+
+    #[cfg(target_os="windows")]
+    {
+        println!("Windows is not yet supported.");
     }
 }
