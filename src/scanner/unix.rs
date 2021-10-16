@@ -1,4 +1,4 @@
-use crate::icmp;
+use crate::packet::icmp;
 use crate::scanner::shared::HostScanner;
 use std::{thread, time};
 use std::time::{Duration, Instant};
@@ -16,8 +16,8 @@ use std::net::{ToSocketAddrs,TcpStream};
 use crate::packet::endpoint::EndPoints;
 use crate::PortScanner;
 use crate::base_type::{PortScanType, PortStatus, PortInfo, ScanStatus};
-use crate::ethernet;
-use crate::ipv4;
+use crate::packet::ethernet;
+use crate::packet::ipv4;
 
 pub fn scan_hosts(scanner: &HostScanner) ->(Vec<String>, ScanStatus)
 {

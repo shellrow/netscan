@@ -4,15 +4,13 @@ extern crate log;
 mod base_type;
 mod define;
 mod interface;
-mod arp;
+/* mod arp;
 mod ethernet;
 mod ipv4;
 mod tcp;
 mod icmp;
-mod udp;
+mod udp; */
 mod packet;
-mod port;
-mod host;
 mod scanner;
 mod async_scanner;
 
