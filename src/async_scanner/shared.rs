@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 use crate::base_type::{PortScanType, HostScanResult, PortScanResult};
-use crate::async_scanner::scan_ports;
+use crate::async_scanner::{scan_ports, scan_hosts};
 use crate::define::DEFAULT_SRC_PORT;
 
 #[derive(Clone)]
@@ -64,7 +64,12 @@ impl AsyncHostScanner{
         self.scan_result.clone()
     }
     pub async fn run_scan(&mut self) {
-        
+        let start_time = Instant::now();
+        let (up_hosts, status) = scan_hosts(self.clone()).await;
+        let scan_time = Instant::now().duration_since(start_time);
+        self.scan_result.up_hosts = up_hosts;
+        self.scan_result.scan_status = status;
+        self.scan_result.scan_time = scan_time;
     }
 }
 

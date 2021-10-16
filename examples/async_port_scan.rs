@@ -8,7 +8,7 @@ use netscan::ScanStatus;
 async fn main() {
     let src_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4));
     let dst_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
-    let mut port_scanner = match AsyncPortScanner::new(dst_ip) {
+    let mut port_scanner = match AsyncPortScanner::new(src_ip) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
