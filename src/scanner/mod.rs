@@ -1,4 +1,5 @@
 pub mod shared;
+pub use self::shared::*;
 
 #[cfg(not(target_os="windows"))]
 pub mod unix;

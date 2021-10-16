@@ -1,7 +1,7 @@
 extern crate netscan;
 use netscan::HostScanner;
 use netscan::ScanStatus;
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 use ipnet::Ipv4Net;
 use std::time::Duration;
 
@@ -16,12 +16,12 @@ fn main(){
     let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
     //Get host list
     let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
-    for host in hosts{
-        host_scanner.add_ipaddr(&host.to_string());
+    for host in hosts {
+        host_scanner.add_dst_ip(IpAddr::V4(host));
     }
     host_scanner.set_timeout(Duration::from_millis(10000));
     host_scanner.run_scan();
-    let result = host_scanner.get_result();
+    let result = host_scanner.get_scan_result();
     print!("Status: ");
     match result.scan_status {
         ScanStatus::Done => {println!("Done")},

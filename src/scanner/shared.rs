@@ -4,7 +4,7 @@ use default_net;
 use pnet::datalink::MacAddr;
 use crate::interface;
 use crate::scanner::{scan_hosts, scan_ports};
-use crate::base_type::{PortScanType, HostScanResult, PortScanResult, ScanStatus};
+use crate::base_type::{PortScanType, HostScanResult, PortScanResult};
 use crate::define::DEFAULT_SRC_PORT;
 
 /// Structure for host scan  
@@ -57,36 +57,28 @@ pub struct PortScanner {
     pub scan_result: PortScanResult,
 }
 
-
-
 impl HostScanner{
     /// Construct new HostScanner  
     pub fn new() -> Result<HostScanner, String> {
-        let ini_scan_result = HostScanResult{
-            up_hosts: vec![],
-            scan_time: Duration::from_millis(1),
-            scan_status: ScanStatus::Ready,
-        };
         let host_scanner = HostScanner{
             src_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             dst_ips: vec![],
             timeout: Duration::from_millis(10000),
             wait_time: Duration::from_millis(200),
-            scan_result: ini_scan_result,
+            scan_result: HostScanResult::new(),
         };
         Ok(host_scanner)
     }
+    /// Set source IP Address 
+    pub fn set_src_ip(&mut self, src_ipaddr:IpAddr){
+        self.src_ip = src_ipaddr;
+    }
     /// Add target host to list
-    pub fn add_ipaddr(&mut self, ipaddr: &str) {
-        let addr = ipaddr.parse::<IpAddr>();
-        match addr {
-            Ok(valid_addr) => {
-                self.dst_ips.push(valid_addr);
-            }
-            Err(e) => {
-                error!("Error adding ip address {}. Error: {}", ipaddr, e);
-            }
-        };
+    pub fn add_dst_ip(&mut self, ip_addr: IpAddr) {
+        self.dst_ips.push(ip_addr);
+    }
+    pub fn set_dst_ips(&mut self, ips: Vec<IpAddr>) {
+        self.dst_ips = ips;
     }
     /// Set scan timeout  
     pub fn set_timeout(&mut self, timeout: Duration){
@@ -96,16 +88,15 @@ impl HostScanner{
     pub fn set_wait_time(&mut self, wait_time: Duration){
         self.wait_time = wait_time;
     }
-    /// Set source IP Address 
-    pub fn set_src_ipaddr(&mut self, src_ipaddr:IpAddr){
-        self.src_ip = src_ipaddr;
+    pub fn set_scan_result(&mut self, scan_result: HostScanResult) {
+        self.scan_result = scan_result;
     }
     /// Get source IP Address
-    pub fn get_src_ipaddr(&mut self) -> IpAddr {
+    pub fn get_src_ip(&mut self) -> IpAddr {
         return self.src_ip.clone();
     }
     /// Get target hosts
-    pub fn get_target_hosts(&mut self) -> Vec<IpAddr> {
+    pub fn get_dst_ips(&mut self) -> Vec<IpAddr> {
         return self.dst_ips.clone();
     }
     /// Get timeout 
@@ -115,6 +106,10 @@ impl HostScanner{
     /// Get wait time
     pub fn get_wait_time(&mut self) -> Duration {
         return self.wait_time.clone();
+    }
+    /// Return scan result
+    pub fn get_scan_result(&mut self) -> HostScanResult{
+        return self.scan_result.clone();
     }
     /// Run scan with current settings 
     /// 
@@ -126,10 +121,6 @@ impl HostScanner{
         self.scan_result.up_hosts = uphosts;
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);
-    }
-    /// Return scan result
-    pub fn get_result(&mut self) -> HostScanResult{
-        return self.scan_result.clone();
     }
 }
 
@@ -171,19 +162,29 @@ impl PortScanner{
         }
         Ok(port_scanner)
     }
+    pub fn set_src_ip(&mut self, ip_addr: IpAddr) {
+        self.src_ip = ip_addr;
+    }
     /// Set IP address of target host
-    pub fn set_target_ipaddr(&mut self, ip_addr: IpAddr){
+    pub fn set_dst_ip(&mut self, ip_addr: IpAddr){
         self.dst_ip = ip_addr;
     }
-    /// Set range of target ports (by start and end)
-    pub fn set_range(&mut self, start: u16, end: u16){
-        for i in start..end + 1 {
-            self.add_target_port(i);
-        }
+    /// Set source port number 
+    pub fn set_src_port(&mut self, src_port: u16){
+        self.src_port = src_port;
     }
     /// Add target port 
-    pub fn add_target_port(&mut self, port_num: u16){
+    pub fn add_dst_port(&mut self, port_num: u16){
         self.dst_ports.push(port_num);
+    }
+    /// Set range of target ports (by start and end)
+    pub fn set_dst_port_range(&mut self, start_port: u16, end_port: u16) {
+        for i in start_port..end_port + 1 {
+            self.add_dst_port(i);
+        }
+    }
+    pub fn set_dst_ports(&mut self, ports: Vec<u16>) {
+        self.dst_ports = ports;
     }
     /// Set PortScanType. Default is PortScanType::SynScan
     pub fn set_scan_type(&mut self, scan_type: PortScanType){
@@ -201,9 +202,8 @@ impl PortScanner{
     pub fn set_send_rate(&mut self, send_rate: Duration){
         self.send_rate = send_rate;
     }
-    /// Set source port number 
-    pub fn set_src_port(&mut self, src_port: u16){
-        self.src_port = src_port;
+    pub fn set_scan_result(&mut self, scan_result: PortScanResult) {
+        self.scan_result = scan_result;
     }
     /// Get network interface index
     pub fn get_if_index(&mut self) -> u32 {
@@ -213,12 +213,18 @@ impl PortScanner{
     pub fn get_if_name(&mut self) -> String {
         return self.if_name.clone();
     }
+    pub fn get_src_ip(&self) -> IpAddr {
+        self.src_ip
+    }
     /// Get target ip address
-    pub fn get_target_ipaddr(&mut self) -> IpAddr {
+    pub fn get_dst_ip(&mut self) -> IpAddr {
         return self.dst_ip.clone();
     }
+    pub fn get_src_port(&self) -> u16 {
+        self.src_port
+    }
     /// Get target ports
-    pub fn get_target_ports(&mut self) -> Vec<u16> {
+    pub fn get_dst_ports(&mut self) -> Vec<u16> {
         return self.dst_ports.clone();
     }
     /// Get PortScanType
@@ -240,6 +246,10 @@ impl PortScanner{
     /// Get send rate
     pub fn get_send_rate(&mut self) -> Duration {
         return self.send_rate.clone();
+    }
+    /// Return scan result
+    pub fn get_scan_result(&mut self) -> PortScanResult {
+        return self.scan_result.clone();
     }
     /// Run scan with current settings 
     /// 
@@ -270,9 +280,5 @@ impl PortScanner{
         self.scan_result.ports = open_ports;
         self.scan_result.scan_status = status;
         self.scan_result.scan_time = Instant::now().duration_since(start_time);
-    }
-    /// Return scan result
-    pub fn get_result(&mut self) -> PortScanResult{
-        return self.scan_result.clone();
     }
 }
