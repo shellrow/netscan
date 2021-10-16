@@ -2,7 +2,6 @@ use std::net::Ipv4Addr;
 use pnet::packet::ip::{IpNextHeaderProtocol, IpNextHeaderProtocols};
 use pnet::packet::ipv4::{MutableIpv4Packet, Ipv4Flags};
 
-#[allow(dead_code)]
 pub const IPV4_HEADER_LEN: usize = 20;
 
 #[allow(dead_code)]

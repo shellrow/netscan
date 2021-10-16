@@ -1,7 +1,6 @@
 use pnet::packet::ethernet::{MutableEthernetPacket, EtherType, EtherTypes};
 use pnet::datalink::MacAddr;
 
-#[allow(dead_code)]
 pub const ETHERNET_HEADER_LEN: usize = 14;
 
 #[allow(dead_code)]
