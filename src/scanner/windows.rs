@@ -83,29 +83,27 @@ pub fn scan_ports(interface: &pnet::datalink::NetworkInterface, scanner: &PortSc
 {
     let mut result = vec![];
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-    let open_ports: Arc<Mutex<Vec<u16>>> = Arc::new(Mutex::new(vec![]));
+    let port_results: Arc<Mutex<Vec<PortInfo>>> = Arc::new(Mutex::new(vec![]));
+    let port_results_receive = Arc::clone(&port_results);
     let scan_status: Arc<Mutex<ScanStatus>> = Arc::new(Mutex::new(ScanStatus::Ready));
+    let scan_status_receive = Arc::clone(&scan_status);
     // run port scan
     match scanner.scan_type {
         PortScanType::ConnectScan => {
-            run_connect_scan(scanner, &open_ports, &stop, &scan_status);
+            run_connect_scan(scanner, &port_results_receive, &stop, &scan_status_receive);
         },
         PortScanType::SynScan => {
-            run_syn_scan(interface, scanner, &open_ports, &stop, &scan_status);
+            run_syn_scan(interface, scanner, &port_results_receive, &stop, &scan_status_receive);
         }
     }
-    open_ports.lock().unwrap().sort();
-    for port in open_ports.lock().unwrap().iter() {
-        let port_info = PortInfo {
-            port: port.clone(),
-            status: PortStatus::Open,
-        };
-        result.push(port_info);
+    for port_info in port_results.lock().unwrap().iter() {
+        result.push(port_info.clone());
     }
-    return (result, *scan_status.lock().unwrap());
+    let scan_status = *scan_status.lock().unwrap();
+    (result, scan_status)
 }
 
-fn run_syn_scan(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner,open_ports: &Arc<Mutex<Vec<u16>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>) {
+fn run_syn_scan(interface: &pnet::datalink::NetworkInterface, scanner: &PortScanner, port_results: &Arc<Mutex<Vec<PortInfo>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>) {
     let config = pnet::datalink::Config {
         write_buffer_size: 4096,
         read_buffer_size: 4096,
@@ -122,11 +120,11 @@ fn run_syn_scan(interface: &pnet::datalink::NetworkInterface, scanner: &PortScan
         Err(e) => panic!("Error happened {}", e),
     };
     rayon::join(|| send_tcp_packets(&mut tx, scanner, &stop),
-                || receive_tcp_packets(&mut rx, scanner, &open_ports, &stop, &scan_status)
+                || receive_tcp_packets(&mut rx, scanner, &port_results, &stop, &scan_status)
     );
 }
 
-fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>){
+fn run_connect_scan(scanner: &PortScanner, port_results: &Arc<Mutex<Vec<PortInfo>>>, stop: &Arc<Mutex<bool>>, scan_status: &Arc<Mutex<ScanStatus>>){
     let ip_addr = scanner.dst_ip.clone();
     let ports = scanner.dst_ports.clone();
     let timeout = scanner.timeout.clone();
@@ -139,7 +137,12 @@ fn run_connect_scan(scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>, st
             if let Some(addr) = addrs.find(|x| (*x).is_ipv4()) {
                 match TcpStream::connect_timeout(&addr, conn_timeout) {
                     Ok(_) => {
-                        open_ports.lock().unwrap().push(port);
+                        port_results.lock().unwrap().push(
+                            PortInfo{
+                                port: port,
+                                status: PortStatus::Open,
+                            }
+                        );
                     },
                     Err(_) => {},
                 }
@@ -191,7 +194,7 @@ fn send_tcp_packets(tx: &mut Box<dyn pnet::datalink::DataLinkSender>, scanner: &
 fn receive_tcp_packets(
     rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, 
     scanner: &PortScanner, 
-    open_ports: &Arc<Mutex<Vec<u16>>>,  
+    port_results: &Arc<Mutex<Vec<PortInfo>>>,  
     stop: &Arc<Mutex<bool>>, 
     scan_status: &Arc<Mutex<ScanStatus>>) {
     let start_time = Instant::now();
@@ -201,10 +204,10 @@ fn receive_tcp_packets(
                 let frame = pnet::packet::ethernet::EthernetPacket::new(frame).unwrap();
                 match frame.get_ethertype() {
                     pnet::packet::ethernet::EtherTypes::Ipv4 => {
-                        ipv4_handler(&frame, scanner, &open_ports);
+                        ipv4_handler(&frame, &port_results);
                     },
                     pnet::packet::ethernet::EtherTypes::Ipv6 => {
-                        ipv6_handler(&frame, scanner, &open_ports);
+                        ipv6_handler(&frame, &port_results);
                     },
                     _ => {},
                 }
@@ -224,65 +227,80 @@ fn receive_tcp_packets(
     }
 }
 
-fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
+fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
     if let Some(packet) = pnet::packet::ipv4::Ipv4Packet::new(ethernet.payload()){
         match packet.get_next_level_protocol() {
             pnet::packet::ip::IpNextHeaderProtocols::Tcp => {
-                tcp_handler(&packet, scanner, &open_ports);
+                tcp_handler_v4(&packet, port_results);
             },
             pnet::packet::ip::IpNextHeaderProtocols::Udp => {
-                udp_handler(&packet, scanner, &open_ports);
+                udp_handler_v4(&packet, port_results);
             },
             _ => {}
         }
     }
 }
 
-fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
+fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
     if let Some(packet) = pnet::packet::ipv6::Ipv6Packet::new(ethernet.payload()){
         match packet.get_next_header() {
             pnet::packet::ip::IpNextHeaderProtocols::Tcp => {
-                tcp_handler(&packet, scanner, &open_ports);
+                tcp_handler_v6(&packet, port_results);
             },
             pnet::packet::ip::IpNextHeaderProtocols::Udp => {
-                udp_handler(&packet, scanner, &open_ports);
+                udp_handler_v6(&packet, port_results);
             },
             _ => {}
         }
     }
 }
 
-fn tcp_handler(packet: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
-    let tcp = pnet::packet::tcp::TcpPacket::new(packet.get_payload());
-    if let Some(tcp) = tcp {
-        match scanner.scan_type {
-            PortScanType::SynScan => {
-                if tcp.get_flags() == pnet::packet::tcp::TcpFlags::SYN | pnet::packet::tcp::TcpFlags::ACK {
-                    append_packet_info(packet, &tcp, scanner, &open_ports);
-                }
-            },
-            _ => {
-                if tcp.get_flags() == pnet::packet::tcp::TcpFlags::RST {
-                    append_packet_info(packet, &tcp, scanner, &open_ports);
-                }
-            },
-        }
+fn tcp_handler_v4(packet: &pnet::packet::ipv4::Ipv4Packet, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
+    let tcp_packet = pnet::packet::tcp::TcpPacket::new(packet.payload());
+    if let Some(tcp_packet) = tcp_packet {
+        handle_tcp_packet(tcp_packet, port_results);
     }
 }
 
-fn udp_handler(packet: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
+fn tcp_handler_v6(packet: &pnet::packet::ipv6::Ipv6Packet, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
+    let tcp_packet = pnet::packet::tcp::TcpPacket::new(packet.payload());
+    if let Some(tcp_packet) = tcp_packet {
+        handle_tcp_packet(tcp_packet, port_results);
+    }
+}
+
+fn udp_handler_v4(packet: &pnet::packet::ipv4::Ipv4Packet, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
     let udp = pnet::packet::udp::UdpPacket::new(packet.get_payload());
     if let Some(udp) = udp {
-        append_packet_info(packet, &udp, scanner, &open_ports);
+        handle_udp_packet(udp, port_results);
     }
 }
 
-fn append_packet_info(_l3: &dyn EndPoints, l4: &dyn EndPoints, scanner: &PortScanner, open_ports: &Arc<Mutex<Vec<u16>>>) {
-    if l4.get_destination() == scanner.src_port.to_string() {
-        if !open_ports.lock().unwrap().contains(&l4.get_source().parse::<u16>().unwrap()){
-            open_ports.lock().unwrap().push(l4.get_source().parse::<u16>().unwrap());
-        }
+fn udp_handler_v6(packet: &pnet::packet::ipv6::Ipv6Packet, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
+    let udp = pnet::packet::udp::UdpPacket::new(packet.get_payload());
+    if let Some(udp) = udp {
+        handle_udp_packet(udp, port_results);
     }
 }
 
+fn handle_tcp_packet(tcp_packet: pnet::packet::tcp::TcpPacket, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
+    if tcp_packet.get_flags() == pnet::packet::tcp::TcpFlags::SYN | pnet::packet::tcp::TcpFlags::ACK {
+        port_results.lock().unwrap().push(
+            PortInfo{
+                port: tcp_packet.get_source(),
+                status: PortStatus::Open,
+            }
+        );
+    }else if tcp_packet.get_flags() == pnet::packet::tcp::TcpFlags::RST | pnet::packet::tcp::TcpFlags::ACK {
+        port_results.lock().unwrap().push(
+            PortInfo{
+                port: tcp_packet.get_source(),
+                status: PortStatus::Closed,
+            }
+        );
+    }
+}
 
+fn handle_udp_packet(_udp_packet: pnet::packet::udp::UdpPacket, _port_results: &Arc<Mutex<Vec<PortInfo>>>) {
+    //TODO
+}
