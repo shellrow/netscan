@@ -6,6 +6,8 @@ mod define;
 mod interface;
 mod packet;
 mod scanner;
+
+#[cfg(not(target_os="windows"))]
 mod async_scanner;
 
 pub use base_type::{PortScanType, ScanStatus};
