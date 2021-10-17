@@ -8,14 +8,16 @@ Cross-platform network scan library
 with the aim of being lightweight and fast. 
 
 ## Features
-- PORT SCAN
-- HOST SCAN
+- Port Scan
+- Host Scan
+- Async Port Scan (Currently only Unix-Like OS is supported)
+- Async Host Scan (Currently only Unix-Like OS is supported)
 
 ## Usage
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.4.0"
+netscan = "0.5.0"
 ```
 
 ## Example
@@ -26,14 +28,15 @@ use netscan::PortScanner;
 use netscan::PortScanType;
 use netscan::ScanStatus;
 use std::time::Duration;
+use std::net::{IpAddr, Ipv4Addr};
 
 fn main() {
     let mut port_scanner = match PortScanner::new(None) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    port_scanner.set_target_ipaddr("192.168.1.1");
-    port_scanner.set_range(1, 1000);
+    port_scanner.set_dst_ip(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)));
+    port_scanner.set_dst_port_range(1, 1000);
     //port_scanner.add_target_port(22);
     //port_scanner.add_target_port(80);
     //port_scanner.add_target_port(443);
@@ -41,7 +44,7 @@ fn main() {
     port_scanner.set_timeout(Duration::from_millis(10000));
     //port_scanner.set_wait_time(Duration::from_millis(10));
     port_scanner.run_scan();
-    let result = port_scanner.get_result();
+    let result = port_scanner.get_scan_result();
     print!("Status: ");
     match result.scan_status {
         ScanStatus::Done => {println!("Done")},
@@ -49,8 +52,8 @@ fn main() {
         _ => {println!("Error")},
     }
     println!("Open Ports:");
-    for port in result.open_ports {
-        println!("{}", port);
+    for port in result.ports {
+        println!("{:?}", port);
     }
     println!("Scan Time: {:?}", result.scan_time);
     match port_scanner.get_scan_type() {
@@ -73,4 +76,3 @@ For more details see [Examples][examples-url]
 
 ## Additional Notes
 This library requires the ability to create raw sockets.  Execute with administrator privileges.  
-(The default SYN SCAN is recommended, but CONNECT SCAN without administrator privileges is also possible.)
