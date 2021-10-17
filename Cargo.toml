@@ -1,6 +1,6 @@
 [package]
 name = "netscan"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["shellrow <81893184+shellrow@users.noreply.github.com>"]
 edition = "2018"
 description = "Cross-platform network scan library"
@@ -17,9 +17,12 @@ rand = "0.8"
 default-net = "0.4.0"
 log = "0.4"
 pnet = "0.28.0"
+socket2 = { version = "0.4", features = ["all"] }
+tokio = { version = "1.7.0", features = ["rt", "rt-multi-thread", "net", "time", "macros", "sync"] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [ "std" ] }
 
 [dev-dependencies]
 ipnet = "2.3"
+tokio = { version = "1.7.0", features = ["full"] }
