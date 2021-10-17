@@ -6,8 +6,10 @@ use crate::define::DEFAULT_SRC_PORT;
 
 /// Structure for async host scan with various options.   
 /// 
+/// Currently only Unix-Like OS is supported.
+/// 
 /// Should be constructed using AsyncHostScanner::new 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AsyncHostScanner {
     /// Source IP Address  
     pub src_ip: IpAddr,
@@ -92,6 +94,8 @@ impl AsyncHostScanner {
 }
 
 /// Structure for async port scan with various options.   
+/// 
+/// Currently only Unix-Like OS is supported.
 /// 
 /// Should be constructed using AsyncPortScanner::new 
 #[derive(Clone, Debug)]

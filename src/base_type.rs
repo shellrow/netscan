@@ -34,7 +34,7 @@ pub struct PortInfo {
 }
 
 /// Result of HostScanner::run_scan  
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HostScanResult {
     /// List of up host  
     pub up_hosts: Vec<String>,
