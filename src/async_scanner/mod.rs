@@ -1,12 +1,12 @@
 pub mod shared;
 pub use self::shared::*;
 
-#[cfg(not(target_os="windows"))]
+#[cfg(target_family="unix")]
 pub mod unix;
-#[cfg(not(target_os="windows"))]
+#[cfg(target_family="unix")]
 pub use self::unix::*;
 
-/* #[cfg(target_os="windows")]
+/* #[cfg(target_family="windows")]
 pub mod windows;
-#[cfg(target_os="windows")]
+#[cfg(target_family="windows")]
 pub use self::windows::*; */

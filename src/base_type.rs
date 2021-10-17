@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-/// Scan status of current scanner 
+/// Scan task status for each scanner 
 #[derive(Clone, Copy, Debug)]
 pub enum ScanStatus {
     Ready,
@@ -11,13 +11,14 @@ pub enum ScanStatus {
 
 /// Type of port scan 
 /// 
-/// Supports SynScan, ConnectScan
+/// Supports TCP SYN Scan, TCP CONNECT Scan
 #[derive(Clone, Copy, Debug)]
 pub enum PortScanType {
     SynScan,
     ConnectScan,
 }
 
+/// Status of port that responded 
 #[derive(Clone, Copy, Debug)]
 pub enum PortStatus {
     Open,
@@ -25,6 +26,7 @@ pub enum PortStatus {
     Filtered,
 }
 
+/// Information on each port that responded
 #[derive(Clone, Copy, Debug)]
 pub struct PortInfo {
     pub port: u16,

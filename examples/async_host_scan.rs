@@ -1,4 +1,4 @@
-#[cfg(not(target_os="windows"))]
+#[cfg(target_family="unix")]
 async fn unix_main() {
     use netscan::AsyncHostScanner;
     use netscan::ScanStatus;
@@ -40,12 +40,12 @@ async fn unix_main() {
 
 #[tokio::main]
 async fn main() {
-    #[cfg(not(target_os="windows"))]
+    #[cfg(target_family="unix")]
     {
         unix_main().await;
     }
 
-    #[cfg(target_os="windows")]
+    #[cfg(target_family="windows")]
     {
         println!("Windows is not yet supported.");
     }

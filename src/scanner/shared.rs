@@ -7,7 +7,7 @@ use crate::scanner::{scan_hosts, scan_ports};
 use crate::base_type::{PortScanType, HostScanResult, PortScanResult};
 use crate::define::DEFAULT_SRC_PORT;
 
-/// Structure for host scan  
+/// Structure for host scan with various options.   
 /// 
 /// Should be constructed using HostScanner::new 
 #[derive(Clone)]
@@ -24,7 +24,7 @@ pub struct HostScanner {
     pub scan_result: HostScanResult,
 }
 
-/// Structure for port scan  
+/// Structure for port scan with various options.  
 /// 
 /// Should be constructed using PortScanner::new 
 #[derive(Clone)]
@@ -57,7 +57,7 @@ pub struct PortScanner {
     pub scan_result: PortScanResult,
 }
 
-impl HostScanner{
+impl HostScanner {
     /// Construct new HostScanner  
     pub fn new() -> Result<HostScanner, String> {
         let host_scanner = HostScanner{
@@ -69,14 +69,16 @@ impl HostScanner{
         };
         Ok(host_scanner)
     }
-    /// Set source IP Address 
+    /// Set source IP address 
     pub fn set_src_ip(&mut self, src_ipaddr:IpAddr){
         self.src_ip = src_ipaddr;
     }
-    /// Add target host to list
+    /// Add destination host to list 
     pub fn add_dst_ip(&mut self, ip_addr: IpAddr) {
         self.dst_ips.push(ip_addr);
     }
+    /// Set the destination host list 
+    /// (Replace the entire destination list) 
     pub fn set_dst_ips(&mut self, ips: Vec<IpAddr>) {
         self.dst_ips = ips;
     }
@@ -88,6 +90,7 @@ impl HostScanner{
     pub fn set_wait_time(&mut self, wait_time: Duration){
         self.wait_time = wait_time;
     }
+    /// Set scan result
     pub fn set_scan_result(&mut self, scan_result: HostScanResult) {
         self.scan_result = scan_result;
     }
@@ -95,7 +98,7 @@ impl HostScanner{
     pub fn get_src_ip(&mut self) -> IpAddr {
         return self.src_ip.clone();
     }
-    /// Get target hosts
+    /// Get destination hosts
     pub fn get_dst_ips(&mut self) -> Vec<IpAddr> {
         return self.dst_ips.clone();
     }
@@ -107,7 +110,7 @@ impl HostScanner{
     pub fn get_wait_time(&mut self) -> Duration {
         return self.wait_time.clone();
     }
-    /// Return scan result
+    /// Get scan result
     pub fn get_scan_result(&mut self) -> HostScanResult{
         return self.scan_result.clone();
     }
@@ -124,7 +127,7 @@ impl HostScanner{
     }
 }
 
-impl PortScanner{
+impl PortScanner {
     /// Construct new PortScanner (with network interface name)
     /// 
     /// Specify None for default. `PortScanner::new(None)`
@@ -162,10 +165,11 @@ impl PortScanner{
         }
         Ok(port_scanner)
     }
+    /// Set source IP address  
     pub fn set_src_ip(&mut self, ip_addr: IpAddr) {
         self.src_ip = ip_addr;
     }
-    /// Set IP address of target host
+    /// Set destination IP address 
     pub fn set_dst_ip(&mut self, ip_addr: IpAddr){
         self.dst_ip = ip_addr;
     }
@@ -173,16 +177,18 @@ impl PortScanner{
     pub fn set_src_port(&mut self, src_port: u16){
         self.src_port = src_port;
     }
-    /// Add target port 
+    /// Add destination port 
     pub fn add_dst_port(&mut self, port_num: u16){
         self.dst_ports.push(port_num);
     }
-    /// Set range of target ports (by start and end)
+    /// Set range of destination ports (by start and end)
     pub fn set_dst_port_range(&mut self, start_port: u16, end_port: u16) {
         for i in start_port..end_port + 1 {
             self.add_dst_port(i);
         }
     }
+    /// Set the destination port list 
+    /// (Replace the entire destination list) 
     pub fn set_dst_ports(&mut self, ports: Vec<u16>) {
         self.dst_ports = ports;
     }
@@ -202,6 +208,7 @@ impl PortScanner{
     pub fn set_send_rate(&mut self, send_rate: Duration){
         self.send_rate = send_rate;
     }
+    /// Set scan result
     pub fn set_scan_result(&mut self, scan_result: PortScanResult) {
         self.scan_result = scan_result;
     }
@@ -213,27 +220,25 @@ impl PortScanner{
     pub fn get_if_name(&mut self) -> String {
         return self.if_name.clone();
     }
+    /// Get source ip address
     pub fn get_src_ip(&self) -> IpAddr {
         self.src_ip
     }
-    /// Get target ip address
+    /// Get destination ip address
     pub fn get_dst_ip(&mut self) -> IpAddr {
         return self.dst_ip.clone();
     }
+    /// Get source port
     pub fn get_src_port(&self) -> u16 {
         self.src_port
     }
-    /// Get target ports
+    /// Get destination ports
     pub fn get_dst_ports(&mut self) -> Vec<u16> {
         return self.dst_ports.clone();
     }
     /// Get PortScanType
     pub fn get_scan_type(&mut self) -> PortScanType {
         return self.scan_type.clone();
-    }
-    /// Get source port number
-    pub fn get_src_port_num(&mut self) -> u16 {
-        return self.src_port.clone();
     }
     /// Get timeout
     pub fn get_timeout(&mut self) -> Duration {
@@ -247,7 +252,7 @@ impl PortScanner{
     pub fn get_send_rate(&mut self) -> Duration {
         return self.send_rate.clone();
     }
-    /// Return scan result
+    /// Get scan result
     pub fn get_scan_result(&mut self) -> PortScanResult {
         return self.scan_result.clone();
     }
