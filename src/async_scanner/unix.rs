@@ -303,5 +303,5 @@ fn handle_tcp_packet(tcp_packet: pnet::packet::tcp::TcpPacket, port_results: &Ar
 }
 
 fn handle_udp_packet(_udp_packet: pnet::packet::udp::UdpPacket, _port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    //TODO
+    
 }
