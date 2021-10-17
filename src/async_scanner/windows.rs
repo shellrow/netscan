@@ -21,9 +21,7 @@ use crate::packet::icmp;
 use crate::async_scanner::{AsyncPortScanner, AsyncHostScanner};
 
 #[derive(Clone, Debug)]
-pub struct AsyncSocket {
-    inner: Arc<Socket>,
-}
+pub struct AsyncSocket;
 
 impl AsyncSocket {
     pub fn new(addr: IpAddr, protocol: Protocol) -> io::Result<AsyncSocket> {
@@ -32,26 +30,14 @@ impl AsyncSocket {
             IpAddr::V6(_) => Socket::new(Domain::IPV6, Type::RAW, Some(protocol))?,
         };
         socket.set_nonblocking(true)?;
-        Ok(AsyncSocket {
-            inner: Arc::new(socket),
-        })
+        todo!();
     }
-    pub async fn send_to(&self, buf: &mut [u8], target: &SockAddr) -> io::Result<usize> {
-        loop {
-            match self.inner.send_to(buf, target) {
-                Ok(n) => return Ok(n),
-                Err(_) => continue,
-            }
-        }
+    pub async fn send_to(&self, _buf: &mut [u8], _target: &SockAddr) -> io::Result<usize> {
+        todo!();
     }
     #[allow(dead_code)]
-    pub async fn recv(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-        loop {
-            match self.inner.recv(buf) {
-                Ok(result) => return Ok(result),
-                Err(_would_block) => continue,
-            }
-        }
+    pub async fn recv(&self, _buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
+        todo!();
     }
 }
 
@@ -295,5 +281,5 @@ fn handle_tcp_packet(tcp_packet: pnet::packet::tcp::TcpPacket, port_results: &Ar
 }
 
 fn handle_udp_packet(_udp_packet: pnet::packet::udp::UdpPacket, _port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    //TODO
+    todo!();
 }
