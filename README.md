@@ -31,18 +31,18 @@ use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 
 fn main() {
-    let mut port_scanner = match PortScanner::new(None) {
+    let mut port_scanner = match PortScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     port_scanner.set_dst_ip(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)));
     port_scanner.set_dst_port_range(1, 1000);
-    //port_scanner.add_target_port(22);
-    //port_scanner.add_target_port(80);
-    //port_scanner.add_target_port(443);
+    //port_scanner.add_dst_port(22);
+    //port_scanner.add_dst_port(80);
+    //port_scanner.add_dst_port(443);
     port_scanner.set_scan_type(PortScanType::SynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
-    //port_scanner.set_wait_time(Duration::from_millis(10));
+    //port_scanner.set_wait_time(Duration::from_millis(200));
     port_scanner.run_scan();
     let result = port_scanner.get_scan_result();
     print!("Status: ");
