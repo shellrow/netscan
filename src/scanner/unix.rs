@@ -39,11 +39,11 @@ pub fn scan_hosts(_interface: &pnet::datalink::NetworkInterface, scan_setting: &
 
 fn send_icmp_packet(tx: &mut pnet::transport::TransportSender, stop: &Arc<Mutex<bool>>, scan_setting: &ScanSetting){
     for host in &scan_setting.dst_ips {
-        thread::sleep(time::Duration::from_millis(1));
         let mut buf = vec![0; 16];
         let mut icmp_packet = pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
         icmp::build_icmp_packet(&mut icmp_packet);
         let _result = tx.send_to(icmp_packet, *host);
+        thread::sleep(scan_setting.send_rate);
     }
     thread::sleep(scan_setting.wait_time);
     *stop.lock().unwrap() = true;
