@@ -7,6 +7,7 @@ mod interface;
 mod packet;
 mod scanner;
 mod async_scanner;
+mod scan;
 
 pub use base_type::{PortScanType, ScanStatus};
 pub use base_type::{PortScanResult, HostScanResult};

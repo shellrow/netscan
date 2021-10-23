@@ -5,11 +5,12 @@ use std::net::{IpAddr, Ipv4Addr};
 use ipnet::Ipv4Net;
 use std::time::Duration;
 
-fn main(){
+fn main() {
     let mut host_scanner = match HostScanner::new(){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
+    host_scanner.set_src_ip(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4)));
     //Get network address
     let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 0), 24).unwrap();
     assert_eq!(Ok(net.network()), "192.168.1.0".parse());

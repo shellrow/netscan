@@ -41,8 +41,8 @@ impl AsyncSocket {
     }
 }
 
-pub async fn scan_hosts(scanner: AsyncHostScanner) -> (Vec<String>, ScanStatus) {
-    let mut result: Vec<String> = vec![];
+pub async fn scan_hosts(scanner: AsyncHostScanner) -> (Vec<IpAddr>, ScanStatus) {
+    let mut result: Vec<IpAddr> = vec![];
     let async_socket = match AsyncSocket::new(scanner.src_ip.clone(), Protocol::ICMPV4) {
         Ok(socket) => socket,
         Err(_) => return (result, ScanStatus::Error),
@@ -77,7 +77,7 @@ pub async fn scan_hosts(scanner: AsyncHostScanner) -> (Vec<String>, ScanStatus) 
     thread::sleep(scanner.wait_time);
     *stop.lock().await = true;
     for port_info in up_hosts.lock().unwrap().iter() {
-        result.push(port_info.to_string());
+        result.push(port_info.clone());
     }
     (result, ScanStatus::Done)
 }
