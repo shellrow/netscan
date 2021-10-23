@@ -5,7 +5,7 @@ use pnet::datalink::MacAddr;
 pub fn get_interface_index_by_ip(ip_addr: IpAddr) -> Option<u32> {
     for iface in datalink::interfaces() {
         for ip in iface.ips {
-            if ip.contains(ip_addr) {
+            if ip.ip() == ip_addr {
                 return Some(iface.index);
             }
         }   

@@ -275,16 +275,9 @@ impl PortScanner {
         };
         let interfaces = pnet::datalink::interfaces();
         let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == self.if_index).next().expect("Failed to get Interface");    
-        let mut iface_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-        for ip in &interface.ips {
-            match ip.ip() {
-                IpAddr::V4(ipv4) => iface_ip = IpAddr::V4(ipv4),
-                IpAddr::V6(ipv6) => iface_ip = IpAddr::V6(ipv6),
-            }
-        }
         self.src_mac = interface.mac.unwrap();
         self.dst_mac = dst_mac;
-        self.src_ip = iface_ip;
+        self.if_name = interface.name.clone();
         let scan_setting: ScanSetting = ScanSetting {
             src_mac: self.src_mac.clone(),
             dst_mac: self.dst_mac.clone(),
