@@ -59,9 +59,9 @@ pub struct PortScanner {
 
 impl HostScanner {
     /// Construct new HostScanner  
-    pub fn new() -> Result<HostScanner, String> {
+    pub fn new(src_ip: IpAddr) -> Result<HostScanner, String> {
         let host_scanner = HostScanner{
-            src_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            src_ip: src_ip,
             dst_ips: vec![],
             timeout: Duration::from_millis(10000),
             wait_time: Duration::from_millis(200),
@@ -147,13 +147,13 @@ impl PortScanner {
     /// Construct new PortScanner (with network interface name)
     /// 
     /// Specify None for default. `PortScanner::new(None)`
-    pub fn new(if_name: Option<&str>) -> Result<PortScanner, String> {
+    pub fn new(src_ip: IpAddr) -> Result<PortScanner, String> {
         let mut port_scanner = PortScanner{
             if_index: 0,
             if_name: String::new(),
             src_mac: MacAddr::zero(),
             dst_mac: MacAddr::zero(),
-            src_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            src_ip: src_ip,
             dst_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 
             src_port: DEFAULT_SRC_PORT,
             dst_ports: vec![],
@@ -163,21 +163,10 @@ impl PortScanner {
             send_rate: Duration::from_millis(0),
             scan_result: PortScanResult::new(),
         };
-        if let Some(if_name) = if_name {
-            let if_index = interface::get_interface_index_by_name(if_name.to_string());
-            if let Some(if_index) = if_index{
-                port_scanner.if_index = if_index;
-                port_scanner.if_name = if_name.to_string();
-            }else{
-                return Err("Failed to get interface info by name.".to_string());
-            }
+        if let Some(if_index) = interface::get_interface_index_by_ip(src_ip) {
+            port_scanner.if_index = if_index;
         }else{
-            let def_if_index = default_net::get_default_interface_index();
-            if let Some(def_if_index) = def_if_index {
-                port_scanner.if_index = def_if_index;
-            }else{
-                return Err("Failed to get default interface info.".to_string());
-            }
+            return Err(String::from("Failed to get interface info by name."));
         }
         Ok(port_scanner)
     }

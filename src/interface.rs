@@ -1,11 +1,14 @@
+use std::net::IpAddr;
 use pnet::datalink;
 use pnet::datalink::MacAddr;
 
-pub fn get_interface_index_by_name(if_name: String) -> Option<u32> {
+pub fn get_interface_index_by_ip(ip_addr: IpAddr) -> Option<u32> {
     for iface in datalink::interfaces() {
-        if iface.name == if_name {
-            return Some(iface.index)
-        }
+        for ip in iface.ips {
+            if ip.contains(ip_addr) {
+                return Some(iface.index);
+            }
+        }   
     }
     return None;
 }
