@@ -2,6 +2,7 @@ use std::time::Instant;
 use std::sync::{Arc, Mutex};
 use std::net::IpAddr;
 use pnet::packet::Packet;
+use tokio::sync::Mutex as TokioMutex;
 use crate::base_type::{ScanStatus, PortInfo, PortStatus, ScanSetting, ScanResult};
 
 pub fn receive_packets(
@@ -35,6 +36,37 @@ pub fn receive_packets(
         }
         if Instant::now().duration_since(start_time) > scan_setting.timeout {
             *scan_status.lock().unwrap() = ScanStatus::Timeout;
+            break;
+        }
+    }
+}
+
+pub async fn receive_packets_async(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<TokioMutex<bool>>, scan_status: &Arc<TokioMutex<ScanStatus>>) {
+    let start_time = Instant::now();
+    loop {
+        match rx.next() {
+            Ok(frame) => {
+                let frame = pnet::packet::ethernet::EthernetPacket::new(frame).unwrap();
+                match frame.get_ethertype() {
+                    pnet::packet::ethernet::EtherTypes::Ipv4 => {
+                        ipv4_handler(&frame, scan_setting, &scan_result);
+                    },
+                    pnet::packet::ethernet::EtherTypes::Ipv6 => {
+                        ipv6_handler(&frame, scan_setting, &scan_result);
+                    },
+                    _ => {},
+                }
+            },
+            Err(e) => {
+                panic!("Failed to read: {}", e);
+            }
+        }
+        if *stop.lock().await {
+            *scan_status.lock().await = ScanStatus::Done;
+            break;
+        }
+        if Instant::now().duration_since(start_time) > scan_setting.timeout {
+            *scan_status.lock().await = ScanStatus::Timeout;
             break;
         }
     }

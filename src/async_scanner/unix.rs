@@ -13,13 +13,12 @@ use pnet::packet::tcp::MutableTcpPacket;
 use pnet::transport::icmp_packet_iter;
 use pnet::transport::TransportChannelType::Layer4;
 use pnet::transport::TransportProtocol::Ipv4;
-use crate::base_type::{PortStatus, PortInfo, ScanStatus};
-use crate::packet::endpoint::EndPoints;
+use crate::base_type::{PortInfo, ScanStatus, ScanSetting, ScanResult};
 use crate::packet::ethernet;
 use crate::packet::ipv4;
 use crate::packet::tcp;
 use crate::packet::icmp;
-use crate::async_scanner::{AsyncPortScanner, AsyncHostScanner};
+use crate::scan;
 
 #[derive(Clone, Debug)]
 pub struct AsyncSocket {
@@ -59,28 +58,28 @@ impl AsyncSocket {
     }
 }
 
-pub async fn scan_hosts(scanner: AsyncHostScanner) -> (Vec<IpAddr>, ScanStatus) {
+pub async fn scan_hosts(scan_setting: ScanSetting) -> (Vec<IpAddr>, ScanStatus) {
     let mut result: Vec<IpAddr> = vec![];
-    let async_socket = match AsyncSocket::new(scanner.src_ip.clone(), Protocol::ICMPV4) {
+    let async_socket = match AsyncSocket::new(scan_setting.src_ip.clone(), Protocol::ICMPV4) {
         Ok(socket) => socket,
         Err(_) => return (result, ScanStatus::Error),
     };
     let stop: Arc<TokioMutex<bool>> = Arc::new(TokioMutex::new(false));
-    let up_hosts:Arc<Mutex<Vec<IpAddr>>> = Arc::new(Mutex::new(vec![]));
-    let scan_status: Arc<Mutex<ScanStatus>> = Arc::new(Mutex::new(ScanStatus::Ready));
-    let dst_ips: Arc<Mutex<Vec<IpAddr>>> = Arc::new(Mutex::new(scanner.get_dst_ips()));
-    let timeout: Arc<Mutex<Duration>> = Arc::new(Mutex::new(scanner.get_timeout()));
-    let protocol = Layer4(Ipv4(pnet::packet::ip::IpNextHeaderProtocols::Icmp));
     let stop_receive = Arc::clone(&stop);
+    let up_hosts:Arc<Mutex<Vec<IpAddr>>> = Arc::new(Mutex::new(vec![]));
     let up_hosts_receive = Arc::clone(&up_hosts);
+    let scan_status: Arc<Mutex<ScanStatus>> = Arc::new(Mutex::new(ScanStatus::Ready));
+    let dst_ips: Arc<Mutex<Vec<IpAddr>>> = Arc::new(Mutex::new(scan_setting.dst_ips.clone()));
+    let timeout: Arc<Mutex<Duration>> = Arc::new(Mutex::new(scan_setting.timeout.clone()));
+    let protocol = Layer4(Ipv4(pnet::packet::ip::IpNextHeaderProtocols::Icmp));
     let (mut _tx, mut rx) = match pnet::transport::transport_channel(4096, protocol) {
         Ok((tx, rx)) => (tx, rx),
-        Err(e) => panic!("Error happened {}", e),
+        Err(_) => return (result, ScanStatus::Error),
     };
     tokio::spawn(async move {
         receive_icmp_packets(&mut rx, &dst_ips, &timeout, &stop_receive, &up_hosts_receive, &scan_status).await;
     });
-    for ipaddr in scanner.get_dst_ips() {
+    for ipaddr in scan_setting.dst_ips.clone() {
         let socket = async_socket.clone();
         let mut icmp_packet: Vec<u8> = build_icmpv4_echo_packet().await;
         let socket_addr = SocketAddr::new(ipaddr, 0);
@@ -92,7 +91,7 @@ pub async fn scan_hosts(scanner: AsyncHostScanner) -> (Vec<IpAddr>, ScanStatus) 
             }
         });
     }
-    thread::sleep(scanner.wait_time);
+    thread::sleep(scan_setting.wait_time);
     *stop.lock().await = true;
     for host in up_hosts.lock().unwrap().iter() {
         result.push(host.clone());
@@ -149,17 +148,22 @@ async fn build_syn_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_por
     tcp_packet.packet().to_vec()
 }
 
-pub async fn scan_ports(scanner: AsyncPortScanner) -> (Vec<PortInfo>, ScanStatus) {
+pub async fn scan_ports(scan_setting: ScanSetting) -> (Vec<PortInfo>, ScanStatus) {
     let mut result: Vec<PortInfo> = vec![];
-    let async_socket = match AsyncSocket::new(scanner.src_ip.clone(), Protocol::TCP) {
+    let receive_setting = scan_setting.clone();
+    let scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
+    let scan_result_receive = Arc::clone(&scan_result);
+    let scan_status: Arc<TokioMutex<ScanStatus>> = Arc::new(TokioMutex::new(ScanStatus::Ready));
+    let scan_status_receive = Arc::clone(&scan_status);
+    let stop: Arc<TokioMutex<bool>> = Arc::new(TokioMutex::new(false));
+    let stop_receive = Arc::clone(&stop);
+    let async_socket = match AsyncSocket::new(scan_setting.src_ip.clone(), Protocol::TCP) {
         Ok(socket) => socket,
         Err(_) => return (result, ScanStatus::Error),
     };
-    let port_results: Arc<Mutex<Vec<PortInfo>>> = Arc::new(Mutex::new(vec![]));
-    let stop: Arc<TokioMutex<bool>> = Arc::new(TokioMutex::new(false));
-    let src_ip = scanner.src_ip.clone();
-    let src_port = scanner.src_port.clone();
-    let dst_ip = scanner.dst_ip.clone();
+    let src_ip = scan_setting.src_ip.clone();
+    let src_port = scan_setting.src_port.clone();
+    let dst_ip = scan_setting.dst_ip.clone();
     let default_index = default_net::get_default_interface_index().unwrap();
     let interfaces = pnet::datalink::interfaces();
     let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == default_index).next().expect("Failed to get Interface");
@@ -175,15 +179,13 @@ pub async fn scan_ports(scanner: AsyncPortScanner) -> (Vec<PortInfo>, ScanStatus
     };
     let (mut _tx, mut rx) = match pnet::datalink::channel(&interface, config) {
         Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => panic!("Unknown channel type"),
-        Err(e) => panic!("Error happened {}", e),
+        Ok(_) => return (result, ScanStatus::Error),
+        Err(_) => return (result, ScanStatus::Error),
     };
-    let stop_receive = Arc::clone(&stop);
-    let port_results_receive = Arc::clone(&port_results);
     tokio::spawn(async move {
-        receive_tcp_packets(&mut rx, &stop_receive, &port_results_receive).await;
+        scan::receive::receive_packets_async(&mut rx, &receive_setting, &scan_result_receive, &stop_receive, &scan_status_receive).await;
     });
-    for port in scanner.dst_ports.clone() {
+    for port in scan_setting.dst_ports.clone() {
         let socket = async_socket.clone();
         let mut syn_packet: Vec<u8> = build_syn_packet(src_ip, src_port, dst_ip, port).await;
         let socket_addr = SocketAddr::new(dst_ip, port);
@@ -195,113 +197,17 @@ pub async fn scan_ports(scanner: AsyncPortScanner) -> (Vec<PortInfo>, ScanStatus
             }
         });
     }
-    thread::sleep(scanner.wait_time);
+    thread::sleep(scan_setting.wait_time);
     *stop.lock().await = true;
-    for port_info in port_results.lock().unwrap().iter() {
+    for port_info in scan_result.lock().unwrap().ports.iter() {
         result.push(port_info.clone());
     }
-    (result, ScanStatus::Done)
-}
-
-async fn receive_tcp_packets(rx: &mut Box<dyn pnet::datalink::DataLinkReceiver>, stop: &Arc<TokioMutex<bool>>, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    loop {
-        match rx.next() {
-            Ok(frame) => {
-                let frame = pnet::packet::ethernet::EthernetPacket::new(frame).unwrap();
-                match frame.get_ethertype() {
-                    pnet::packet::ethernet::EtherTypes::Ipv4 => {
-                        ipv4_handler(&frame, port_results);
-                    },
-                    pnet::packet::ethernet::EtherTypes::Ipv6 => {
-                        ipv6_handler(&frame, port_results);
-                    },
-                    _ => {},
-                }
-            },
-            Err(e) => {
-                panic!("Failed to read: {}", e);
-            }
-        }
-        if *stop.lock().await {
-            break;
-        }
+    let mut status_result = *scan_status.lock().await;
+    match status_result {
+        ScanStatus::Ready => {
+            status_result = ScanStatus::Done;
+        },
+        _ => {},
     }
-}
-
-fn ipv4_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    if let Some(packet) = pnet::packet::ipv4::Ipv4Packet::new(ethernet.payload()){
-        match packet.get_next_level_protocol() {
-            pnet::packet::ip::IpNextHeaderProtocols::Tcp => {
-                tcp_handler_v4(&packet, port_results);
-            },
-            pnet::packet::ip::IpNextHeaderProtocols::Udp => {
-                udp_handler_v4(&packet, port_results);
-            },
-            _ => {}
-        }
-    }
-}
-
-fn ipv6_handler(ethernet: &pnet::packet::ethernet::EthernetPacket, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    if let Some(packet) = pnet::packet::ipv6::Ipv6Packet::new(ethernet.payload()){
-        match packet.get_next_header() {
-            pnet::packet::ip::IpNextHeaderProtocols::Tcp => {
-                tcp_handler_v6(&packet, port_results);
-            },
-            pnet::packet::ip::IpNextHeaderProtocols::Udp => {
-                udp_handler_v6(&packet, port_results);
-            },
-            _ => {}
-        }
-    }
-}
-
-fn tcp_handler_v4(packet: &pnet::packet::ipv4::Ipv4Packet, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    let tcp_packet = pnet::packet::tcp::TcpPacket::new(packet.payload());
-    if let Some(tcp_packet) = tcp_packet {
-        handle_tcp_packet(tcp_packet, port_results);
-    }
-}
-
-fn tcp_handler_v6(packet: &pnet::packet::ipv6::Ipv6Packet, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    let tcp_packet = pnet::packet::tcp::TcpPacket::new(packet.payload());
-    if let Some(tcp_packet) = tcp_packet {
-        handle_tcp_packet(tcp_packet, port_results);
-    }
-}
-
-fn udp_handler_v4(packet: &pnet::packet::ipv4::Ipv4Packet, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    let udp = pnet::packet::udp::UdpPacket::new(packet.get_payload());
-    if let Some(udp) = udp {
-        handle_udp_packet(udp, port_results);
-    }
-}
-
-fn udp_handler_v6(packet: &pnet::packet::ipv6::Ipv6Packet, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    let udp = pnet::packet::udp::UdpPacket::new(packet.get_payload());
-    if let Some(udp) = udp {
-        handle_udp_packet(udp, port_results);
-    }
-}
-
-fn handle_tcp_packet(tcp_packet: pnet::packet::tcp::TcpPacket, port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    if tcp_packet.get_flags() == pnet::packet::tcp::TcpFlags::SYN | pnet::packet::tcp::TcpFlags::ACK {
-        port_results.lock().unwrap().push(
-            PortInfo{
-                port: tcp_packet.get_source(),
-                status: PortStatus::Open,
-            }
-        );
-    }else if tcp_packet.get_flags() == pnet::packet::tcp::TcpFlags::RST | pnet::packet::tcp::TcpFlags::ACK {
-        port_results.lock().unwrap().push(
-            PortInfo{
-                port: tcp_packet.get_source(),
-                status: PortStatus::Closed,
-            }
-        );
-    }
-}
-
-fn handle_udp_packet(_udp_packet: pnet::packet::udp::UdpPacket, _port_results: &Arc<Mutex<Vec<PortInfo>>>) {
-    
+    (result, status_result)
 }

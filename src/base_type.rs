@@ -79,12 +79,14 @@ impl PortScanResult {
 }
 
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 pub enum Protocol {
     Tcp,
     Udp,
     Icmp,
 }
 
+#[derive(Clone, Debug)]
 pub struct ScanSetting {
     pub src_mac: MacAddr,
     pub dst_mac: MacAddr,
@@ -120,6 +122,7 @@ impl ScanSetting {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct ScanResult {
     pub hosts: Vec<IpAddr>,
     pub ports: Vec<PortInfo>,

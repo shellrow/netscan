@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
-use crate::base_type::{PortScanType, HostScanResult, PortScanResult};
+use crate::base_type::{PortScanType, HostScanResult, PortScanResult, Protocol, ScanSetting};
 use crate::async_scanner::{scan_ports, scan_hosts};
 use crate::define::DEFAULT_SRC_PORT;
 
@@ -84,8 +84,22 @@ impl AsyncHostScanner {
     /// 
     /// Results are stored in AsyncHostScanner::scan_result
     pub async fn run_scan(&mut self) {
+        let scan_setting: ScanSetting = ScanSetting {
+            src_mac: pnet::datalink::MacAddr::zero(),
+            dst_mac: pnet::datalink::MacAddr::zero(),
+            src_ip: self.src_ip.clone(),
+            dst_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            dst_ips: self.dst_ips.clone(),
+            src_port: DEFAULT_SRC_PORT,
+            dst_ports: vec![],
+            timeout: self.timeout.clone(),
+            wait_time: self.wait_time.clone(),
+            send_rate: Duration::from_millis(1),
+            protocol: Protocol::Icmp,
+            scan_type: None,
+        };
         let start_time = Instant::now();
-        let (up_hosts, status) = scan_hosts(self.clone()).await;
+        let (up_hosts, status) = scan_hosts(scan_setting).await;
         let scan_time = Instant::now().duration_since(start_time);
         self.scan_result.up_hosts = up_hosts;
         self.scan_result.scan_status = status;
@@ -224,8 +238,22 @@ impl AsyncPortScanner {
     /// 
     /// Results are stored in AsyncPortScanner::scan_result
     pub async fn run_scan(&mut self) {
+        let scan_setting: ScanSetting = ScanSetting {
+            src_mac: pnet::datalink::MacAddr::zero(),
+            dst_mac: pnet::datalink::MacAddr::zero(),
+            src_ip: self.src_ip.clone(),
+            dst_ip: self.dst_ip.clone(),
+            dst_ips: vec![],
+            src_port: self.src_port.clone(),
+            dst_ports: self.dst_ports.clone(),
+            timeout: self.timeout.clone(),
+            wait_time: self.wait_time.clone(),
+            send_rate: self.send_rate.clone(),
+            protocol: Protocol::Tcp,
+            scan_type: Some(self.scan_type.clone()),
+        };
         let start_time = Instant::now();
-        let (ports, status) = scan_ports(self.clone()).await;
+        let (ports, status) = scan_ports(scan_setting).await;
         let scan_time = Instant::now().duration_since(start_time);
         self.scan_result.ports = ports;
         self.scan_result.scan_status = status;
