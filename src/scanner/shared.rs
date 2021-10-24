@@ -58,7 +58,7 @@ pub struct PortScanner {
 }
 
 impl HostScanner {
-    /// Construct new HostScanner  
+    /// Construct new HostScanner (with network interface IP address) 
     pub fn new(src_ip: IpAddr) -> Result<HostScanner, String> {
         let host_scanner = HostScanner{
             src_ip: src_ip,
@@ -144,9 +144,7 @@ impl HostScanner {
 }
 
 impl PortScanner {
-    /// Construct new PortScanner (with network interface name)
-    /// 
-    /// Specify None for default. `PortScanner::new(None)`
+    /// Construct new PortScanner (with network interface IP address)
     pub fn new(src_ip: IpAddr) -> Result<PortScanner, String> {
         let mut port_scanner = PortScanner{
             if_index: 0,

@@ -24,6 +24,7 @@ pub struct AsyncHostScanner {
 }
 
 impl AsyncHostScanner {
+    /// Construct new AsyncHostScanner (with network interface IP address) 
     pub fn new(src_ip: IpAddr) -> Result<AsyncHostScanner, String> {
         Ok(
             AsyncHostScanner {
@@ -135,7 +136,7 @@ pub struct AsyncPortScanner {
 }
 
 impl AsyncPortScanner {
-    /// Construct new AsyncPortScanner 
+    /// Construct new AsyncPortScanner (with network interface IP address) 
     pub fn new(src_ip: IpAddr) -> Result<AsyncPortScanner, String> {
         Ok(
             AsyncPortScanner {
