@@ -122,8 +122,8 @@ impl HostScanner {
         let interfaces = pnet::datalink::interfaces();
         let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == default_if.index).next().expect("Failed to get Interface");
         let scan_setting: ScanSetting = ScanSetting {
-            src_mac: default_if.mac.unwrap().parse::<pnet::datalink::MacAddr>().unwrap(),
-            dst_mac: default_if.gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap(),
+            src_mac: default_if.mac.expect("Failed to get interface MAC").parse::<pnet::datalink::MacAddr>().unwrap(),
+            dst_mac: default_if.gateway.mac.expect("Failed to get gateway MAC").parse::<pnet::datalink::MacAddr>().unwrap(),
             src_ip: self.src_ip.clone(),
             dst_ip: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             dst_ips: self.dst_ips.clone(),
@@ -166,7 +166,7 @@ impl PortScanner {
         if let Some(if_index) = interface::get_interface_index_by_ip(src_ip) {
             port_scanner.if_index = if_index;
         }else{
-            return Err(String::from("Failed to get interface info by name."));
+            return Err(String::from("Failed to get interface info by IP address."));
         }
         Ok(port_scanner)
     }
@@ -275,7 +275,7 @@ impl PortScanner {
         };
         let interfaces = pnet::datalink::interfaces();
         let interface = interfaces.into_iter().filter(|interface: &pnet::datalink::NetworkInterface| interface.index == self.if_index).next().expect("Failed to get Interface");    
-        self.src_mac = interface.mac.unwrap();
+        self.src_mac = interface.mac.expect("Failed to get interface MAC");
         self.dst_mac = dst_mac;
         self.if_name = interface.name.clone();
         let scan_setting: ScanSetting = ScanSetting {
