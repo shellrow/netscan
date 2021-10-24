@@ -17,7 +17,7 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.5.0"
+netscan = "0.6.0"
 ```
 
 ## Example
@@ -31,6 +31,7 @@ use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 
 fn main() {
+    // Construct new PortScanner (with network interface IP address)
     let mut port_scanner = match PortScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
