@@ -1,5 +1,5 @@
 use std::net::IpAddr;
-use pnet::packet::tcp::{MutableTcpPacket, TcpOption, TcpFlags};
+use pnet_packet::tcp::{MutableTcpPacket, TcpOption, TcpFlags};
 
 pub fn build_tcp_packet(tcp_packet:&mut MutableTcpPacket, src_ip: IpAddr, src_port:u16, dst_ip: IpAddr, dst_port:u16) {
     tcp_packet.set_source(src_port);
@@ -18,7 +18,7 @@ pub fn build_tcp_packet(tcp_packet:&mut MutableTcpPacket, src_ip: IpAddr, src_po
         IpAddr::V4(src_ip) => {
             match dst_ip {
                 IpAddr::V4(dst_ip) => {
-                    let checksum = pnet::packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip, &dst_ip);
+                    let checksum = pnet_packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip, &dst_ip);
                     tcp_packet.set_checksum(checksum);
                 },
                 IpAddr::V6(_) => {},
@@ -28,7 +28,7 @@ pub fn build_tcp_packet(tcp_packet:&mut MutableTcpPacket, src_ip: IpAddr, src_po
             match dst_ip {
                 IpAddr::V4(_) => {},
                 IpAddr::V6(dst_ip) => {
-                    let checksum = pnet::packet::tcp::ipv6_checksum(&tcp_packet.to_immutable(), &src_ip, &dst_ip);
+                    let checksum = pnet_packet::tcp::ipv6_checksum(&tcp_packet.to_immutable(), &src_ip, &dst_ip);
                     tcp_packet.set_checksum(checksum);
                 },
             }

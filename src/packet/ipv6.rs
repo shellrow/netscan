@@ -1,6 +1,6 @@
 use std::net::Ipv6Addr;
-use pnet::packet::ip::{IpNextHeaderProtocol, IpNextHeaderProtocols};
-use pnet::packet::ipv6::{MutableIpv6Packet};
+use pnet_packet::ip::{IpNextHeaderProtocol, IpNextHeaderProtocols};
+use pnet_packet::ipv6::{MutableIpv6Packet};
 
 #[allow(dead_code)]
 pub const IPV6_HEADER_LEN: usize = 40;

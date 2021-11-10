@@ -1,39 +1,31 @@
 extern crate netscan;
-use netscan::HostScanner;
-use netscan::ScanStatus;
+use netscan::blocking::HostScanner;
+use netscan::setting::{ScanType, Destination};
+use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 use ipnet::Ipv4Net;
-use std::time::Duration;
 
 fn main() {
     let mut host_scanner = match HostScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    //Get network address
     let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 0), 24).unwrap();
-    assert_eq!(Ok(net.network()), "192.168.1.0".parse());
     let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
-    //Get host list
     let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
     for host in hosts {
-        host_scanner.add_dst_ip(IpAddr::V4(host));
+        let dst: Destination = Destination::new(IpAddr::V4(host), vec![]);
+        host_scanner.add_destination(dst);
     }
+    host_scanner.set_scan_type(ScanType::IcmpPingScan);
     host_scanner.set_timeout(Duration::from_millis(10000));
+    host_scanner.set_wait_time(Duration::from_millis(100));
     host_scanner.run_scan();
     let result = host_scanner.get_scan_result();
-    print!("Status: ");
-    match result.scan_status {
-        ScanStatus::Done => {println!("Done")},
-        ScanStatus::Timeout => {println!("Timed out")},
-        _ => {println!("Error")},
-    }
-    println!("Up Hosts:");
-    for host in result.up_hosts {
-        println!("{}", host);
+    println!("Status: {:?}", result.scan_status);
+    println!("UP Hosts:");
+    for host in result.hosts {
+        println!("{:?}", host);
     }
     println!("Scan Time: {:?}", result.scan_time);
-    if host_scanner.get_wait_time() > Duration::from_millis(0) {
-        println!("(Including {:?} of wait time)", host_scanner.get_wait_time());
-    }
 }

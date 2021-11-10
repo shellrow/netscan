@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
-use pnet::datalink::MacAddr;
-use pnet::packet::ethernet::EtherTypes;
-use pnet::packet::arp::{MutableArpPacket, ArpHardwareTypes, ArpOperations};
+use pnet_datalink::MacAddr;
+use pnet_packet::ethernet::EtherTypes;
+use pnet_packet::arp::{MutableArpPacket, ArpHardwareTypes, ArpOperations};
 
 #[allow(dead_code)]
 pub const ARP_HEADER_LEN: usize = 28;

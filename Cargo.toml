@@ -15,8 +15,8 @@ serde = { version = "1.0", features = ["derive"] }
 rayon = "1.5"
 rand = "0.8"
 default-net = "0.4.0"
-log = "0.4"
-pnet = "0.28.0"
+pnet_packet = "0.28"
+pnet_datalink = "0.28"
 socket2 = { version = "0.4", features = ["all"] }
 tokio = { version = "1.7.0", features = ["rt", "rt-multi-thread", "net", "time", "macros", "sync"] }
 
