@@ -17,54 +17,38 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.6.0"
+netscan = "0.7.0"
 ```
 
 ## Example
 Port Scan Example
 ```rust
 extern crate netscan;
-use netscan::PortScanner;
-use netscan::PortScanType;
-use netscan::ScanStatus;
+use netscan::blocking::PortScanner;
+use netscan::setting::{ScanType, Destination};
 use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 
 fn main() {
-    // Construct new PortScanner (with network interface IP address)
     let mut port_scanner = match PortScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    port_scanner.set_dst_ip(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)));
-    port_scanner.set_dst_port_range(1, 1000);
-    //port_scanner.add_dst_port(22);
-    //port_scanner.add_dst_port(80);
-    //port_scanner.add_dst_port(443);
-    port_scanner.set_scan_type(PortScanType::SynScan);
+    let dst_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 8));
+    //let dst: Destination = Destination::new(dst_ip, vec![22, 80, 443]);
+    let dst: Destination = Destination::new_with_port_range(dst_ip, 1, 1000);
+    port_scanner.add_destination(dst);
+    port_scanner.set_scan_type(ScanType::TcpSynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
-    //port_scanner.set_wait_time(Duration::from_millis(200));
+    port_scanner.set_wait_time(Duration::from_millis(100));
     port_scanner.run_scan();
     let result = port_scanner.get_scan_result();
-    print!("Status: ");
-    match result.scan_status {
-        ScanStatus::Done => {println!("Done")},
-        ScanStatus::Timeout => {println!("Timed out")},
-        _ => {println!("Error")},
-    }
+    println!("Status: {:?}", result.scan_status);
     println!("Open Ports:");
     for port in result.ports {
         println!("{:?}", port);
     }
     println!("Scan Time: {:?}", result.scan_time);
-    match port_scanner.get_scan_type() {
-        PortScanType::ConnectScan => {},
-        _=> {
-            if port_scanner.get_wait_time() > Duration::from_millis(0) {
-                println!("(Including {:?} of wait time)", port_scanner.get_wait_time());
-            }
-        },
-    }
 }
 ```
 
