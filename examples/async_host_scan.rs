@@ -1,6 +1,6 @@
 #[cfg(target_family="unix")]
 async fn unix_main() {
-    use netscan::HostScanner;
+    use netscan::async_io::HostScanner;
     use netscan::setting::{ScanType, Destination};
     use std::time::Duration;
     use std::net::{IpAddr, Ipv4Addr};

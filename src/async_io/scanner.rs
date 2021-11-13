@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::time::{Duration, Instant};
 use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting};
 use crate::result::{HostScanResult, PortScanResult, ScanStatus};
-use crate::async_impl::{scan_hosts, scan_ports};
+use crate::async_io::{scan_hosts, scan_ports};
 
 #[derive(Clone, Debug)]
 pub struct HostScanner {

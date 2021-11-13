@@ -11,7 +11,7 @@ use crate::result::{HostScanResult, PortScanResult, ScanResult};
 use crate::setting::{ScanSetting};
 use crate::setting::{ScanType};
 use crate::packet;
-use crate::async_impl::receiver;
+use crate::async_io::receiver;
 
 #[derive(Clone, Debug)]
 pub struct AsyncSocket {

@@ -2,7 +2,7 @@
 async fn unix_main() {
     use std::net::{IpAddr, Ipv4Addr};
     use std::time::Duration;
-    use netscan::PortScanner;
+    use netscan::async_io::PortScanner;
     use netscan::setting::{ScanType, Destination};
     let mut port_scanner = match PortScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
         Ok(scanner) => (scanner),

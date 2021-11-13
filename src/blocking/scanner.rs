@@ -67,7 +67,7 @@ impl HostScanner {
             scan_type: ScanType::IcmpPingScan,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
-            send_rate: Duration::from_millis(1),
+            send_rate: Duration::from_millis(0),
             scan_result: HostScanResult::new(),
         };
         Ok(host_scanner)
@@ -173,7 +173,7 @@ impl PortScanner {
             scan_type: ScanType::TcpSynScan,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
-            send_rate: Duration::from_millis(1),
+            send_rate: Duration::from_millis(0),
             scan_result: PortScanResult::new(),
         };
         Ok(port_scanner)
