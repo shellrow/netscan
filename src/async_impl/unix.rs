@@ -180,9 +180,7 @@ pub async fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     let receive_result: Arc<Mutex<ScanResult>>  = Arc::clone(&scan_result);
     let receive_stop: Arc<Mutex<bool>> = Arc::clone(&stop);
     let receive_setting: ScanSetting = scan_setting.clone();
-    //let rcv_socket = socket.clone();
     tokio::spawn(async move {
-        //receiver::rcv_packets(rcv_socket, receive_setting, &receive_result, &receive_stop).await;
         receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop).await;    
     });
     send_ping_packet(&socket, &scan_setting).await;
