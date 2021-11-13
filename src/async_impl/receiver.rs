@@ -1,31 +1,9 @@
 use std::time::Instant;
 use std::sync::{Arc, Mutex};
 use std::net::IpAddr;
-//use std::mem::{self, MaybeUninit};
 use pnet_packet::Packet;
 use crate::result::{ScanResult, PortInfo, PortStatus, HostInfo};
 use crate::setting::{ScanSetting, ScanType};
-//use crate::async_impl::unix::AsyncSocket;
-
-/* pub async fn rcv_packets(socket: AsyncSocket, scan_setting: ScanSetting, _scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
-    let start_time = Instant::now();
-    let mut buf: [MaybeUninit<u8>; 1024] = unsafe {
-        MaybeUninit::uninit().assume_init()
-    };
-    while let Ok((sz, from_addr)) = socket.recv_from(&mut buf).await {
-        let buf = unsafe { mem::transmute::<_, [u8; 1024]>(buf) };
-        let frame: Vec<u8> = buf[0..sz].to_vec();
-        if let Some(packet) = pnet_packet::ipv4::Ipv4Packet::new(&frame){
-            println!("{:?}, {}, {:?}", from_addr.as_socket(), sz, packet);
-        }
-        if *stop.lock().unwrap(){
-            break;
-        }
-        if Instant::now().duration_since(start_time) > scan_setting.timeout {
-            break;
-        }
-    }
-} */
 
 pub async fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>, scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
     let start_time = Instant::now();
