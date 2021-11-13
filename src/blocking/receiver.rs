@@ -36,34 +36,38 @@ pub fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>, scan_s
 
 fn ipv4_handler(ethernet: &pnet_packet::ethernet::EthernetPacket, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     if let Some(packet) = pnet_packet::ipv4::Ipv4Packet::new(ethernet.payload()){
-        match packet.get_next_level_protocol() {
-            pnet_packet::ip::IpNextHeaderProtocols::Tcp => {
-                tcp_handler_v4(&packet, scan_setting, scan_result);
-            },
-            pnet_packet::ip::IpNextHeaderProtocols::Udp => {
-                udp_handler_v4(&packet, scan_setting, scan_result);
-            },
-            pnet_packet::ip::IpNextHeaderProtocols::Icmp => {
-                icmp_handler_v4(&packet, scan_setting, scan_result);
+        if scan_setting.ip_set.contains(&IpAddr::V4(packet.get_source())) {
+            match packet.get_next_level_protocol() {
+                pnet_packet::ip::IpNextHeaderProtocols::Tcp => {
+                    tcp_handler_v4(&packet, scan_setting, scan_result);
+                },
+                pnet_packet::ip::IpNextHeaderProtocols::Udp => {
+                    udp_handler_v4(&packet, scan_setting, scan_result);
+                },
+                pnet_packet::ip::IpNextHeaderProtocols::Icmp => {
+                    icmp_handler_v4(&packet, scan_setting, scan_result);
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 }
 
 fn ipv6_handler(ethernet: &pnet_packet::ethernet::EthernetPacket, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     if let Some(packet) = pnet_packet::ipv6::Ipv6Packet::new(ethernet.payload()){
-        match packet.get_next_header() {
-            pnet_packet::ip::IpNextHeaderProtocols::Tcp => {
-                tcp_handler_v6(&packet, scan_setting, scan_result);
-            },
-            pnet_packet::ip::IpNextHeaderProtocols::Udp => {
-                udp_handler_v6(&packet, scan_setting, scan_result);
-            },
-            pnet_packet::ip::IpNextHeaderProtocols::Icmpv6 => {
-                icmp_handler_v6(&packet, scan_setting, scan_result);
-            },
-            _ => {}
+        if scan_setting.ip_set.contains(&IpAddr::V6(packet.get_source())) {
+            match packet.get_next_header() {
+                pnet_packet::ip::IpNextHeaderProtocols::Tcp => {
+                    tcp_handler_v6(&packet, scan_setting, scan_result);
+                },
+                pnet_packet::ip::IpNextHeaderProtocols::Udp => {
+                    udp_handler_v6(&packet, scan_setting, scan_result);
+                },
+                pnet_packet::ip::IpNextHeaderProtocols::Icmpv6 => {
+                    icmp_handler_v6(&packet, scan_setting, scan_result);
+                },
+                _ => {}
+            }
         }
     }
 }
@@ -104,10 +108,10 @@ fn udp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, scan_setting: &ScanSet
     }
 }
 
-fn icmp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
+fn icmp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, _scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     let icmp_packet = pnet_packet::icmp::IcmpPacket::new(packet.payload());
     if let Some(_icmp) = icmp_packet {
-        if scan_setting.ip_set.contains(&IpAddr::V4(packet.get_source())) && !scan_result.lock().unwrap().ip_set.contains(&IpAddr::V4(packet.get_source())) {
+        if !scan_result.lock().unwrap().ip_set.contains(&IpAddr::V4(packet.get_source())) {
             scan_result.lock().unwrap().host_scan_result.hosts.push(
                 HostInfo {
                     ip_addr: IpAddr::V4(packet.get_source()),
@@ -119,10 +123,10 @@ fn icmp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, scan_setting: &ScanSe
     }
 }
 
-fn icmp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
+fn icmp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, _scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     let icmp_packet = pnet_packet::icmp::IcmpPacket::new(packet.payload());
     if let Some(_icmp) = icmp_packet {
-        if scan_setting.ip_set.contains(&IpAddr::V6(packet.get_source())) && !scan_result.lock().unwrap().ip_set.contains(&IpAddr::V6(packet.get_source())) {
+        if !scan_result.lock().unwrap().ip_set.contains(&IpAddr::V6(packet.get_source())) {
             scan_result.lock().unwrap().host_scan_result.hosts.push(
                 HostInfo {
                     ip_addr: IpAddr::V6(packet.get_source()),
@@ -138,46 +142,54 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, host_info: HostInf
     if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::SYN | pnet_packet::tcp::TcpFlags::ACK {
         match scan_setting.scan_type {
             ScanType::TcpSynScan => {
-                scan_result.lock().unwrap().port_scan_result.ports.push(
-                    PortInfo{
-                        port: tcp_packet.get_source(),
-                        status: PortStatus::Open,
-                    }
-                );
-                scan_result.lock().unwrap().port_set.insert(tcp_packet.get_source());
+                if !scan_result.lock().unwrap().port_set.contains(&tcp_packet.get_source()) {
+                    scan_result.lock().unwrap().port_scan_result.ports.push(
+                        PortInfo{
+                            port: tcp_packet.get_source(),
+                            status: PortStatus::Open,
+                        }
+                    );
+                    scan_result.lock().unwrap().port_set.insert(tcp_packet.get_source());
+                }
             },
             _ => {
-                scan_result.lock().unwrap().host_scan_result.hosts.push(host_info);
-                match host_info.ip_addr {
-                    IpAddr::V4(ip) => {
-                        scan_result.lock().unwrap().ip_set.insert(IpAddr::V4(ip));
-                    },
-                    IpAddr::V6(ip) => {
-                        scan_result.lock().unwrap().ip_set.insert(IpAddr::V6(ip));
-                    },
+                if !scan_result.lock().unwrap().ip_set.contains(&host_info.ip_addr) {
+                    scan_result.lock().unwrap().host_scan_result.hosts.push(host_info);
+                    match host_info.ip_addr {
+                        IpAddr::V4(ip) => {
+                            scan_result.lock().unwrap().ip_set.insert(IpAddr::V4(ip));
+                        },
+                        IpAddr::V6(ip) => {
+                            scan_result.lock().unwrap().ip_set.insert(IpAddr::V6(ip));
+                        },
+                    }
                 }
             },
         }
     }else if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::RST | pnet_packet::tcp::TcpFlags::ACK {
         match scan_setting.scan_type {
             ScanType::TcpSynScan => {
-                scan_result.lock().unwrap().port_scan_result.ports.push(
-                    PortInfo{
-                        port: tcp_packet.get_source(),
-                        status: PortStatus::Closed,
-                    }
-                );
-                scan_result.lock().unwrap().port_set.insert(tcp_packet.get_source());
+                if !scan_result.lock().unwrap().port_set.contains(&tcp_packet.get_source()) {
+                    scan_result.lock().unwrap().port_scan_result.ports.push(
+                        PortInfo{
+                            port: tcp_packet.get_source(),
+                            status: PortStatus::Closed,
+                        }
+                    );
+                    scan_result.lock().unwrap().port_set.insert(tcp_packet.get_source());    
+                }
             },
             _ => {
-                scan_result.lock().unwrap().host_scan_result.hosts.push(host_info);
-                match host_info.ip_addr {
-                    IpAddr::V4(ip) => {
-                        scan_result.lock().unwrap().ip_set.insert(IpAddr::V4(ip));
-                    },
-                    IpAddr::V6(ip) => {
-                        scan_result.lock().unwrap().ip_set.insert(IpAddr::V6(ip));
-                    },
+                if !scan_result.lock().unwrap().ip_set.contains(&host_info.ip_addr) {
+                    scan_result.lock().unwrap().host_scan_result.hosts.push(host_info);
+                    match host_info.ip_addr {
+                        IpAddr::V4(ip) => {
+                            scan_result.lock().unwrap().ip_set.insert(IpAddr::V4(ip));
+                        },
+                        IpAddr::V6(ip) => {
+                            scan_result.lock().unwrap().ip_set.insert(IpAddr::V6(ip));
+                        },
+                    }
                 }
             },
         }

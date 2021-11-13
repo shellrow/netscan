@@ -4,6 +4,7 @@ use std::time::{Duration, Instant};
 use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting};
 use crate::result::{HostScanResult, PortScanResult, ScanStatus};
 use crate::blocking::{scan_hosts, scan_ports};
+use crate::interface;
 
 #[derive(Clone, Debug)]
 pub struct HostScanner {
@@ -59,7 +60,7 @@ impl HostScanner {
             if_index: if_index,
             if_name: if_name,
             src_mac: src_mac.octets(),
-            dst_mac: pnet_datalink::MacAddr::zero().octets(),
+            dst_mac: interface::get_default_gateway_macaddr(),
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             destinations: vec![],
@@ -165,7 +166,7 @@ impl PortScanner {
             if_index: if_index,
             if_name: if_name,
             src_mac: src_mac.octets(),
-            dst_mac: pnet_datalink::MacAddr::zero().octets(),
+            dst_mac: interface::get_default_gateway_macaddr(),
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             destinations: vec![],

@@ -13,15 +13,17 @@ pub fn get_interface_index_by_ip(ip_addr: IpAddr) -> Option<u32> {
     return None;
 }
 
-#[allow(dead_code)]
 #[cfg(target_os="windows")]
-pub fn get_default_gateway_macaddr() -> MacAddr {
-    let default_gateway = default_net::get_default_gateway();
-    default_gateway.mac.expect("Failed to get gateway mac").parse::<pnet::datalink::MacAddr>().unwrap()
+pub fn get_default_gateway_macaddr() -> [u8; 6] {
+    match default_net::get_default_gateway() {
+        Ok(gateway) => {
+            gateway.mac_addr.octets()
+        },
+        Err(_) => MacAddr::zero().octets(),
+    }
 }
 
-#[allow(dead_code)]
 #[cfg(not(target_os="windows"))]
-pub fn get_default_gateway_macaddr() -> MacAddr {
-    MacAddr::zero()
+pub fn get_default_gateway_macaddr() -> [u8; 6] {
+    MacAddr::zero().octets()
 }
