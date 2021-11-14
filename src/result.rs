@@ -2,6 +2,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use std::collections::HashSet;
 
+/// Status of scan task 
 #[derive(Clone, Debug)]
 pub enum ScanStatus {
     Ready,
@@ -10,6 +11,7 @@ pub enum ScanStatus {
     Error,
 }
 
+/// Status of the scanned port 
 #[derive(Clone, Copy, Debug)]
 pub enum PortStatus {
     Open,
@@ -17,18 +19,21 @@ pub enum PortStatus {
     Filtered,
 }
 
+/// Information about the scanned host 
 #[derive(Clone, Copy, Debug)]
 pub struct HostInfo {
     pub ip_addr: IpAddr,
     pub ttl: u8,
 }
 
+/// Information about the scanned port 
 #[derive(Clone, Copy, Debug)]
 pub struct PortInfo {
     pub port: u16,
     pub status: PortStatus,
 }
 
+/// Result of host scan 
 #[derive(Clone, Debug)]
 pub struct HostScanResult {
     pub hosts: Vec<HostInfo>,
@@ -46,6 +51,7 @@ impl HostScanResult {
     }
 }
 
+/// Result of port scan
 #[derive(Clone, Debug)]
 pub struct PortScanResult {
     pub ip_addr: IpAddr,  
@@ -65,6 +71,7 @@ impl PortScanResult {
     }
 }
 
+#[doc(hidden)]
 #[derive(Clone, Debug)]
 pub struct ScanResult {
     pub host_scan_result: HostScanResult,
