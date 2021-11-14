@@ -1,9 +1,12 @@
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Instant, Duration};
+use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use pnet_packet::ethernet::EtherTypes;
 use pnet_packet::ip::IpNextHeaderProtocols;
-use crate::result::{HostScanResult, PortScanResult, ScanResult};
+use rayon::prelude::*;
+use crate::result::{HostScanResult, PortScanResult, ScanResult, PortInfo, PortStatus};
 use crate::setting::{ScanSetting};
 use crate::setting::{ScanType};
 use crate::packet;
@@ -113,6 +116,34 @@ fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &
     *stop.lock().unwrap() = true;
 }
 
+fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
+    let start_time = Instant::now();
+    let conn_timeout = Duration::from_millis(50);
+    for dst in scan_setting.destinations.clone() {
+        let ip_addr: IpAddr = dst.dst_ip;
+        dst.dst_ports.into_par_iter().for_each(|port| {
+            let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
+            let socket_addr: SocketAddr = SocketAddr::new(ip_addr, port);
+            let sock_addr = SockAddr::from(socket_addr);
+            match socket.connect_timeout(&sock_addr, conn_timeout) {
+                Ok(_) => {
+                    scan_result.lock().unwrap().port_scan_result.ports.push(
+                        PortInfo{
+                            port: port,
+                            status: PortStatus::Open,
+                        }
+                    );
+                },
+                Err(_) => {},
+            }
+            if Instant::now().duration_since(start_time) > scan_setting.timeout {
+                *stop.lock().unwrap() = true;
+                return;
+            }
+        });
+    }
+}
+
 pub fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     let interfaces = pnet_datalink::interfaces();
     let interface = match interfaces.into_iter().filter(|interface: &pnet_datalink::NetworkInterface| interface.index == scan_setting.if_index).next() {
@@ -168,9 +199,17 @@ pub fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
     let scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     let receive_setting: ScanSetting = scan_setting.clone();
-    rayon::join(|| send_packets(&mut tx, &scan_setting, &stop),
+    match scan_setting.scan_type {
+        ScanType::TcpSynScan => {
+            rayon::join(|| send_packets(&mut tx, &scan_setting, &stop),
                 || receiver::receive_packets(&mut rx, receive_setting, &scan_result, &stop)
-    );
+            );
+        },
+        ScanType::TcpConnectScan => {
+            run_connect_scan(scan_setting, &scan_result, &stop);
+        },
+        _ => {},
+    }
     let result: PortScanResult = scan_result.lock().unwrap().port_scan_result.clone(); 
     return result;
 }
