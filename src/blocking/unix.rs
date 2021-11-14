@@ -1,13 +1,15 @@
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Instant, Duration};
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use pnet_packet::Packet;
-use crate::result::{HostScanResult, PortScanResult, ScanResult};
+use crate::result::{HostScanResult, PortScanResult, ScanResult, PortInfo, PortStatus};
 use crate::setting::{ScanSetting};
 use crate::setting::{ScanType};
 use crate::packet;
 use crate::blocking::receiver;
+use rayon::prelude::*;
 
 fn build_icmpv4_echo_packet() -> Vec<u8> {
     let mut buf = vec![0; 16];
@@ -73,8 +75,32 @@ fn send_udp_packets(socket: &Socket, scan_setting: &ScanSetting) {
     }
 }
 
-fn try_connect(_socket: &Socket, _scan_setting: &ScanSetting) {
-    
+fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
+    let start_time = Instant::now();
+    let conn_timeout = Duration::from_millis(50);
+    for dst in scan_setting.destinations.clone() {
+        let ip_addr: IpAddr = dst.dst_ip;
+        dst.dst_ports.into_par_iter().for_each(|port| {
+            let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
+            let socket_addr: SocketAddr = SocketAddr::new(ip_addr, port);
+            let sock_addr = SockAddr::from(socket_addr);
+            match socket.connect_timeout(&sock_addr, conn_timeout) {
+                Ok(_) => {
+                    scan_result.lock().unwrap().port_scan_result.ports.push(
+                        PortInfo{
+                            port: port,
+                            status: PortStatus::Open,
+                        }
+                    );
+                },
+                Err(_) => {},
+            }
+            if Instant::now().duration_since(start_time) > scan_setting.timeout {
+                *stop.lock().unwrap() = true;
+                return;
+            }
+        });
+    }
 }
 
 fn send_ping_packet(socket: &Socket, scan_setting: &ScanSetting) {
@@ -98,9 +124,6 @@ fn send_tcp_packets(socket: &Socket, scan_setting: &ScanSetting) {
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
             send_tcp_syn_packets(socket, scan_setting);
-        },
-        ScanType::TcpConnectScan => {
-            try_connect(socket, scan_setting);
         },
         _ => {
             return;
@@ -212,12 +235,20 @@ pub fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
     let receive_result: Arc<Mutex<ScanResult>>  = Arc::clone(&scan_result);
     let receive_stop: Arc<Mutex<bool>> = Arc::clone(&stop);
     let receive_setting: ScanSetting = scan_setting.clone();
-    thread::spawn(move || {
-        receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop);    
-    });
-    send_tcp_packets(&socket, &scan_setting);
-    thread::sleep(scan_setting.wait_time);
-    *stop.lock().unwrap() = true;
+    match scan_setting.scan_type {
+        ScanType::TcpSynScan => {
+            thread::spawn(move || {
+                receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop);    
+            });
+            send_tcp_packets(&socket, &scan_setting);
+            thread::sleep(scan_setting.wait_time);
+            *stop.lock().unwrap() = true;
+        },
+        ScanType::TcpConnectScan => {
+            run_connect_scan(scan_setting, &receive_result, &receive_stop);
+        },
+        _ => {},
+    }
     let result: PortScanResult = scan_result.lock().unwrap().port_scan_result.clone(); 
     return result;
 }
