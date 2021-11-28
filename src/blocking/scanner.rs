@@ -147,7 +147,7 @@ impl HostScanner {
     }
     /// Set send rate
     pub fn set_send_rate(&mut self, send_rate: Duration){
-        self.wait_time = send_rate;
+        self.send_rate = send_rate;
     }
     /// Get send rate
     pub fn get_send_rate(&self) -> Duration {
@@ -271,7 +271,7 @@ impl PortScanner {
     }
     /// Set send rate
     pub fn set_send_rate(&mut self, send_rate: Duration){
-        self.wait_time = send_rate;
+        self.send_rate = send_rate;
     }
     /// Get send rate
     pub fn get_send_rate(&self) -> Duration {
