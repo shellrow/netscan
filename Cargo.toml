@@ -1,6 +1,6 @@
 [package]
 name = "netscan"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["shellrow <81893184+shellrow@users.noreply.github.com>"]
 edition = "2018"
 description = "Cross-platform network scan library"
@@ -11,14 +11,13 @@ categories = ["network-programming"]
 license = "MIT"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-rayon = "1.5"
-rand = "0.8"
+rayon = "1.5.1"
+rand = "0.8.4"
 default-net = "0.5.0"
 pnet_packet = "0.28"
 pnet_datalink = "0.28"
 socket2 = { version = "0.4", features = ["all"] }
-tokio = { version = "1.7.0", features = ["rt", "rt-multi-thread", "net", "time", "macros", "sync"] }
+tokio = { version = "1.7.0", features = ["rt", "rt-multi-thread", "net", "time", "macros", "sync"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [ "std" ] }
@@ -26,3 +25,28 @@ winapi = { version = "0.3.9", features = [ "std" ] }
 [dev-dependencies]
 ipnet = "2.3"
 tokio = { version = "1.7.0", features = ["full"] }
+
+[features]
+async = ["tokio"]
+full = ["async"]
+
+[lib]
+name = "netscan"
+
+[[example]]
+name = "port_scan"
+path = "examples/port_scan.rs"
+
+[[example]]
+name = "host_scan"
+path = "examples/host_scan.rs"
+
+[[example]]
+name = "async_port_scan"
+path = "examples/async_port_scan.rs"
+required-features = ["async"]
+
+[[example]]
+name = "async_host_scan"
+path = "examples/async_host_scan.rs"
+required-features = ["async"]
