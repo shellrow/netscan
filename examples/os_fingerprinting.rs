@@ -49,8 +49,8 @@ fn main() {
     fingerprinter.add_probe_type(ProbeType::TcpSynAckProbe);
     fingerprinter.add_probe_type(ProbeType::TcpRstAckProbe);
     fingerprinter.add_probe_type(ProbeType::TcpEcnProbe);
-    fingerprinter.run_probe();
-    for result in fingerprinter.get_probe_results() {
+    let results = fingerprinter.probe();
+    for result in results {
         println!("{}", result.ip_addr);
         println!("{:?}", result.icmp_echo_result);
         println!("{:?}", result.icmp_timestamp_result);
