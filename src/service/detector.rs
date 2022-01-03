@@ -79,7 +79,9 @@ fn detect_service(setting: &ServiceDetector, port_db: PortDatabase) -> HashMap<u
                     };
                     service_map.lock().unwrap().insert(port, msg);
                 },
-                Err(_) => {},
+                Err(e) => {
+                    service_map.lock().unwrap().insert(port, e.to_string());
+                },
             }
         }
     );
