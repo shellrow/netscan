@@ -25,7 +25,7 @@ impl ServiceDetector {
             dst_ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             dst_name: String::new(),
             open_ports: vec![],
-            connect_timeout: Duration::from_millis(50),
+            connect_timeout: Duration::from_millis(200),
             read_timeout: Duration::from_secs(5),
             accept_invalid_certs: false,
         }
