@@ -186,6 +186,11 @@ impl HostScanner {
         }
         self.scan_result = result;
     }
+    /// Run scan and return result
+    pub fn scan(&mut self) -> HostScanResult {
+        self.run_scan();
+        self.scan_result.clone()
+    }
 }
 
 impl PortScanner {
@@ -309,5 +314,10 @@ impl PortScanner {
             result.scan_status = ScanStatus::Done;
         }
         self.scan_result = result;
+    }
+    /// Run scan and return result
+    pub fn scan(&mut self) -> PortScanResult {
+        self.run_scan();
+        self.scan_result.clone()
     }
 }

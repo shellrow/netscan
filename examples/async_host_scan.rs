@@ -19,8 +19,7 @@ async fn unix_main() {
     host_scanner.set_scan_type(ScanType::IcmpPingScan);
     host_scanner.set_timeout(Duration::from_millis(10000));
     host_scanner.set_wait_time(Duration::from_millis(100));
-    host_scanner.run_scan().await;
-    let result = host_scanner.get_scan_result();
+    let result = host_scanner.scan().await;
     println!("Status: {:?}", result.scan_status);
     println!("UP Hosts:");
     for host in result.hosts {

@@ -49,6 +49,13 @@ impl HostScanResult {
             scan_status: ScanStatus::Ready,
         }
     }
+    pub fn get_hosts(&self) -> Vec<IpAddr> {
+        let mut hosts: Vec<IpAddr> = vec![];
+        for host in self.hosts.clone() {
+            hosts.push(host.ip_addr);
+        }
+        hosts
+    }
 }
 
 /// Result of port scan
@@ -68,6 +75,18 @@ impl PortScanResult {
             scan_time: Duration::from_millis(0),
             scan_status: ScanStatus::Ready,
         }
+    }
+    pub fn get_open_ports(&self) -> Vec<u16> {
+        let mut open_ports: Vec<u16> = vec![];
+        for port_info in self.ports.clone() {
+            match port_info.status {
+                PortStatus::Open => {
+                    open_ports.push(port_info.port);
+                },
+                _ => {},
+            }
+        }
+        open_ports
     }
 }
 

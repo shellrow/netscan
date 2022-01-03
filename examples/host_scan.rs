@@ -21,8 +21,7 @@ fn main() {
     host_scanner.set_timeout(Duration::from_millis(10000));
     host_scanner.set_wait_time(Duration::from_millis(100));
     host_scanner.set_send_rate(Duration::from_millis(1));
-    host_scanner.run_scan();
-    let result = host_scanner.get_scan_result();
+    let result = host_scanner.scan();
     println!("Status: {:?}", result.scan_status);
     println!("UP Hosts:");
     for host in result.hosts {

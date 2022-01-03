@@ -185,6 +185,11 @@ impl HostScanner {
         }
         self.scan_result = result;
     }
+    /// Run scan and return result
+    pub async fn scan(&mut self) -> HostScanResult {
+        self.run_scan().await;
+        self.scan_result.clone()
+    }
 }
 
 impl PortScanner {
@@ -308,5 +313,10 @@ impl PortScanner {
             result.scan_status = ScanStatus::Done;
         }
         self.scan_result = result;
+    }
+    /// Run scan and return result
+    pub async fn scan(&mut self) -> PortScanResult {
+        self.run_scan().await;
+        self.scan_result.clone()
     }
 }

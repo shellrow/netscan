@@ -15,8 +15,7 @@ async fn unix_main() {
     port_scanner.set_scan_type(ScanType::TcpSynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
     port_scanner.set_wait_time(Duration::from_millis(100));
-    port_scanner.run_scan().await;
-    let result = port_scanner.get_scan_result();
+    let result = port_scanner.scan().await;
     println!("Status: {:?}", result.scan_status);
     println!("Open Ports:");
     for port in result.ports {
