@@ -18,6 +18,8 @@ pnet_packet = "0.28"
 pnet_datalink = "0.28"
 socket2 = { version = "0.4", features = ["all"] }
 tokio = { version = "1.7.0", features = ["rt", "rt-multi-thread", "net", "time", "macros", "sync"], optional = true }
+dns-lookup = { version = "1.0", optional = true }
+native-tls = { version = "0.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [ "std" ] }
@@ -28,7 +30,8 @@ tokio = { version = "1.7.0", features = ["full"] }
 
 [features]
 async = ["tokio"]
-full = ["async"]
+service = ["dns-lookup", "native-tls"]
+full = ["async", "service"]
 
 [lib]
 name = "netscan"
@@ -50,3 +53,8 @@ required-features = ["async"]
 name = "async_host_scan"
 path = "examples/async_host_scan.rs"
 required-features = ["async"]
+
+[[example]]
+name = "service_detection"
+path = "examples/service_detection.rs"
+required-features = ["service"]
