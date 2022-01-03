@@ -41,8 +41,8 @@ fn main() {
     port_scanner.set_scan_type(ScanType::TcpSynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
     port_scanner.set_wait_time(Duration::from_millis(100));
-    port_scanner.run_scan();
-    let result = port_scanner.get_scan_result();
+    port_scanner.set_send_rate(Duration::from_millis(1));
+    let result = port_scanner.scan();
     println!("Status: {:?}", result.scan_status);
     println!("Open Ports:");
     for port in result.ports {
