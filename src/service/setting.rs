@@ -1,3 +1,4 @@
+/// List of specific ports such as HTTP/HTTPS
 #[derive(Clone, Debug)]
 pub struct PortDatabase {
     pub http_ports: Vec<u16>,

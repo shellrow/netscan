@@ -148,11 +148,11 @@ impl OSFingerprinter {
     pub fn set_probe_types(&mut self, probe_types: Vec<ProbeType>) {
         self.probe_types= probe_types;
     }
-    /// Set scan timeout  
+    /// Set probe timeout  
     pub fn set_timeout(&mut self, timeout: Duration){
         self.timeout = timeout;
     }
-    /// Set scan wait-time  
+    /// Set wait-time after the sending task is completed  
     pub fn set_wait_time(&mut self, wait_time: Duration){
         self.wait_time = wait_time;
     }

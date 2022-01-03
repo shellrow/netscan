@@ -9,13 +9,22 @@ use rayon::prelude::*;
 use super::setting::PortDatabase;
 use std::net::{IpAddr, Ipv4Addr};
 
+/// Struct for service detection
 #[derive(Clone, Debug)]
 pub struct ServiceDetector {
+    /// Destination IP address
     pub dst_ip: IpAddr,
+    /// Destination Host Name
     pub dst_name: String,
+    /// Target ports for service detection
     pub open_ports: Vec<u16>,
+    /// TCP connect (open) timeout
     pub connect_timeout: Duration,
+    /// TCP read timeout
     pub read_timeout: Duration,
+    /// Disables SSL/TLS certificate validation when detecting HTTPS services.  
+    /// 
+    /// Default value is false, which means validation is enabled. 
     pub accept_invalid_certs: bool,
 }
 
@@ -86,7 +95,7 @@ fn detect_service(setting: &ServiceDetector, port_db: PortDatabase) -> HashMap<u
         }
     );
     let result_map: HashMap<u16, String> = service_map.lock().unwrap().clone();
-    return result_map;
+    result_map
 }
 
 fn read_response(reader: &mut BufReader<&TcpStream>) -> String {
@@ -95,7 +104,7 @@ fn read_response(reader: &mut BufReader<&TcpStream>) -> String {
         Ok(_) => {},
         Err(_) => {},
     }
-    return msg;
+    msg
 }
 
 fn parse_header(response_header: String) -> String {
@@ -103,13 +112,12 @@ fn parse_header(response_header: String) -> String {
     if header_fields.len() == 1 {
         return response_header;
     }
-    let mut result_vec: Vec<String> = vec![];
     for field in header_fields {
-        if field.contains("Server:") || field.contains("Location:") {
-            result_vec.push(field.to_string());
+        if field.contains("Server:") {
+            return field.trim().to_string();
         }
     }
-    return result_vec.iter().map(|s| s.trim()).collect::<Vec<_>>().join("\t");
+    String::new()
 }
 
 fn write_head_request(writer: &mut BufWriter<&TcpStream>, _ip_addr:String) {

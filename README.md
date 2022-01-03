@@ -10,8 +10,21 @@ with the aim of being lightweight and fast.
 ## Features
 - Port Scan
 - Host Scan
-- Async Port Scan (Currently only Unix-Like OS is supported)
-- Async Host Scan (Currently only Unix-Like OS is supported)
+- Async Port Scan (Unix-Like OS only) 
+- Async Host Scan (Unix-Like OS only) 
+- Service Detection (experimental) 
+- OS Detection (experimental) 
+
+## Feature flags
+The following feature flags can be used to enable/disable specific features.
+#### `--feature async`
+Enable async scanning.
+#### `--feature service`
+Enable service detection.
+#### `--feature os`
+Enable OS detection.
+#### `--feature full`
+Enable all of the above.
 
 ## Usage
 Add `netscan` to your dependencies  

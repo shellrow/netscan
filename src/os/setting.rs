@@ -2,6 +2,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 use pnet_datalink::MacAddr;
 
+/// Probes for fingerprinting
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ProbeType {
     IcmpEchoProbe,
@@ -14,6 +15,7 @@ pub enum ProbeType {
     TcpEcnProbe,
 }
 
+/// TCP Options
 #[derive(Clone, Copy, Debug)]
 pub enum TcpOptionKind {
     Eol,
@@ -50,6 +52,7 @@ impl TcpOptionKind {
     }
 }
 
+/// Target host and required port information
 #[derive(Clone, Debug)]
 pub struct ProbeTarget {
     pub ip_addr: IpAddr,
