@@ -11,3 +11,6 @@ pub mod async_io;
 
 #[cfg(feature = "service")]
 pub mod service;
+
+#[cfg(feature = "os")]
+pub mod os;

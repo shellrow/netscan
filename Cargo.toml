@@ -31,7 +31,8 @@ tokio = { version = "1.7.0", features = ["full"] }
 [features]
 async = ["tokio"]
 service = ["dns-lookup", "native-tls"]
-full = ["async", "service"]
+os = []
+full = ["async", "service", "os"]
 
 [lib]
 name = "netscan"
@@ -58,3 +59,8 @@ required-features = ["async"]
 name = "service_detection"
 path = "examples/service_detection.rs"
 required-features = ["service"]
+
+[[example]]
+name = "os_fingerprinting"
+path = "examples/os_fingerprinting.rs"
+required-features = ["os"]
