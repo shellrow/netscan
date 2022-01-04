@@ -12,7 +12,7 @@ use super::result::{ProbeStatus, ProbeResult};
 const DEFAULT_SRC_PORT: u16 = 54433;
 
 /// Struct for fingerprint probe
-pub struct OSFingerprinter {
+pub struct Fingerprinter {
     /// Index of network interface  
     pub if_index: u32,
     /// Name of network interface  
@@ -39,9 +39,9 @@ pub struct OSFingerprinter {
     pub probe_results: Vec<ProbeResult>,
 }
 
-impl OSFingerprinter {
+impl Fingerprinter {
     /// Create new fingerprinter with interfece IP
-    pub fn new(src_ip: IpAddr) -> Result<OSFingerprinter, String> {
+    pub fn new(src_ip: IpAddr) -> Result<Fingerprinter, String> {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
         let mut src_mac: MacAddr = MacAddr::zero();
@@ -65,7 +65,7 @@ impl OSFingerprinter {
             },
             Err(_) => return Err(String::from("Failed to get gateway mac")),
         };
-        let fingerprinter = OSFingerprinter {
+        let fingerprinter = Fingerprinter {
             if_index: if_index,
             if_name: if_name,
             src_mac: src_mac.to_string(),
@@ -83,7 +83,7 @@ impl OSFingerprinter {
     }
 
     /// Create new fingerprinter with interfece IP and gateway IP
-    pub fn new_with_gateway_ip(src_ip: IpAddr, gateway_ip: IpAddr) -> Result<OSFingerprinter, String> {
+    pub fn new_with_gateway_ip(src_ip: IpAddr, gateway_ip: IpAddr) -> Result<Fingerprinter, String> {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
         let mut src_mac: MacAddr = MacAddr::zero();
@@ -112,7 +112,7 @@ impl OSFingerprinter {
             },
             IpAddr::V6(_) => return Err(String::from("Failed to create Fingerprinter. Invalid Gateway IP address.")),
         };
-        let fingerprinter = OSFingerprinter {
+        let fingerprinter = Fingerprinter {
             if_index: if_index,
             if_name: if_name,
             src_mac: src_mac.to_string(),

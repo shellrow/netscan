@@ -61,6 +61,6 @@ path = "examples/service_detection.rs"
 required-features = ["service"]
 
 [[example]]
-name = "os_fingerprinting"
-path = "examples/os_fingerprinting.rs"
+name = "fingerprinting"
+path = "examples/fingerprinting.rs"
 required-features = ["os"]

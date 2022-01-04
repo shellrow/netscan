@@ -1,13 +1,13 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
-use netscan::os::{OSFingerprinter};
+use netscan::os::{Fingerprinter};
 use netscan::os::{ProbeType, ProbeTarget};
 
 fn main() {
     let src_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4));
     //let gateway_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
-    let mut fingerprinter = OSFingerprinter::new(src_ip).unwrap();
-    //let mut fingerprinter = OSFingerprinter::new_with_gateway_ip(src_ip, gateway_ip).unwrap();
+    let mut fingerprinter = Fingerprinter::new(src_ip).unwrap();
+    //let mut fingerprinter = Fingerprinter::new_with_gateway_ip(src_ip, gateway_ip).unwrap();
     fingerprinter.set_wait_time(Duration::from_millis(200));
     let probe_target1: ProbeTarget = ProbeTarget {
         ip_addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 2)),
