@@ -9,22 +9,11 @@ with the aim of being lightweight and fast.
 
 ## Features
 - Port Scan
+    - TCP SYN scan
+    - TCP CONNECT scan
 - Host Scan
-- Async Port Scan (Unix-Like OS only) 
-- Async Host Scan (Unix-Like OS only) 
-- Service Detection (experimental) 
-- OS Detection (experimental) 
-
-## Feature flags
-The following feature flags can be used to enable/disable specific features.
-#### `--feature async`
-Enable async scanning.
-#### `--feature service`
-Enable service detection.
-#### `--feature os`
-Enable OS detection.
-#### `--feature full`
-Enable all of the above.
+    - ICMP PING scan
+    - TCP PING scan
 
 ## Usage
 Add `netscan` to your dependencies  
@@ -64,6 +53,18 @@ fn main() {
     println!("Scan Time: {:?}", result.scan_time);
 }
 ```
+
+## Feature flags
+The following feature flags can be used to enable/disable specific features.
+#### `--feature async`
+Enable async scanning.  
+**Unix-Like OS only**
+#### `--feature service`
+Enable service detection. (Experimental)      
+#### `--feature os`
+Enable TCP/IP Stack Fingerprinting. (Experimental)  
+#### `--feature full`
+Enable all of the above.
 
 For more details see [Examples][examples-url]
 
