@@ -18,6 +18,7 @@ pnet_packet = "0.28"
 pnet_datalink = "0.28"
 socket2 = { version = "0.4", features = ["all"] }
 tokio = { version = "1.7.0", features = ["rt", "rt-multi-thread", "net", "time", "macros", "sync"], optional = true }
+futures = {version = "0.3", optional = true}
 dns-lookup = { version = "1.0", optional = true }
 native-tls = { version = "0.2", optional = true }
 
@@ -29,7 +30,7 @@ ipnet = "2.3"
 tokio = { version = "1.7.0", features = ["full"] }
 
 [features]
-async = ["tokio"]
+async = ["tokio", "futures"]
 service = ["dns-lookup", "native-tls"]
 os = []
 full = ["async", "service", "os"]

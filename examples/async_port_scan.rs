@@ -12,14 +12,20 @@ async fn unix_main() {
     //let dst: Destination = Destination::new(dst_ip, vec![22, 80, 443]);
     let dst: Destination = Destination::new_with_port_range(dst_ip, 1, 1000);
     port_scanner.add_destination(dst);
+    let dst_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10));
+    let dst: Destination = Destination::new_with_port_range(dst_ip, 1, 1000);
+    port_scanner.add_destination(dst);
     port_scanner.set_scan_type(ScanType::TcpSynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
     port_scanner.set_wait_time(Duration::from_millis(100));
     let result = port_scanner.scan().await;
     println!("Status: {:?}", result.scan_status);
-    println!("Open Ports:");
-    for port in result.ports {
-        println!("{:?}", port);
+    println!("Results:");
+    for (ip, ports) in result.result_map {
+        println!("{}", ip);
+        for port in ports {
+            println!("{:?}", port);
+        }
     }
     println!("Scan Time: {:?}", result.scan_time);
 }

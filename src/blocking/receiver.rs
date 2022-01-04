@@ -1,6 +1,6 @@
 use std::time::Instant;
 use std::sync::{Arc, Mutex};
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use pnet_packet::Packet;
 use crate::result::{ScanResult, PortInfo, PortStatus, HostInfo};
 use crate::setting::{ScanSetting, ScanType};
@@ -139,17 +139,27 @@ fn icmp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, _scan_setting: &ScanS
 }
 
 fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, host_info: HostInfo, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
+    let socket_addr: SocketAddr = SocketAddr::new(host_info.ip_addr, tcp_packet.get_source());
     if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::SYN | pnet_packet::tcp::TcpFlags::ACK {
         match scan_setting.scan_type {
             ScanType::TcpSynScan => {
-                if !scan_result.lock().unwrap().port_set.contains(&tcp_packet.get_source()) {
-                    scan_result.lock().unwrap().port_scan_result.ports.push(
-                        PortInfo{
-                            port: tcp_packet.get_source(),
-                            status: PortStatus::Open,
-                        }
-                    );
-                    scan_result.lock().unwrap().port_set.insert(tcp_packet.get_source());
+                if !scan_result.lock().unwrap().socket_set.contains(&socket_addr) {
+                    let port_info = PortInfo{
+                        port: socket_addr.port(),
+                        status: PortStatus::Open,
+                    };
+                    // Avoid deadlock.
+                    let exists: bool = 
+                    if let Some(r) = scan_result.lock().unwrap().port_scan_result.result_map.get_mut(&socket_addr.ip()) {
+                        r.push(port_info);
+                        true
+                    }else {
+                        false
+                    };
+                    if !exists {
+                        scan_result.lock().unwrap().port_scan_result.result_map.insert(socket_addr.ip(), vec![port_info]);
+                    }
+                    scan_result.lock().unwrap().socket_set.insert(socket_addr);
                 }
             },
             _ => {
@@ -169,14 +179,23 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, host_info: HostInf
     }else if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::RST | pnet_packet::tcp::TcpFlags::ACK {
         match scan_setting.scan_type {
             ScanType::TcpSynScan => {
-                if !scan_result.lock().unwrap().port_set.contains(&tcp_packet.get_source()) {
-                    scan_result.lock().unwrap().port_scan_result.ports.push(
-                        PortInfo{
-                            port: tcp_packet.get_source(),
-                            status: PortStatus::Closed,
-                        }
-                    );
-                    scan_result.lock().unwrap().port_set.insert(tcp_packet.get_source());    
+                if !scan_result.lock().unwrap().socket_set.contains(&socket_addr) {
+                    let port_info = PortInfo{
+                        port: socket_addr.port(),
+                        status: PortStatus::Closed,
+                    };
+                    // Avoid deadlock.
+                    let exists: bool = 
+                    if let Some(r) = scan_result.lock().unwrap().port_scan_result.result_map.get_mut(&socket_addr.ip()) {
+                        r.push(port_info);
+                        true
+                    }else {
+                        false
+                    };
+                    if !exists {
+                        scan_result.lock().unwrap().port_scan_result.result_map.insert(socket_addr.ip(), vec![port_info]);
+                    }
+                    scan_result.lock().unwrap().socket_set.insert(socket_addr);    
                 }
             },
             _ => {

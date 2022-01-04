@@ -46,9 +46,12 @@ fn main() {
     port_scanner.set_send_rate(Duration::from_millis(1));
     let result = port_scanner.scan();
     println!("Status: {:?}", result.scan_status);
-    println!("Open Ports:");
-    for port in result.ports {
-        println!("{:?}", port);
+    println!("Results:");
+    for (ip, ports) in result.result_map {
+        println!("{}", ip);
+        for port in ports {
+            println!("{:?}", port);
+        }
     }
     println!("Scan Time: {:?}", result.scan_time);
 }

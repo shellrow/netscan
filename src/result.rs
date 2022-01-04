@@ -1,6 +1,6 @@
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 /// Status of scan task 
 #[derive(Clone, Debug)]
@@ -61,8 +61,7 @@ impl HostScanResult {
 /// Result of port scan
 #[derive(Clone, Debug)]
 pub struct PortScanResult {
-    pub ip_addr: IpAddr,  
-    pub ports: Vec<PortInfo>,
+    pub result_map: HashMap<IpAddr, Vec<PortInfo>>,
     pub scan_time: Duration,
     pub scan_status: ScanStatus,
 }
@@ -70,20 +69,21 @@ pub struct PortScanResult {
 impl PortScanResult {
     pub fn new() -> PortScanResult {
         PortScanResult{
-            ip_addr: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            ports: vec![],
+            result_map: HashMap::new(),
             scan_time: Duration::from_millis(0),
             scan_status: ScanStatus::Ready,
         }
     }
-    pub fn get_open_ports(&self) -> Vec<u16> {
+    pub fn get_open_ports(&self, ip_addr: IpAddr) -> Vec<u16> {
         let mut open_ports: Vec<u16> = vec![];
-        for port_info in self.ports.clone() {
-            match port_info.status {
-                PortStatus::Open => {
-                    open_ports.push(port_info.port);
-                },
-                _ => {},
+        if let Some(ports) = self.result_map.get(&ip_addr) {
+            for port_info in ports {
+                match port_info.status {
+                    PortStatus::Open => {
+                        open_ports.push(port_info.port);
+                    },
+                    _ => {},
+                }
             }
         }
         open_ports
@@ -96,7 +96,7 @@ pub struct ScanResult {
     pub host_scan_result: HostScanResult,
     pub port_scan_result: PortScanResult,
     pub ip_set: HashSet<IpAddr>,
-    pub port_set: HashSet<u16>,
+    pub socket_set: HashSet<SocketAddr>,
 }
 
 impl ScanResult {
@@ -105,7 +105,7 @@ impl ScanResult {
             host_scan_result: HostScanResult::new(),
             port_scan_result: PortScanResult::new(),
             ip_set: HashSet::new(),
-            port_set: HashSet::new(),
+            socket_set: HashSet::new(),
         }
     }
 }
