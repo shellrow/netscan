@@ -118,7 +118,7 @@ fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &
 
 fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
     let start_time = Instant::now();
-    let conn_timeout = Duration::from_millis(50);
+    let conn_timeout = Duration::from_millis(200);
     for dst in scan_setting.destinations.clone() {
         let ip_addr: IpAddr = dst.dst_ip;
         dst.dst_ports.into_par_iter().for_each(|port| {
@@ -127,12 +127,21 @@ fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResul
             let sock_addr = SockAddr::from(socket_addr);
             match socket.connect_timeout(&sock_addr, conn_timeout) {
                 Ok(_) => {
-                    scan_result.lock().unwrap().port_scan_result.ports.push(
-                        PortInfo{
-                            port: port,
-                            status: PortStatus::Open,
-                        }
-                    );
+                    let port_info = PortInfo{
+                        port: socket_addr.port(),
+                        status: PortStatus::Open,
+                    };
+                    // Avoid deadlock.
+                    let exists: bool = 
+                    if let Some(r) = scan_result.lock().unwrap().port_scan_result.result_map.get_mut(&socket_addr.ip()) {
+                        r.push(port_info);
+                        true
+                    }else {
+                        false
+                    };
+                    if !exists {
+                        scan_result.lock().unwrap().port_scan_result.result_map.insert(socket_addr.ip(), vec![port_info]);
+                    }
                 },
                 Err(_) => {},
             }
