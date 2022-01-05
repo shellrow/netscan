@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
-use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting};
+use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
 use crate::result::{HostScanResult, PortScanResult, ScanStatus};
 use crate::blocking::{scan_hosts, scan_ports};
 use crate::interface;
@@ -175,6 +175,8 @@ impl HostScanner {
             wait_time: self.wait_time.clone(),
             send_rate: self.send_rate.clone(),
             scan_type: self.scan_type.clone(),
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
         };
         let start_time = Instant::now();
         let mut result: HostScanResult = scan_hosts(scan_setting);
@@ -304,6 +306,8 @@ impl PortScanner {
             wait_time: self.wait_time.clone(),
             send_rate: self.send_rate.clone(),
             scan_type: self.scan_type.clone(),
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
         };
         let start_time = Instant::now();
         let mut result: PortScanResult = scan_ports(scan_setting);

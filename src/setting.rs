@@ -5,6 +5,8 @@ use pnet_datalink::MacAddr;
 
 #[doc(hidden)]
 pub const DEFAULT_SRC_PORT: u16 = 53443;
+pub(crate) const DEFAULT_HOSTS_CONCURRENCY: usize = 50;
+pub(crate) const DEFAULT_PORTS_CONCURRENCY: usize = 100;
 
 /// Scan Type 
 #[derive(Clone, Debug)]
@@ -78,4 +80,6 @@ pub struct ScanSetting {
     pub wait_time: Duration,
     pub send_rate: Duration,
     pub scan_type: ScanType,
+    pub hosts_concurrency: usize,
+    pub ports_concurrency: usize,
 }

@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
-use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting};
+use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
 use crate::result::{HostScanResult, PortScanResult, ScanStatus};
 use crate::async_io::{scan_hosts, scan_ports};
 
@@ -24,6 +24,8 @@ pub struct HostScanner {
     pub destinations: Vec<Destination>,
     /// Scan Type 
     pub scan_type: ScanType,
+    /// Number of host scans to run concurrently
+    pub hosts_concurrency: usize,
     /// Timeout setting for entire scan task 
     pub timeout: Duration,
     /// Waiting time after packet sending task is completed 
@@ -53,6 +55,10 @@ pub struct PortScanner {
     pub destinations: Vec<Destination>,
     /// Scan Type 
     pub scan_type: ScanType,
+    /// Number of host scans to run concurrently
+    pub hosts_concurrency: usize,
+    /// Number of port scans to run concurrently
+    pub ports_concurrency: usize,
     /// Timeout setting for entire scan task 
     pub timeout: Duration,
     /// Waiting time after packet sending task is completed 
@@ -93,6 +99,7 @@ impl HostScanner {
             src_port: DEFAULT_SRC_PORT,
             destinations: vec![],
             scan_type: ScanType::IcmpPingScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
@@ -152,6 +159,10 @@ impl HostScanner {
     pub fn get_send_rate(&self) -> Duration {
         self.send_rate.clone()
     }
+    /// Set hosts concurrency
+    pub fn set_hosts_concurrency(&mut self, concurrency: usize){
+        self.hosts_concurrency = concurrency;
+    }
     /// Get scan result
     pub fn get_scan_result(&self) -> HostScanResult {
         self.scan_result.clone()
@@ -174,6 +185,8 @@ impl HostScanner {
             wait_time: self.wait_time.clone(),
             send_rate: self.timeout.clone(),
             scan_type: self.scan_type.clone(),
+            hosts_concurrency: self.hosts_concurrency,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
         };
         let start_time = Instant::now();
         let mut result: HostScanResult = scan_hosts(scan_setting).await;
@@ -222,6 +235,8 @@ impl PortScanner {
             src_port: DEFAULT_SRC_PORT,
             destinations: vec![],
             scan_type: ScanType::TcpSynScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
@@ -281,6 +296,14 @@ impl PortScanner {
     pub fn get_send_rate(&self) -> Duration {
         self.send_rate.clone()
     }
+    /// Set hosts concurrency
+    pub fn set_hosts_concurrency(&mut self, concurrency: usize){
+        self.hosts_concurrency = concurrency;
+    }
+    /// Set ports concurrency
+    pub fn set_ports_concurrency(&mut self, concurrency: usize){
+        self.ports_concurrency = concurrency;
+    }
     /// Get scan result
     pub fn get_scan_result(&self) -> PortScanResult {
         self.scan_result.clone()
@@ -303,6 +326,8 @@ impl PortScanner {
             wait_time: self.wait_time.clone(),
             send_rate: self.timeout.clone(),
             scan_type: self.scan_type.clone(),
+            hosts_concurrency: self.hosts_concurrency,
+            ports_concurrency: self.ports_concurrency,
         };
         let start_time = Instant::now();
         let mut result: PortScanResult = scan_ports(scan_setting).await;

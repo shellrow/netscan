@@ -17,9 +17,6 @@ use crate::setting::{ScanSetting, ScanType, Destination};
 use crate::packet;
 use crate::async_io::receiver;
 
-const HOSTS_CONCURRENCY: usize = 50;
-const PORTS_CONCURRENCY: usize = 100;
-
 #[derive(Clone, Debug)]
 pub struct AsyncSocket {
     inner: Arc<AsyncFd<Socket>>,
@@ -80,7 +77,7 @@ async fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_por
 
 async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
     let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
-        HOSTS_CONCURRENCY, |dst| {
+        scan_setting.hosts_concurrency, |dst| {
             let socket_addr = SocketAddr::new(dst.dst_ip, 0);
             let sock_addr = SockAddr::from(socket_addr);
             async move {
@@ -97,10 +94,10 @@ async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting
 
 async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting){
     let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
-        HOSTS_CONCURRENCY, |dst| {
+        scan_setting.hosts_concurrency, |dst| {
             async move {
                 let fut_port = stream::iter(dst.dst_ports.clone()).for_each_concurrent(
-                    PORTS_CONCURRENCY, |port| {
+                    scan_setting.ports_concurrency, |port| {
                         let dst = dst.clone();
                         let socket_addr = SocketAddr::new(dst.dst_ip, port);
                         let sock_addr = SockAddr::from(socket_addr);
@@ -122,10 +119,10 @@ async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting){
 
 async fn send_udp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
     let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
-        HOSTS_CONCURRENCY, |dst| {
+        scan_setting.hosts_concurrency, |dst| {
             async move {
                 let fut_port = stream::iter(dst.dst_ports.clone()).for_each_concurrent(
-                    PORTS_CONCURRENCY, |port| {
+                    scan_setting.ports_concurrency, |port| {
                         let dst = dst.clone();
                         let socket_addr = SocketAddr::new(dst.dst_ip, port);
                         let sock_addr = SockAddr::from(socket_addr);
@@ -173,9 +170,9 @@ async fn try_connect_ports(concurrency: usize, dst: Destination) -> (IpAddr, Vec
 }
 
 async fn run_connect_scan(scan_setting: ScanSetting) -> PortScanResult {
-    let scan_result: Vec<(IpAddr, Vec<PortInfo>)> = stream::iter(scan_setting.destinations.into_iter())
-        .map(|dst| try_connect_ports(PORTS_CONCURRENCY, dst))
-        .buffer_unordered(HOSTS_CONCURRENCY)
+    let scan_result: Vec<(IpAddr, Vec<PortInfo>)> = stream::iter(scan_setting.destinations.clone().into_iter())
+        .map(|dst| try_connect_ports(scan_setting.ports_concurrency, dst))
+        .buffer_unordered(scan_setting.hosts_concurrency)
         .collect()
         .await;
     let mut result_map: HashMap<IpAddr, Vec<PortInfo>> = HashMap::new();
