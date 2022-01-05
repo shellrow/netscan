@@ -140,7 +140,7 @@ fn send_tcp_packets(socket: &Socket, scan_setting: &ScanSetting) {
     }
 }
 
-pub fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
+pub(crate) fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     let socket = match scan_setting.src_ip {
         IpAddr::V4(_) => {
             match scan_setting.scan_type {
@@ -198,7 +198,7 @@ pub fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     return result;
 }
 
-pub fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
+pub(crate) fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
     let socket = match scan_setting.src_ip {
         IpAddr::V4(_) => {
             match scan_setting.scan_type {

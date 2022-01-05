@@ -214,7 +214,7 @@ async fn send_tcp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
     }
 }
 
-pub async fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
+pub(crate) async fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     let socket = match scan_setting.scan_type {
         ScanType::IcmpPingScan => AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::ICMPV4).unwrap(),
         ScanType::TcpPingScan => AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::TCP).unwrap(),
@@ -258,7 +258,7 @@ pub async fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     return result;
 }
 
-pub async fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
+pub(crate) async fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
     match scan_setting.scan_type{
         ScanType::TcpConnectScan => {
             let scan_result = run_connect_scan(scan_setting).await;

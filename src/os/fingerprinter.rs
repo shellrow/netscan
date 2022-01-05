@@ -160,7 +160,7 @@ impl Fingerprinter {
     pub fn set_send_rate(&mut self, send_rate: Duration){
         self.send_rate = send_rate;
     }
-    /// Get probe results
+    /// Get probe result
     pub fn get_probe_results(&self) -> Vec<ProbeResult> {
         self.probe_results.clone()
     }
@@ -184,6 +184,7 @@ impl Fingerprinter {
             self.probe_results.push(result);
         }
     }
+    /// Run probe and return result
     pub fn probe(&mut self) -> Vec<ProbeResult> {
         self.run_probe();
         self.probe_results.clone()

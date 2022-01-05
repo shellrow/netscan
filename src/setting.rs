@@ -3,8 +3,7 @@ use std::time::Duration;
 use std::collections::HashSet;
 use pnet_datalink::MacAddr;
 
-#[doc(hidden)]
-pub const DEFAULT_SRC_PORT: u16 = 53443;
+pub(crate) const DEFAULT_SRC_PORT: u16 = 53443;
 pub(crate) const DEFAULT_HOSTS_CONCURRENCY: usize = 50;
 pub(crate) const DEFAULT_PORTS_CONCURRENCY: usize = 100;
 
@@ -66,9 +65,8 @@ impl Destination {
     }
 }
 
-#[doc(hidden)]
 #[derive(Clone, Debug)]
-pub struct ScanSetting {
+pub(crate) struct ScanSetting {
     pub if_index: u32,
     pub src_mac: MacAddr,
     pub dst_mac: MacAddr,

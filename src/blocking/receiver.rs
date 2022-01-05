@@ -5,7 +5,7 @@ use pnet_packet::Packet;
 use crate::result::{ScanResult, PortInfo, PortStatus, HostInfo};
 use crate::setting::{ScanSetting, ScanType};
 
-pub fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>, scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
+pub(crate) fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>, scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
     let start_time = Instant::now();
     loop {
         match rx.next() {

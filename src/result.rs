@@ -90,9 +90,8 @@ impl PortScanResult {
     }
 }
 
-#[doc(hidden)]
 #[derive(Clone, Debug)]
-pub struct ScanResult {
+pub(crate) struct ScanResult {
     pub host_scan_result: HostScanResult,
     pub port_scan_result: PortScanResult,
     pub ip_set: HashSet<IpAddr>,

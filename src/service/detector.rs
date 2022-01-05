@@ -22,13 +22,14 @@ pub struct ServiceDetector {
     pub connect_timeout: Duration,
     /// TCP read timeout
     pub read_timeout: Duration,
-    /// Disables SSL/TLS certificate validation when detecting HTTPS services.  
+    /// SSL/TLS certificate validation when detecting HTTPS services.  
     /// 
     /// Default value is false, which means validation is enabled. 
     pub accept_invalid_certs: bool,
 }
 
 impl ServiceDetector {
+    /// Create new ServiceDetector
     pub fn new() -> ServiceDetector {
         ServiceDetector{
             dst_ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
@@ -39,27 +40,37 @@ impl ServiceDetector {
             accept_invalid_certs: false,
         }
     }
+    /// Set Destination IP address
     pub fn set_dst_ip(&mut self, dst_ip: IpAddr){
         self.dst_ip = dst_ip;
     }
+    /// Set Destination Host Name
     pub fn set_dst_name(&mut self, host_name: IpAddr){
         self.dst_ip = host_name;
     }
+    /// Set target ports
     pub fn set_open_ports(&mut self, open_ports: Vec<u16>){
         self.open_ports = open_ports;
     }
+    /// Add target port
     pub fn add_open_port(&mut self, open_port: u16){
         self.open_ports.push(open_port);
     }
+    /// Set connect (open) timeout
     pub fn set_connect_timeout(&mut self, connect_timeout: Duration){
         self.connect_timeout = connect_timeout;
     }
+    /// Set TCP read timeout
     pub fn set_read_timeout(&mut self, read_timeout: Duration){
         self.read_timeout = read_timeout;
     }
+    /// Set SSL/TLS certificate validation enable/disable.
     pub fn set_accept_invalid_certs(&mut self, accept_invalid_certs: bool){
         self.accept_invalid_certs = accept_invalid_certs;
     }
+    /// Run service detection and return result
+    /// 
+    /// PortDatabase can be omitted with None (use default list) 
     pub fn detect(&self, port_db: Option<PortDatabase>) -> HashMap<u16, String> {
         detect_service(self, port_db.unwrap_or(PortDatabase::default()))
     }

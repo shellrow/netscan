@@ -62,9 +62,8 @@ pub struct ProbeTarget {
     pub closed_udp_port: u16,
 }
 
-#[doc(hidden)]
 #[derive(Clone, Debug)]
-pub struct ProbeSetting {
+pub(crate) struct ProbeSetting {
     pub src_mac: MacAddr,
     pub dst_mac: MacAddr,
     pub src_ip: IpAddr,

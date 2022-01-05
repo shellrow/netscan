@@ -1,10 +1,8 @@
 use pnet_packet::ethernet::{MutableEthernetPacket, EtherType, EtherTypes};
 use pnet_datalink::MacAddr;
 
-#[doc(hidden)]
 pub const ETHERNET_HEADER_LEN: usize = 14;
 
-#[doc(hidden)]
 pub fn build_ethernet_packet(eth_packet: &mut MutableEthernetPacket, src_mac: MacAddr, dst_mac: MacAddr, ether_type: EtherType) {
     eth_packet.set_source(src_mac);
     eth_packet.set_destination(dst_mac);

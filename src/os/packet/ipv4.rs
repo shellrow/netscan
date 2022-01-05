@@ -2,24 +2,18 @@ use std::net::Ipv4Addr;
 use pnet_packet::ip::{IpNextHeaderProtocol, IpNextHeaderProtocols};
 use pnet_packet::ipv4::{MutableIpv4Packet, Ipv4Flags};
 
-#[doc(hidden)]
 pub const IPV4_HEADER_LEN: usize = 20;
-#[doc(hidden)]
 pub const IPV4_TOTAL_LEN: u16 = 52;
 
-#[doc(hidden)]
 #[cfg(not(target_family="windows"))]
 pub const IPV4_TOTAL_LEN_TCP: u16 = 64;
 
-#[doc(hidden)]
 #[cfg(target_family="windows")]
 pub const IPV4_TOTAL_LEN_TCP: u16 = 52;
 
 pub const IPV4_DEFAULT_ID: u16 = 4162;
-
 pub const IPV4_DEFAULT_TTL: u8 = 64;
 
-#[doc(hidden)]
 pub fn build_ipv4_packet(ipv4_packet: &mut MutableIpv4Packet, src_ip: Ipv4Addr, dst_ip: Ipv4Addr, next_protocol: IpNextHeaderProtocol) {
     ipv4_packet.set_header_length(69);
     ipv4_packet.set_source(src_ip);

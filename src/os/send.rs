@@ -101,7 +101,7 @@ fn build_udp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8]) {
     udp::build_udp_packet(&mut udp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, probe_setting.probe_target.closed_udp_port);
 }
 
-pub fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, probe_setting: &ProbeSetting, stop: &Arc<Mutex<bool>>) {
+pub(crate) fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, probe_setting: &ProbeSetting, stop: &Arc<Mutex<bool>>) {
     for probe_type in probe_setting.probe_types.clone() {
         match probe_type {
             ProbeType::IcmpEchoProbe => {

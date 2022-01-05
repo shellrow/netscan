@@ -11,7 +11,7 @@ use super::result::*;
 use crate::packet::ipv4::IPV4_HEADER_LEN;
 use crate::packet::ipv6::IPV6_HEADER_LEN;
 
-pub fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>, probe_setting: &ProbeSetting, probe_result: &Arc<Mutex<ProbeResult>>,  stop: &Arc<Mutex<bool>>, probe_status: &Arc<Mutex<ProbeStatus>>) {
+pub(crate) fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>, probe_setting: &ProbeSetting, probe_result: &Arc<Mutex<ProbeResult>>,  stop: &Arc<Mutex<bool>>, probe_status: &Arc<Mutex<ProbeStatus>>) {
     let start_time = Instant::now();
     loop {
         match rx.next() {

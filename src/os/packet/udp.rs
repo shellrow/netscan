@@ -1,11 +1,9 @@
 use std::net::IpAddr;
 use pnet_packet::udp::MutableUdpPacket;
 
-#[doc(hidden)]
 #[allow(dead_code)]
 pub const UDP_HEADER_LEN: usize = 8;
 
-#[doc(hidden)]
 pub fn build_udp_packet(udp_packet:&mut MutableUdpPacket, src_ip: IpAddr, src_port:u16, dst_ip: IpAddr, dst_port:u16) {
     udp_packet.set_length(8);
     udp_packet.set_source(src_port);
