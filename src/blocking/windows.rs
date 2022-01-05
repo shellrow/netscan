@@ -153,7 +153,7 @@ fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResul
     }
 }
 
-pub fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
+pub(crate) fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     let interfaces = pnet_datalink::interfaces();
     let interface = match interfaces.into_iter().filter(|interface: &pnet_datalink::NetworkInterface| interface.index == scan_setting.if_index).next() {
         Some(interface) => interface,
@@ -184,7 +184,7 @@ pub fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     return result;
 }
 
-pub fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
+pub(crate) fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
     let interfaces = pnet_datalink::interfaces();
     let interface = match interfaces.into_iter().filter(|interface: &pnet_datalink::NetworkInterface| interface.index == scan_setting.if_index).next() {
         Some(interface) => interface,
