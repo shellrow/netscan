@@ -72,5 +72,6 @@ pub(crate) struct ProbeSetting {
     pub probe_types: Vec<ProbeType>,
     pub timeout: Duration,
     pub wait_time: Duration,
+    #[allow(dead_code)]
     pub send_rate: Duration,
 }

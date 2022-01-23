@@ -1,10 +1,11 @@
-#[cfg(target_family="unix")]
-async fn unix_main() {
-    use netscan::async_io::HostScanner;
-    use netscan::setting::{ScanType, Destination};
-    use std::time::Duration;
-    use std::net::{IpAddr, Ipv4Addr};
-    use ipnet::Ipv4Net;
+use netscan::async_io::HostScanner;
+use netscan::setting::{ScanType, Destination};
+use std::time::Duration;
+use std::net::{IpAddr, Ipv4Addr};
+use ipnet::Ipv4Net;
+
+#[tokio::main]
+async fn main() {
     let mut host_scanner = match HostScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -26,17 +27,4 @@ async fn unix_main() {
         println!("{:?}", host);
     }
     println!("Scan Time: {:?}", result.scan_time);
-}
-
-#[tokio::main]
-async fn main() {
-    #[cfg(target_family="unix")]
-    {
-        unix_main().await;
-    }
-
-    #[cfg(target_family="windows")]
-    {
-        println!("Windows is not yet supported.");
-    }
 }

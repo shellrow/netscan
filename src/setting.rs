@@ -78,6 +78,8 @@ pub(crate) struct ScanSetting {
     pub wait_time: Duration,
     pub send_rate: Duration,
     pub scan_type: ScanType,
+    #[allow(dead_code)]
     pub hosts_concurrency: usize,
+    #[allow(dead_code)]
     pub ports_concurrency: usize,
 }

@@ -6,7 +6,6 @@ pub mod result;
 pub mod blocking;
 
 #[cfg(feature = "async")]
-#[cfg(not(target_os="windows"))]
 pub mod async_io;
 
 #[cfg(feature = "service")]
