@@ -68,7 +68,9 @@ impl Destination {
 #[derive(Clone, Debug)]
 pub(crate) struct ScanSetting {
     pub if_index: u32,
+    #[allow(dead_code)]
     pub src_mac: MacAddr,
+    #[allow(dead_code)]
     pub dst_mac: MacAddr,
     pub src_ip: IpAddr,
     pub src_port: u16,
