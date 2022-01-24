@@ -14,24 +14,23 @@ license = "MIT"
 rayon = "1.5.1"
 rand = "0.8.4"
 default-net = "0.7.0"
-pnet_packet = "0.28"
-pnet_datalink = "0.28"
-socket2 = { version = "0.4", features = ["all"] }
-tokio = { version = "1.7.0", features = ["rt", "rt-multi-thread", "net", "time", "macros", "sync"], optional = true }
+pnet_packet = "0.28.0"
+pnet_datalink = "0.28.0"
+socket2 = { version = "0.4.3", features = ["all"] }
 async-io = { version = "1.6.0", optional = true }
-futures = {version = "0.3", optional = true}
-dns-lookup = { version = "1.0", optional = true }
-native-tls = { version = "0.2", optional = true }
+futures = {version = "0.3.19", features = ["executor", "thread-pool"],  optional = true}
+futures-lite = {version = "1.12.0", optional = true}
+dns-lookup = { version = "1.0.8", optional = true }
+native-tls = { version = "0.2.8", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [ "std" ] }
 
 [dev-dependencies]
 ipnet = "2.3"
-tokio = { version = "1.7.0", features = ["full"] }
 
 [features]
-async = ["tokio", "async-io", "futures"]
+async = ["async-io", "futures", "futures-lite"]
 service = ["dns-lookup", "native-tls"]
 os = []
 full = ["async", "service", "os"]

@@ -3,9 +3,9 @@ use netscan::setting::{ScanType, Destination};
 use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 use ipnet::Ipv4Net;
+use async_io;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let mut host_scanner = match HostScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
@@ -20,7 +20,9 @@ async fn main() {
     host_scanner.set_scan_type(ScanType::IcmpPingScan);
     host_scanner.set_timeout(Duration::from_millis(10000));
     host_scanner.set_wait_time(Duration::from_millis(100));
-    let result = host_scanner.scan().await;
+    let result = async_io::block_on(async {
+        host_scanner.scan().await
+    });
     println!("Status: {:?}", result.scan_status);
     println!("UP Hosts:");
     for host in result.hosts {

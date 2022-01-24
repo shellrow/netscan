@@ -1,58 +1,22 @@
-use std::io;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, SocketAddr, TcpStream};
 use std::sync::Arc;
-use std::mem::MaybeUninit;
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use std::collections::HashMap;
-use socket2::{Domain, Protocol, SockAddr, Socket, Type};
-use tokio::io::unix::AsyncFd;
-use tokio::net::TcpStream;
-use tokio::sync::mpsc;
+use socket2::{Protocol, SockAddr, Type};
+use std::sync::mpsc;
 use pnet_packet::Packet;
+use async_io::{Async, Timer};
+use futures_lite::{future::FutureExt, io};
 use futures::stream::{self, StreamExt};
+use futures::executor::ThreadPool;
+use futures::task::SpawnExt;
 use crate::result::{HostScanResult, PortScanResult, PortStatus, PortInfo, ScanResult, ScanStatus};
 use crate::setting::{ScanSetting, ScanType, Destination};
 use crate::packet;
 use crate::async_io::receiver;
-
-#[derive(Clone, Debug)]
-pub struct AsyncSocket {
-    inner: Arc<AsyncFd<Socket>>,
-}
-
-impl AsyncSocket {
-    pub fn new(addr: IpAddr, socket_type: Type, protocol: Protocol) -> io::Result<AsyncSocket> {
-        let socket = match addr {
-            IpAddr::V4(_) => Socket::new(Domain::IPV4, socket_type, Some(protocol))?,
-            IpAddr::V6(_) => Socket::new(Domain::IPV6, socket_type, Some(protocol))?,
-        };
-        socket.set_nonblocking(true)?;
-        Ok(AsyncSocket {
-            inner: Arc::new(AsyncFd::new(socket)?),
-        })
-    }
-    pub async fn send_to(&self, buf: &mut [u8], target: &SockAddr) -> io::Result<usize> {
-        loop {
-            let mut guard = self.inner.writable().await?;
-            match guard.try_io(|inner| inner.get_ref().send_to(buf, target)) {
-                Ok(n) => return n,
-                Err(_) => continue,
-            }
-        }
-    }
-    #[allow(dead_code)]
-    pub async fn recv_from(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<(usize, SockAddr)> {
-        loop {
-            let mut guard = self.inner.readable().await?;
-            match guard.try_io(|inner| inner.get_ref().recv_from(buf)) {
-                Ok(result) => return result,
-                Err(_would_block) => continue,
-            }
-        }
-    }
-}
+use super::socket::AsyncSocket;
 
 async fn build_icmpv4_echo_packet() -> Vec<u8> {
     let mut buf = vec![0; 16];
@@ -143,7 +107,7 @@ async fn send_udp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
 }
 
 async fn try_connect_ports(concurrency: usize, dst: Destination) -> (IpAddr, Vec<PortInfo>) {
-    let (channel_tx, mut channel_rx) = mpsc::channel(concurrency);
+    let (channel_tx, channel_rx) = mpsc::channel();
     let conn_timeout = Duration::from_millis(200);
     let fut = stream::iter(dst.dst_ports.clone()).for_each_concurrent(
         concurrency, |port| {
@@ -151,9 +115,13 @@ async fn try_connect_ports(concurrency: usize, dst: Destination) -> (IpAddr, Vec
             let channel_tx = channel_tx.clone();
             async move {
                 let socket_addr = SocketAddr::new(dst.dst_ip, port);
-                match tokio::time::timeout(conn_timeout, TcpStream::connect(&socket_addr)).await {
-                    Ok(Ok(_)) => {
-                        let _ = channel_tx.send(port).await;
+                let stream = Async::<TcpStream>::connect(socket_addr).or(async {
+                    Timer::after(conn_timeout).await;
+                    Err(io::ErrorKind::TimedOut.into())
+                }).await;
+                match stream {
+                    Ok(_) => {
+                        let _ = channel_tx.send(port);
                     },
                     _ => {},
                 }
@@ -163,8 +131,15 @@ async fn try_connect_ports(concurrency: usize, dst: Destination) -> (IpAddr, Vec
     fut.await;
     drop(channel_tx);
     let mut open_ports: Vec<PortInfo> = vec![];
-    while let Some(port) = channel_rx.recv().await {
-        open_ports.push(PortInfo{port: port, status: PortStatus::Open});
+    loop {
+        match channel_rx.recv() {
+            Ok(port) => {
+                open_ports.push(PortInfo{port: port, status: PortStatus::Open});
+            },
+            Err(_) => {
+                break;
+            },
+        }
     }
     (dst.dst_ip, open_ports)
 }
@@ -248,9 +223,11 @@ pub(crate) async fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     let receive_result: Arc<Mutex<ScanResult>>  = Arc::clone(&scan_result);
     let receive_stop: Arc<Mutex<bool>> = Arc::clone(&stop);
     let receive_setting: ScanSetting = scan_setting.clone();
-    tokio::spawn(async move {
-        receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop).await;    
-    });
+    let executor = ThreadPool::new().unwrap();
+    let future = async move {
+        receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop).await;
+    };
+    executor.spawn(future).unwrap();
     send_ping_packet(&socket, &scan_setting).await;
     thread::sleep(scan_setting.wait_time);
     *stop.lock().unwrap() = true;
@@ -298,9 +275,11 @@ pub(crate) async fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
     let receive_result: Arc<Mutex<ScanResult>>  = Arc::clone(&scan_result);
     let receive_stop: Arc<Mutex<bool>> = Arc::clone(&stop);
     let receive_setting: ScanSetting = scan_setting.clone();
-    tokio::spawn(async move {
-        receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop).await;    
-    });
+    let executor = ThreadPool::new().unwrap();
+    let future = async move {
+        receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop).await;
+    };
+    executor.spawn(future).unwrap();
     send_tcp_packets(&socket, &scan_setting).await;
     thread::sleep(scan_setting.wait_time);
     *stop.lock().unwrap() = true;

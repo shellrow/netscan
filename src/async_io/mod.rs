@@ -1,5 +1,6 @@
 mod scanner;
 mod receiver;
+mod socket;
 
 #[cfg(not(target_os="windows"))]
 mod unix;
