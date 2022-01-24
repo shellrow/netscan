@@ -61,7 +61,6 @@ fn main() {
 The following feature flags can be used to enable/disable specific features.
 #### `--feature async`
 Enable async scanning.  
-**Unix-Like OS only**
 #### `--feature service`
 Enable service detection. (Experimental)      
 #### `--feature os`
