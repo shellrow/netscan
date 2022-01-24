@@ -9,8 +9,8 @@ fn main(){
         Ok(scanner) => (scanner),
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    let dst_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 92));
-    //let dst: Destination = Destination::new(dst_ip, vec![22, 80, 443]);
+    let dst_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 8));
+    //let dst: Destination = Destination::new(dst_ip, vec![22, 80, 443, 5000, 8080]);
     let dst: Destination = Destination::new_with_port_range(dst_ip, 1, 1000);
     port_scanner.add_destination(dst);
     port_scanner.set_scan_type(ScanType::TcpSynScan);
