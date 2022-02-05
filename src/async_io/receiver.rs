@@ -21,9 +21,7 @@ pub(crate) async fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkRece
                     _ => {},
                 }
             },
-            Err(e) => {
-                panic!("Failed to read: {}", e);
-            }
+            Err(_) => {},
         }
         if *stop.lock().unwrap(){
             break;

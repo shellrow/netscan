@@ -21,9 +21,7 @@ pub(crate) fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>,
                     _ => {},
                 }
             },
-            Err(e) => {
-                panic!("Failed to read: {}", e);
-            }
+            Err(_) => {},
         }
         if *stop.lock().unwrap(){
             break;
