@@ -13,15 +13,19 @@ fn main() {
     let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 0), 24).unwrap();
     let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
     let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
+    // Add scan target
     for host in hosts {
         let dst: Destination = Destination::new(IpAddr::V4(host), vec![]);
         host_scanner.add_destination(dst);
     }
+    // Set options
     host_scanner.set_scan_type(ScanType::IcmpPingScan);
     host_scanner.set_timeout(Duration::from_millis(10000));
     host_scanner.set_wait_time(Duration::from_millis(100));
-    host_scanner.set_send_rate(Duration::from_millis(1));
+    //host_scanner.set_send_rate(Duration::from_millis(1));
+    // Run scan 
     let result = host_scanner.scan();
+    // Print results 
     println!("Status: {:?}", result.scan_status);
     println!("UP Hosts:");
     for host in result.hosts {
