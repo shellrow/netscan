@@ -1,4 +1,3 @@
-extern crate netscan;
 use netscan::blocking::PortScanner;
 use netscan::setting::{ScanType, Destination};
 use std::time::Duration;
