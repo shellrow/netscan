@@ -312,10 +312,12 @@ impl PortScanner {
         let start_time = Instant::now();
         let mut result: PortScanResult = scan_ports(scan_setting);
         result.scan_time = Instant::now().duration_since(start_time);
-        if result.scan_time > self.timeout {
-            result.scan_status = ScanStatus::Timeout;
-        } else {
-            result.scan_status = ScanStatus::Done;
+        if result.scan_status != ScanStatus::Error {
+            if result.scan_time > self.timeout {
+                result.scan_status = ScanStatus::Timeout;
+            } else {
+                result.scan_status = ScanStatus::Done;
+            }
         }
         self.scan_result = result;
     }

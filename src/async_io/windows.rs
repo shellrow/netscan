@@ -243,14 +243,22 @@ pub(crate) async fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
             // TODO
             // Winsock2 does not allow TCP data to be sent over Raw Socket
             // ...so another Async capable implementation is needed
-            return PortScanResult::new();
+            return PortScanResult{
+                result_map: HashMap::new(),
+                scan_time: Duration::from_millis(0),
+                scan_status: ScanStatus::Error,
+            };
         },
         ScanType::TcpConnectScan => {
             let scan_result = run_connect_scan(scan_setting).await;
             return scan_result;
         },
         _ => {
-            return PortScanResult::new();
+            return PortScanResult{
+                result_map: HashMap::new(),
+                scan_time: Duration::from_millis(0),
+                scan_status: ScanStatus::Error,
+            };
         },
     }
     /* let socket = match scan_setting.scan_type {

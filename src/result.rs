@@ -3,7 +3,7 @@ use std::time::Duration;
 use std::collections::{HashSet, HashMap};
 
 /// Status of scan task 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ScanStatus {
     Ready,
     Done,
