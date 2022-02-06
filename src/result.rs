@@ -22,22 +22,29 @@ pub enum PortStatus {
 /// Information about the scanned host 
 #[derive(Clone, Copy, Debug)]
 pub struct HostInfo {
+    /// IP address of the host
     pub ip_addr: IpAddr,
+    /// IP Time to Live (Hop Limit)
     pub ttl: u8,
 }
 
 /// Information about the scanned port 
 #[derive(Clone, Copy, Debug)]
 pub struct PortInfo {
+    /// Port number
     pub port: u16,
+    /// Port status
     pub status: PortStatus,
 }
 
 /// Result of host scan 
 #[derive(Clone, Debug)]
 pub struct HostScanResult {
+    /// Hosts that responded
     pub hosts: Vec<HostInfo>,
+    /// Time taken to scan
     pub scan_time: Duration,
+    /// Status of the scan task
     pub scan_status: ScanStatus,
 }
 
@@ -49,6 +56,7 @@ impl HostScanResult {
             scan_status: ScanStatus::Ready,
         }
     }
+    /// Returns IP addresses from the scan result
     pub fn get_hosts(&self) -> Vec<IpAddr> {
         let mut hosts: Vec<IpAddr> = vec![];
         for host in self.hosts.clone() {
@@ -61,8 +69,11 @@ impl HostScanResult {
 /// Result of port scan
 #[derive(Clone, Debug)]
 pub struct PortScanResult {
+    /// HashMap of scanned IP addresses and their respective port scan results.
     pub result_map: HashMap<IpAddr, Vec<PortInfo>>,
+    /// Time taken to scan
     pub scan_time: Duration,
+    /// Status of the scan task
     pub scan_status: ScanStatus,
 }
 
@@ -74,6 +85,7 @@ impl PortScanResult {
             scan_status: ScanStatus::Ready,
         }
     }
+    /// Get open ports of the specified IP address from the scan results
     pub fn get_open_ports(&self, ip_addr: IpAddr) -> Vec<u16> {
         let mut open_ports: Vec<u16> = vec![];
         if let Some(ports) = self.result_map.get(&ip_addr) {

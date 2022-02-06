@@ -10,9 +10,21 @@ pub(crate) const DEFAULT_PORTS_CONCURRENCY: usize = 100;
 /// Scan Type 
 #[derive(Clone, Debug)]
 pub enum ScanType {
+    /// Default fast port scan type.
+    /// 
+    /// Send TCP packet with SYN flag to the target ports and check response.
     TcpSynScan,
+    /// Attempt TCP connection and check port status.
+    /// 
+    /// Slow but can be run without administrator privileges.
     TcpConnectScan,
+    /// Default host scan type.
+    /// 
+    /// Send ICMP echo request and check response.
     IcmpPingScan,
+    /// Perform host scan for a specific service.
+    /// 
+    /// Send TCP packets with SYN flag to a specific port and check response.
     TcpPingScan,
     UdpPingScan,
 }
