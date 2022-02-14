@@ -23,24 +23,8 @@ fn main() {
         open_udp_port: 123,
         closed_udp_port: 33455,
     };
-    let probe_target3: ProbeTarget = ProbeTarget {
-        ip_addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4)),
-        open_tcp_ports: vec![22,80],
-        closed_tcp_port: 443,
-        open_udp_port: 123,
-        closed_udp_port: 33455,
-    };
-    let probe_target4: ProbeTarget = ProbeTarget {
-        ip_addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 5)),
-        open_tcp_ports: vec![22,80],
-        closed_tcp_port: 443,
-        open_udp_port: 123,
-        closed_udp_port: 33455,
-    };
     fingerprinter.add_probe_target(probe_target1);
     fingerprinter.add_probe_target(probe_target2);
-    fingerprinter.add_probe_target(probe_target3);
-    fingerprinter.add_probe_target(probe_target4);
     fingerprinter.add_probe_type(ProbeType::IcmpEchoProbe);
     fingerprinter.add_probe_type(ProbeType::IcmpTimestampProbe);
     fingerprinter.add_probe_type(ProbeType::IcmpAddressMaskProbe);
