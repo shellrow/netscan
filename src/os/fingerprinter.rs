@@ -148,6 +148,18 @@ impl Fingerprinter {
     pub fn set_probe_types(&mut self, probe_types: Vec<ProbeType>) {
         self.probe_types= probe_types;
     }
+    /// Set all probe types
+    pub fn set_full_probe(&mut self) {
+        self.probe_types.clear();
+        self.probe_types.push(ProbeType::IcmpEchoProbe);
+        self.probe_types.push(ProbeType::IcmpTimestampProbe);
+        self.probe_types.push(ProbeType::IcmpAddressMaskProbe);
+        self.probe_types.push(ProbeType::IcmpInformationProbe);
+        self.probe_types.push(ProbeType::IcmpUnreachableProbe);
+        self.probe_types.push(ProbeType::TcpSynAckProbe);
+        self.probe_types.push(ProbeType::TcpRstAckProbe);
+        self.probe_types.push(ProbeType::TcpEcnProbe);
+    }
     /// Set probe timeout  
     pub fn set_timeout(&mut self, timeout: Duration){
         self.timeout = timeout;

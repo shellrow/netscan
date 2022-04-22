@@ -1,13 +1,10 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
-use netscan::os::{Fingerprinter};
-use netscan::os::{ProbeType, ProbeTarget};
+use netscan::os::{Fingerprinter, ProbeTarget};
 
 fn main() {
     let src_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4));
-    //let gateway_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
     let mut fingerprinter = Fingerprinter::new(src_ip).unwrap();
-    //let mut fingerprinter = Fingerprinter::new_with_gateway_ip(src_ip, gateway_ip).unwrap();
     fingerprinter.set_wait_time(Duration::from_millis(200));
     let probe_target1: ProbeTarget = ProbeTarget {
         ip_addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 2)),
@@ -25,14 +22,7 @@ fn main() {
     };
     fingerprinter.add_probe_target(probe_target1);
     fingerprinter.add_probe_target(probe_target2);
-    fingerprinter.add_probe_type(ProbeType::IcmpEchoProbe);
-    fingerprinter.add_probe_type(ProbeType::IcmpTimestampProbe);
-    fingerprinter.add_probe_type(ProbeType::IcmpAddressMaskProbe);
-    fingerprinter.add_probe_type(ProbeType::IcmpInformationProbe);
-    fingerprinter.add_probe_type(ProbeType::IcmpUnreachableProbe);
-    fingerprinter.add_probe_type(ProbeType::TcpSynAckProbe);
-    fingerprinter.add_probe_type(ProbeType::TcpRstAckProbe);
-    fingerprinter.add_probe_type(ProbeType::TcpEcnProbe);
+    fingerprinter.set_full_probe();
     let results = fingerprinter.probe();
     for result in results {
         println!("{}", result.ip_addr);
