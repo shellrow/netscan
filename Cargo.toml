@@ -2,7 +2,7 @@
 name = "netscan"
 version = "0.8.4"
 authors = ["shellrow <81893184+shellrow@users.noreply.github.com>"]
-edition = "2018"
+edition = "2021"
 description = "Cross-platform network scan library"
 repository = "https://github.com/shellrow/netscan"
 readme = "README.md"
