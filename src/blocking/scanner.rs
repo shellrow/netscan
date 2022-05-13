@@ -1,6 +1,8 @@
 use std::net::IpAddr;
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
+use std::sync::{Mutex, Arc};
+use std::sync::mpsc::{channel ,Sender, Receiver};
 use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
 use crate::result::{HostScanResult, PortScanResult, ScanStatus};
 use crate::blocking::{scan_hosts, scan_ports};
@@ -33,6 +35,10 @@ pub struct HostScanner {
     pub send_rate: Duration,
     /// Scan Result 
     pub scan_result: HostScanResult,
+    /// Sender for progress messaging
+    pub tx: Arc<Mutex<Sender<u32>>>,
+    /// Receiver for progress messaging
+    pub rx: Arc<Mutex<Receiver<u32>>>,
 }
 
 /// Port Scanner 
@@ -62,6 +68,10 @@ pub struct PortScanner {
     pub send_rate: Duration,
     /// Scan Result 
     pub scan_result: PortScanResult,
+    /// Sender for progress messaging
+    pub tx: Arc<Mutex<Sender<u32>>>,
+    /// Receiver for progress messaging
+    pub rx: Arc<Mutex<Receiver<u32>>>,
 }
 
 impl HostScanner {
@@ -85,6 +95,7 @@ impl HostScanner {
         if if_index == 0 || if_name.is_empty() || src_mac == pnet_datalink::MacAddr::zero() {
             return Err(String::from("Failed to create Scanner. Network Interface not found."));
         }
+        let (tx, rx) = channel();
         let host_scanner = HostScanner {
             if_index: if_index,
             if_name: if_name,
@@ -98,6 +109,8 @@ impl HostScanner {
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(0),
             scan_result: HostScanResult::new(),
+            tx: Arc::new(Mutex::new(tx)),
+            rx: Arc::new(Mutex::new(rx)),
         };
         Ok(host_scanner)
     }
@@ -157,6 +170,10 @@ impl HostScanner {
     pub fn get_scan_result(&self) -> HostScanResult {
         self.scan_result.clone()
     }
+    /// Get progress receiver
+    pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<u32>>> {
+        self.rx.clone()
+    }
     /// Run Host Scan
     pub fn run_scan(&mut self){
         let mut ip_set: HashSet<IpAddr> = HashSet::new();
@@ -179,7 +196,7 @@ impl HostScanner {
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
         };
         let start_time = Instant::now();
-        let mut result: HostScanResult = scan_hosts(scan_setting);
+        let mut result: HostScanResult = scan_hosts(scan_setting, &self.tx);
         result.scan_time = Instant::now().duration_since(start_time);
         if result.scan_time > self.timeout {
             result.scan_status = ScanStatus::Timeout;
@@ -216,6 +233,7 @@ impl PortScanner {
         if if_index == 0 || if_name.is_empty() || src_mac == pnet_datalink::MacAddr::zero() {
             return Err(String::from("Failed to create Scanner. Network Interface not found."));
         }
+        let (tx, rx) = channel();
         let port_scanner = PortScanner {
             if_index: if_index,
             if_name: if_name,
@@ -229,6 +247,8 @@ impl PortScanner {
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(0),
             scan_result: PortScanResult::new(),
+            tx: Arc::new(Mutex::new(tx)),
+            rx: Arc::new(Mutex::new(rx)),
         };
         Ok(port_scanner)
     }
@@ -288,6 +308,10 @@ impl PortScanner {
     pub fn get_scan_result(&self) -> PortScanResult {
         self.scan_result.clone()
     }
+    /// Get progress receiver
+    pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<u32>>> {
+        self.rx.clone()
+    }
     /// Run Port Scan
     pub fn run_scan(&mut self){
         let mut ip_set: HashSet<IpAddr> = HashSet::new();
@@ -310,7 +334,7 @@ impl PortScanner {
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
         };
         let start_time = Instant::now();
-        let mut result: PortScanResult = scan_ports(scan_setting);
+        let mut result: PortScanResult = scan_ports(scan_setting, &self.tx);
         result.scan_time = Instant::now().duration_since(start_time);
         if result.scan_status != ScanStatus::Error {
             if result.scan_time > self.timeout {
