@@ -1,6 +1,6 @@
 use std::net::{IpAddr, SocketAddr, TcpStream};
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use std::thread;
 use std::time::Duration;
 use std::collections::HashMap;
@@ -39,7 +39,7 @@ async fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_por
     udp_packet.packet().to_vec()
 }
 
-async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
+async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency, |dst| {
             let socket_addr = SocketAddr::new(dst.dst_ip, 0);
@@ -50,13 +50,22 @@ async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting
                     Ok(_) => {},
                     Err(_) => {},
                 }
+                match ptx.lock() {
+                    Ok(lr) => {
+                        match lr.send(socket_addr) {
+                            Ok(_) => {},
+                            Err(_) => {},
+                        }
+                    },
+                    Err(_) => {},
+                }
             }
         }
     );
     fut_host.await;
 }
 
-async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting){
+async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>){
     let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency, |dst| {
             async move {
@@ -71,6 +80,15 @@ async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting){
                                 Ok(_) => {},
                                 Err(_) => {},
                             }
+                            match ptx.lock() {
+                                Ok(lr) => {
+                                    match lr.send(socket_addr) {
+                                        Ok(_) => {},
+                                        Err(_) => {},
+                                    }
+                                },
+                                Err(_) => {},
+                            }
                         }
                     }
                 );
@@ -81,7 +99,7 @@ async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting){
     fut_host.await;
 }
 
-async fn send_udp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
+async fn send_udp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency, |dst| {
             async move {
@@ -96,6 +114,15 @@ async fn send_udp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
                                 Ok(_) => {},
                                 Err(_) => {},
                             }
+                            match ptx.lock() {
+                                Ok(lr) => {
+                                    match lr.send(socket_addr) {
+                                        Ok(_) => {},
+                                        Err(_) => {},
+                                    }
+                                },
+                                Err(_) => {},
+                            }
                         }
                     }
                 );
@@ -106,7 +133,7 @@ async fn send_udp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
     fut_host.await;
 }
 
-async fn try_connect_ports(concurrency: usize, dst: Destination) -> (IpAddr, Vec<PortInfo>) {
+async fn try_connect_ports(concurrency: usize, dst: Destination, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> (IpAddr, Vec<PortInfo>) {
     let (channel_tx, channel_rx) = mpsc::channel();
     let conn_timeout = Duration::from_millis(200);
     let fut = stream::iter(dst.dst_ports.clone()).for_each_concurrent(
@@ -124,6 +151,15 @@ async fn try_connect_ports(concurrency: usize, dst: Destination) -> (IpAddr, Vec
                         let _ = channel_tx.send(port);
                     },
                     _ => {},
+                }
+                match ptx.lock() {
+                    Ok(lr) => {
+                        match lr.send(socket_addr) {
+                            Ok(_) => {},
+                            Err(_) => {},
+                        }
+                    },
+                    Err(_) => {},
                 }
             }
         }
@@ -144,9 +180,9 @@ async fn try_connect_ports(concurrency: usize, dst: Destination) -> (IpAddr, Vec
     (dst.dst_ip, open_ports)
 }
 
-async fn run_connect_scan(scan_setting: ScanSetting) -> PortScanResult {
+async fn run_connect_scan(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> PortScanResult {
     let scan_result: Vec<(IpAddr, Vec<PortInfo>)> = stream::iter(scan_setting.destinations.clone().into_iter())
-        .map(|dst| try_connect_ports(scan_setting.ports_concurrency, dst))
+        .map(|dst| try_connect_ports(scan_setting.ports_concurrency, dst, ptx))
         .buffer_unordered(scan_setting.hosts_concurrency)
         .collect()
         .await;
@@ -161,16 +197,16 @@ async fn run_connect_scan(scan_setting: ScanSetting) -> PortScanResult {
     }
 }
 
-async fn send_ping_packet(socket: &AsyncSocket, scan_setting: &ScanSetting) {
+async fn send_ping_packet(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
-            send_icmp_echo_packets(socket, scan_setting).await;
+            send_icmp_echo_packets(socket, scan_setting, ptx).await;
         },
         ScanType::TcpPingScan => {
-            send_tcp_syn_packets(socket, scan_setting).await;
+            send_tcp_syn_packets(socket, scan_setting, ptx).await;
         },
         ScanType::UdpPingScan => {
-            send_udp_packets(socket, scan_setting).await;
+            send_udp_packets(socket, scan_setting, ptx).await;
         },
         _ => {
             return;
@@ -178,10 +214,10 @@ async fn send_ping_packet(socket: &AsyncSocket, scan_setting: &ScanSetting) {
     }
 }
 
-async fn send_tcp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
+async fn send_tcp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
-            send_tcp_syn_packets(socket, scan_setting).await;
+            send_tcp_syn_packets(socket, scan_setting, ptx).await;
         },
         _ => {
             return;
@@ -189,7 +225,7 @@ async fn send_tcp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
     }
 }
 
-pub(crate) async fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
+pub(crate) async fn scan_hosts(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> HostScanResult {
     let socket = match scan_setting.scan_type {
         ScanType::IcmpPingScan => AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::ICMPV4).unwrap(),
         ScanType::TcpPingScan => AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::TCP).unwrap(),
@@ -228,17 +264,17 @@ pub(crate) async fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
         receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop).await;
     };
     executor.spawn(future).unwrap();
-    send_ping_packet(&socket, &scan_setting).await;
+    send_ping_packet(&socket, &scan_setting, ptx).await;
     thread::sleep(scan_setting.wait_time);
     *stop.lock().unwrap() = true;
     let result: HostScanResult = scan_result.lock().unwrap().host_scan_result.clone(); 
     return result;
 }
 
-pub(crate) async fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
+pub(crate) async fn scan_ports(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> PortScanResult {
     match scan_setting.scan_type{
         ScanType::TcpConnectScan => {
-            let scan_result = run_connect_scan(scan_setting).await;
+            let scan_result = run_connect_scan(scan_setting, ptx).await;
             return scan_result;
         },
         _ => {},
@@ -280,7 +316,7 @@ pub(crate) async fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
         receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop).await;
     };
     executor.spawn(future).unwrap();
-    send_tcp_packets(&socket, &scan_setting).await;
+    send_tcp_packets(&socket, &scan_setting, ptx).await;
     thread::sleep(scan_setting.wait_time);
     *stop.lock().unwrap() = true;
     let result: PortScanResult = scan_result.lock().unwrap().port_scan_result.clone(); 

@@ -1,4 +1,4 @@
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::collections::HashSet;
 use std::time::{Duration, Instant};
 use std::sync::{Mutex, Arc};
@@ -36,9 +36,9 @@ pub struct HostScanner {
     /// Scan Result 
     pub scan_result: HostScanResult,
     /// Sender for progress messaging
-    pub tx: Arc<Mutex<Sender<u32>>>,
+    pub tx: Arc<Mutex<Sender<SocketAddr>>>,
     /// Receiver for progress messaging
-    pub rx: Arc<Mutex<Receiver<u32>>>,
+    pub rx: Arc<Mutex<Receiver<SocketAddr>>>,
 }
 
 /// Port Scanner 
@@ -69,9 +69,9 @@ pub struct PortScanner {
     /// Scan Result 
     pub scan_result: PortScanResult,
     /// Sender for progress messaging
-    pub tx: Arc<Mutex<Sender<u32>>>,
+    pub tx: Arc<Mutex<Sender<SocketAddr>>>,
     /// Receiver for progress messaging
-    pub rx: Arc<Mutex<Receiver<u32>>>,
+    pub rx: Arc<Mutex<Receiver<SocketAddr>>>,
 }
 
 impl HostScanner {
@@ -171,7 +171,7 @@ impl HostScanner {
         self.scan_result.clone()
     }
     /// Get progress receiver
-    pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<u32>>> {
+    pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<SocketAddr>>> {
         self.rx.clone()
     }
     /// Run Host Scan
@@ -309,7 +309,7 @@ impl PortScanner {
         self.scan_result.clone()
     }
     /// Get progress receiver
-    pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<u32>>> {
+    pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<SocketAddr>>> {
         self.rx.clone()
     }
     /// Run Port Scan

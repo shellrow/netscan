@@ -33,8 +33,7 @@ fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16
     udp_packet.packet().to_vec()
 }
 
-fn send_icmp_echo_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<u32>>>) {
-    let mut seq: u32 = 1;
+fn send_icmp_echo_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     for dst in scan_setting.destinations.clone() {
         let socket_addr = SocketAddr::new(dst.dst_ip, 0);
         let sock_addr = SockAddr::from(socket_addr);
@@ -45,20 +44,18 @@ fn send_icmp_echo_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc
         }
         match ptx.lock() {
             Ok(lr) => {
-                match lr.send(seq) {
+                match lr.send(socket_addr) {
                     Ok(_) => {},
                     Err(_) => {},
                 }
             },
             Err(_) => {},
         }
-        seq += 1;
         thread::sleep(scan_setting.send_rate);
     }
 }
 
-fn send_tcp_syn_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<u32>>>){
-    let mut seq: u32 = 1;
+fn send_tcp_syn_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>){
     for dst in scan_setting.destinations.clone() {
         for port in dst.dst_ports {
             let socket_addr = SocketAddr::new(dst.dst_ip, port);
@@ -70,21 +67,19 @@ fn send_tcp_syn_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<M
             }
             match ptx.lock() {
                 Ok(lr) => {
-                    match lr.send(seq) {
+                    match lr.send(socket_addr) {
                         Ok(_) => {},
                         Err(_) => {},
                     }
                 },
                 Err(_) => {},
             }
-            seq += 1;
             thread::sleep(scan_setting.send_rate);
         }
     }
 }
 
-fn send_udp_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<u32>>>) {
-    let mut seq: u32 = 1;
+fn send_udp_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     for dst in scan_setting.destinations.clone() {
         for port in dst.dst_ports {
             let socket_addr = SocketAddr::new(dst.dst_ip, port);
@@ -96,14 +91,13 @@ fn send_udp_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex
             }
             match ptx.lock() {
                 Ok(lr) => {
-                    match lr.send(seq) {
+                    match lr.send(socket_addr) {
                         Ok(_) => {},
                         Err(_) => {},
                     }
                 },
                 Err(_) => {},
             }
-            seq += 1;
             thread::sleep(scan_setting.send_rate);
         }
     }
@@ -146,7 +140,7 @@ fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResul
     }
 }
 
-fn send_ping_packet(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<u32>>>) {
+fn send_ping_packet(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
             send_icmp_echo_packets(socket, scan_setting, ptx);
@@ -163,7 +157,7 @@ fn send_ping_packet(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex
     }
 }
 
-fn send_tcp_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<u32>>>) {
+fn send_tcp_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
             send_tcp_syn_packets(socket, scan_setting, ptx);
@@ -174,7 +168,7 @@ fn send_tcp_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex
     }
 }
 
-pub(crate) fn scan_hosts(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<u32>>>) -> HostScanResult {
+pub(crate) fn scan_hosts(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> HostScanResult {
     let socket = match scan_setting.src_ip {
         IpAddr::V4(_) => {
             match scan_setting.scan_type {
@@ -232,7 +226,7 @@ pub(crate) fn scan_hosts(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<u32>>
     return result;
 }
 
-pub(crate) fn scan_ports(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<u32>>>) -> PortScanResult {
+pub(crate) fn scan_ports(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> PortScanResult {
     let socket = match scan_setting.src_ip {
         IpAddr::V4(_) => {
             match scan_setting.scan_type {
