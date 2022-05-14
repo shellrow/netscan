@@ -1,5 +1,6 @@
 use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use std::thread;
 use std::time::{Instant, Duration};
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
@@ -78,7 +79,7 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
     packet::icmp::build_icmp_packet(&mut icmp_packet);
 }
 
-fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &ScanSetting, stop: &Arc<Mutex<bool>>) {
+fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &ScanSetting, stop: &Arc<Mutex<bool>>, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::TcpSynScan | ScanType::TcpPingScan => {
             for dst in scan_setting.destinations.clone() {
@@ -87,6 +88,16 @@ fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &
                     tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
                         build_tcp_syn_packet(scan_setting, packet, dst_ip, port);
                     });
+                    let socket_addr = SocketAddr::new(dst.dst_ip, port);
+                    match ptx.lock() {
+                        Ok(lr) => {
+                            match lr.send(socket_addr) {
+                                Ok(_) => {},
+                                Err(_) => {},
+                            }
+                        },
+                        Err(_) => {},
+                    }
                     thread::sleep(scan_setting.send_rate);
                 }
             }
@@ -98,6 +109,16 @@ fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &
                     tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
                         build_udp_packet(scan_setting, packet, dst_ip, port);
                     });
+                    let socket_addr = SocketAddr::new(dst.dst_ip, port);
+                    match ptx.lock() {
+                        Ok(lr) => {
+                            match lr.send(socket_addr) {
+                                Ok(_) => {},
+                                Err(_) => {},
+                            }
+                        },
+                        Err(_) => {},
+                    }
                     thread::sleep(scan_setting.send_rate);
                 }
             }
@@ -107,6 +128,16 @@ fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &
                 tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
                     build_icmp_echo_packet(scan_setting, packet, dst.dst_ip);
                 });
+                let socket_addr = SocketAddr::new(dst.dst_ip, 0);
+                match ptx.lock() {
+                    Ok(lr) => {
+                        match lr.send(socket_addr) {
+                            Ok(_) => {},
+                            Err(_) => {},
+                        }
+                    },
+                    Err(_) => {},
+                }
                 thread::sleep(scan_setting.send_rate);
             }
         },
@@ -153,7 +184,7 @@ fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResul
     }
 }
 
-pub(crate) fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
+pub(crate) fn scan_hosts(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> HostScanResult {
     let interfaces = pnet_datalink::interfaces();
     let interface = match interfaces.into_iter().filter(|interface: &pnet_datalink::NetworkInterface| interface.index == scan_setting.if_index).next() {
         Some(interface) => interface,
@@ -177,14 +208,14 @@ pub(crate) fn scan_hosts(scan_setting: ScanSetting) -> HostScanResult {
     let scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     let receive_setting: ScanSetting = scan_setting.clone();
-    rayon::join(|| send_packets(&mut tx, &scan_setting, &stop),
+    rayon::join(|| send_packets(&mut tx, &scan_setting, &stop, ptx),
                 || receiver::receive_packets(&mut rx, receive_setting, &scan_result, &stop)
     );
     let result: HostScanResult = scan_result.lock().unwrap().host_scan_result.clone(); 
     return result;
 }
 
-pub(crate) fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
+pub(crate) fn scan_ports(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> PortScanResult {
     let interfaces = pnet_datalink::interfaces();
     let interface = match interfaces.into_iter().filter(|interface: &pnet_datalink::NetworkInterface| interface.index == scan_setting.if_index).next() {
         Some(interface) => interface,
@@ -210,7 +241,7 @@ pub(crate) fn scan_ports(scan_setting: ScanSetting) -> PortScanResult {
     let receive_setting: ScanSetting = scan_setting.clone();
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
-            rayon::join(|| send_packets(&mut tx, &scan_setting, &stop),
+            rayon::join(|| send_packets(&mut tx, &scan_setting, &stop, ptx),
                 || receiver::receive_packets(&mut rx, receive_setting, &scan_result, &stop)
             );
         },
