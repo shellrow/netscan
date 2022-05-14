@@ -1,5 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
+use std::thread;
 use netscan::async_io::PortScanner;
 use netscan::setting::{ScanType, Destination};
 use async_io;
@@ -18,10 +19,18 @@ fn main(){
     port_scanner.set_scan_type(ScanType::TcpSynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
     port_scanner.set_wait_time(Duration::from_millis(100));
+    let rx = port_scanner.get_progress_receiver();
     // Run scan 
-    let result = async_io::block_on(async {
-        port_scanner.scan().await
+    let handle = thread::spawn(move|| {
+        async_io::block_on(async {
+            port_scanner.scan().await
+        })
     });
+    // Print progress
+    while let Ok(socket_addr) = rx.lock().unwrap().recv() {
+        println!("Check: {}", socket_addr);
+    }
+    let result = handle.join().unwrap();
     // Print results 
     println!("Status: {:?}", result.scan_status);
     println!("Results:");

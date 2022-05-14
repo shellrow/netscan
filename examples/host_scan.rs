@@ -3,6 +3,7 @@ use netscan::setting::{ScanType, Destination};
 use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 use ipnet::Ipv4Net;
+use std::thread;
 
 fn main() {
     let mut host_scanner = match HostScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
@@ -22,8 +23,16 @@ fn main() {
     host_scanner.set_timeout(Duration::from_millis(10000));
     host_scanner.set_wait_time(Duration::from_millis(100));
     //host_scanner.set_send_rate(Duration::from_millis(1));
+    let rx = host_scanner.get_progress_receiver();
     // Run scan 
-    let result = host_scanner.scan();
+    let handle = thread::spawn(move|| {
+        host_scanner.scan()
+    });
+    // Print progress
+    while let Ok(socket_addr) = rx.lock().unwrap().recv() {
+        println!("Check: {}", socket_addr);
+    }
+    let result = handle.join().unwrap();
     // Print results 
     println!("Status: {:?}", result.scan_status);
     println!("UP Hosts:");

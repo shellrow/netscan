@@ -29,9 +29,8 @@ fn main() {
         port_scanner.scan()
     });
     // Print progress
-    while let Ok(msg) = rx.lock().unwrap().recv() {
-        print!("seq: {}", msg);
-        print!("\r");
+    while let Ok(socket_addr) = rx.lock().unwrap().recv() {
+        println!("Check: {}", socket_addr);
     }
     let result = handle.join().unwrap();
     // Print results 
