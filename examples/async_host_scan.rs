@@ -23,6 +23,7 @@ fn main() {
     host_scanner.set_scan_type(ScanType::IcmpPingScan);
     host_scanner.set_timeout(Duration::from_millis(10000));
     host_scanner.set_wait_time(Duration::from_millis(100));
+    
     let rx = host_scanner.get_progress_receiver();
     // Run scan 
     let handle = thread::spawn(move|| {
@@ -31,8 +32,8 @@ fn main() {
         })
     });
     // Print progress
-    while let Ok(socket_addr) = rx.lock().unwrap().recv() {
-        println!("Check: {}", socket_addr);
+    while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
+        //println!("Check: {}", socket_addr);
     }
     let result = handle.join().unwrap();
     // Print results 

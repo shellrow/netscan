@@ -22,15 +22,16 @@ fn main() {
     port_scanner.set_scan_type(ScanType::TcpSynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
     port_scanner.set_wait_time(Duration::from_millis(100));
-    //port_scanner.set_send_rate(Duration::from_millis(1)); 
+    //port_scanner.set_send_rate(Duration::from_millis(1));
+    
     let rx = port_scanner.get_progress_receiver();
     // Run scan 
     let handle = thread::spawn(move|| {
         port_scanner.scan()
     });
     // Print progress
-    while let Ok(socket_addr) = rx.lock().unwrap().recv() {
-        println!("Check: {}", socket_addr);
+    while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
+        //println!("Check: {}", socket_addr);
     }
     let result = handle.join().unwrap();
     // Print results 
