@@ -9,7 +9,7 @@ pub mod blocking;
 pub mod async_io;
 
 #[cfg(feature = "service")]
-pub mod service;
+extern crate netscan_service;
 
 #[cfg(feature = "os")]
-pub mod os;
+extern crate netscan_os;
