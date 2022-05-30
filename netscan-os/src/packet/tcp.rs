@@ -2,6 +2,30 @@ use std::net::IpAddr;
 use pnet_packet::tcp::{MutableTcpPacket, TcpOption, TcpFlags};
 use crate::setting::ProbeType;
 
+pub enum TcpProbeOption {
+    Syn1,
+    Syn2,
+    Syn3,
+    Syn4,
+    Syn5,
+    Syn6,
+    Ecn
+}
+
+impl TcpProbeOption {
+    pub fn get_tcp_options(&self) -> Vec<TcpOption> {
+        match *self {
+            TcpProbeOption::Syn1 => vec![TcpOption::wscale(10), TcpOption::nop(), TcpOption::mss(1460), TcpOption::timestamp(u32::MAX, u32::MIN), TcpOption::sack_perm()],
+            TcpProbeOption::Syn2 => vec![TcpOption::mss(1400), TcpOption::wscale(0), TcpOption::sack_perm(), TcpOption::timestamp(u32::MAX, u32::MIN)],
+            TcpProbeOption::Syn3 => vec![TcpOption::timestamp(u32::MAX, u32::MIN), TcpOption::nop(), TcpOption::nop(), TcpOption::wscale(5),TcpOption::nop(), TcpOption::mss(640)],
+            TcpProbeOption::Syn4 => vec![TcpOption::sack_perm(), TcpOption::timestamp(u32::MAX, u32::MIN), TcpOption::wscale(10)],
+            TcpProbeOption::Syn5 => vec![TcpOption::mss(536), TcpOption::sack_perm(), TcpOption::timestamp(u32::MAX, u32::MIN), TcpOption::wscale(10)],
+            TcpProbeOption::Syn6 => vec![TcpOption::mss(265), TcpOption::sack_perm(), TcpOption::timestamp(u32::MAX, u32::MIN)],
+            TcpProbeOption::Ecn => vec![TcpOption::wscale(10), TcpOption::nop(), TcpOption::mss(1460), TcpOption::sack_perm(), TcpOption::nop(), TcpOption::nop()],
+        }
+    }
+}
+
 #[cfg(not(target_family="windows"))]
 pub fn build_tcp_packet(tcp_packet:&mut MutableTcpPacket, src_ip: IpAddr, src_port:u16, dst_ip: IpAddr, dst_port:u16, probe_type: ProbeType) {
     tcp_packet.set_source(src_port);

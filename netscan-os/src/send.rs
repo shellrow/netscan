@@ -129,6 +129,11 @@ pub(crate) fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, prob
                     build_udp_probe_packet(probe_setting, packet);
                 });
             },
+            ProbeType::TcpProbe => {
+                tx.build_and_send(1, TCP_PACKET_SIZE, &mut |packet: &mut [u8]| {
+                    build_tcp_probe_packet(probe_setting, packet, probe_type);
+                });
+            },
             ProbeType::TcpSynAckProbe => {
                 tx.build_and_send(1, TCP_PACKET_SIZE, &mut |packet: &mut [u8]| {
                     build_tcp_probe_packet(probe_setting, packet, probe_type);
