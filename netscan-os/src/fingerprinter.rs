@@ -159,6 +159,7 @@ impl Fingerprinter {
         self.probe_types.push(ProbeType::TcpSynAckProbe);
         self.probe_types.push(ProbeType::TcpRstAckProbe);
         self.probe_types.push(ProbeType::TcpEcnProbe);
+        self.probe_types.push(ProbeType::TcpProbe);
     }
     /// Set probe timeout  
     pub fn set_timeout(&mut self, timeout: Duration){

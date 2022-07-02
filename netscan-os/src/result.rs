@@ -176,6 +176,50 @@ impl TcpEcnResult {
 }
 
 #[derive(Clone, Debug)]
+pub struct TcpSynAckFingerprint {
+    pub tcp_window_size: u16,
+    pub tcp_option_order: Vec<TcpOptionKind>,
+}
+
+#[derive(Clone, Debug)]
+pub struct TcpEcnFingerprint {
+    pub tcp_ecn_support: bool,
+    pub ip_df: bool,
+    pub tcp_window_size: u16,
+    pub tcp_option_order: Vec<TcpOptionKind>,
+}
+
+impl TcpEcnFingerprint {
+    pub fn new() -> TcpEcnFingerprint {
+        TcpEcnFingerprint {
+            tcp_ecn_support: false,
+            ip_df: false,
+            tcp_window_size: 0,
+            tcp_option_order: vec![],
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TcpFingerprint {
+    pub ip_id: u16,
+    pub ip_ttl: u8,
+    pub tcp_syn_ack_fingerprint: Vec<TcpSynAckFingerprint>,
+    pub tcp_enc_fingerprint: TcpEcnFingerprint,
+}
+
+impl TcpFingerprint {
+    pub fn new() -> TcpFingerprint {
+        TcpFingerprint {
+            ip_id: 0,
+            ip_ttl: 0,
+            tcp_syn_ack_fingerprint: vec![],
+            tcp_enc_fingerprint: TcpEcnFingerprint::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct ProbeResult {
     pub ip_addr: IpAddr,
     pub icmp_echo_result: Option<IcmpEchoResult>,
@@ -188,6 +232,7 @@ pub struct ProbeResult {
     pub tcp_rst_ack_result: Option<TcpRstAckResult>,
     pub tcp_ecn_result: Option<TcpEcnResult>,
     pub tcp_header_result: Option<TcpHeaderResult>,
+    pub tcp_fingerprint: TcpFingerprint,
 }
 
 impl ProbeResult {
@@ -204,6 +249,7 @@ impl ProbeResult {
             tcp_rst_ack_result: None,
             tcp_ecn_result: None,
             tcp_header_result: None,
+            tcp_fingerprint: TcpFingerprint::new(),
         }
     }
     pub fn new_with_types(ip_addr: IpAddr, types: Vec<ProbeType>) -> ProbeResult {
@@ -219,6 +265,7 @@ impl ProbeResult {
             tcp_rst_ack_result: if types.contains(&ProbeType::TcpRstAckProbe) {Some(TcpRstAckResult::new())}else {None},
             tcp_ecn_result: if types.contains(&ProbeType::TcpEcnProbe) {Some(TcpEcnResult::new())}else {None},
             tcp_header_result: None,
+            tcp_fingerprint: TcpFingerprint::new(),
         }
     }
 }

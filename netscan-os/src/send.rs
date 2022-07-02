@@ -8,7 +8,7 @@ use super::packet::{icmp, tcp, udp, ipv4, ethernet};
 use super::setting::{ProbeType, ProbeSetting};
 use super::packet::{ICMP_PACKET_SIZE, TCP_PACKET_SIZE, UDP_PACKET_SIZE};
 
-fn build_tcp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8], probe_type: ProbeType){
+fn build_tcp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8], probe_type: ProbeType, option: Option<tcp::TcpProbeOption>){
     // Setup Ethernet header
     let mut eth_header = pnet_packet::ethernet::MutableEthernetPacket::new(&mut tmp_packet[..ethernet::ETHERNET_HEADER_LEN]).unwrap();
     ethernet::build_ethernet_packet(&mut eth_header, probe_setting.src_mac, probe_setting.dst_mac, EtherTypes::Ipv4);
@@ -30,21 +30,25 @@ fn build_tcp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8], p
     match probe_type {
         ProbeType::TcpSynAckProbe => {
             let dst_port: u16 = *probe_setting.probe_target.open_tcp_ports.get(0).unwrap_or(&80);
-            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, dst_port, probe_type);
+            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, dst_port, probe_type, option);
         },
         ProbeType::TcpRstAckProbe => {
-            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, probe_setting.probe_target.closed_tcp_port, probe_type);
+            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, probe_setting.probe_target.closed_tcp_port, probe_type, option);
         },
         ProbeType::TcpEcnProbe => {
             let dst_port: u16 = match probe_setting.probe_target.open_tcp_ports.get(1) {
                 Some(dst_port) => dst_port.clone(),
                 None => *probe_setting.probe_target.open_tcp_ports.get(0).unwrap_or(&80)
             };
-            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, dst_port, probe_type);
+            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, dst_port, probe_type, option);
+        },
+        ProbeType::TcpProbe => {
+            let dst_port: u16 = *probe_setting.probe_target.open_tcp_ports.get(0).unwrap_or(&80);
+            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, dst_port, probe_type, option);
         },
         _ => {
             let dst_port: u16 = *probe_setting.probe_target.open_tcp_ports.get(0).unwrap_or(&80);
-            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, dst_port, probe_type);
+            tcp::build_tcp_packet(&mut tcp_header, probe_setting.src_ip, probe_setting.src_port, probe_setting.probe_target.ip_addr, dst_port, probe_type, option);
         },
     }
 }
@@ -130,23 +134,25 @@ pub(crate) fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, prob
                 });
             },
             ProbeType::TcpProbe => {
-                tx.build_and_send(1, TCP_PACKET_SIZE, &mut |packet: &mut [u8]| {
-                    build_tcp_probe_packet(probe_setting, packet, probe_type);
-                });
+                for option in tcp::TcpProbeOption::VALUES.iter().copied() {
+                    tx.build_and_send(1, TCP_PACKET_SIZE, &mut |packet: &mut [u8]| {
+                        build_tcp_probe_packet(probe_setting, packet, probe_type, Some(option));
+                    });    
+                }
             },
             ProbeType::TcpSynAckProbe => {
                 tx.build_and_send(1, TCP_PACKET_SIZE, &mut |packet: &mut [u8]| {
-                    build_tcp_probe_packet(probe_setting, packet, probe_type);
+                    build_tcp_probe_packet(probe_setting, packet, probe_type, None);
                 });
             },
             ProbeType::TcpRstAckProbe => {
                 tx.build_and_send(1, TCP_PACKET_SIZE, &mut |packet: &mut [u8]| {
-                    build_tcp_probe_packet(probe_setting, packet, probe_type);
+                    build_tcp_probe_packet(probe_setting, packet, probe_type, None);
                 });
             },
             ProbeType::TcpEcnProbe => {
                 tx.build_and_send(1, TCP_PACKET_SIZE, &mut |packet: &mut [u8]| {
-                    build_tcp_probe_packet(probe_setting, packet, probe_type);
+                    build_tcp_probe_packet(probe_setting, packet, probe_type, None);
                 });
             },
         }

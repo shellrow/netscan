@@ -98,7 +98,7 @@ fn tcp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, _probe_setting: &Probe
         }
         let header_result: TcpHeaderResult = TcpHeaderResult {
             tcp_window_size: tcp_packet.get_window(),
-            tcp_option_order: tcp_options,
+            tcp_option_order: tcp_options.clone(),
         };
         if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::SYN | pnet_packet::tcp::TcpFlags::ACK {
             probe_result.lock().unwrap().tcp_header_result = Some(header_result);
@@ -109,6 +109,13 @@ fn tcp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, _probe_setting: &Probe
                 ip_ttl: packet.get_ttl(),
             };
             probe_result.lock().unwrap().tcp_syn_ack_result = Some(result);
+
+            let result: TcpSynAckFingerprint = TcpSynAckFingerprint {
+                tcp_window_size: tcp_packet.get_window(),
+                tcp_option_order: tcp_options
+            };
+            probe_result.lock().unwrap().tcp_fingerprint.tcp_syn_ack_fingerprint.push(result);
+
         }else if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::RST | pnet_packet::tcp::TcpFlags::ACK {
             let result: TcpRstAckResult = TcpRstAckResult{
                 rst_ack_response: true,
@@ -134,6 +141,14 @@ fn tcp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, _probe_setting: &Probe
                 ip_ttl: packet.get_ttl(),
             };
             probe_result.lock().unwrap().tcp_ecn_result = Some(result);
+
+            let result: TcpEcnFingerprint = TcpEcnFingerprint {
+                tcp_ecn_support: true,
+                ip_df: if packet.get_flags() >= 2 {true}else{false},
+                tcp_window_size: tcp_packet.get_window(),
+                tcp_option_order: tcp_options,
+            };
+            probe_result.lock().unwrap().tcp_fingerprint.tcp_enc_fingerprint = result;
         }
     }
 }
