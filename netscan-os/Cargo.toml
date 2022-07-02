@@ -13,8 +13,8 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rayon = "1.5.2"
+rayon = "1.5.3"
 rand = "0.8.5"
 default-net = "0.11.0"
-pnet_packet = "0.29.0"
-pnet_datalink = "0.29.0"
+pnet_packet = "0.31.0"
+pnet_datalink = "0.31.0"

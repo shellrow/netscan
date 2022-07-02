@@ -13,9 +13,9 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rayon = "1.5.2"
+rayon = "1.5.3"
 dns-lookup = { version = "1.0.8"}
 native-tls = { version = "0.2.10"}
-async-io = { version = "1.6.0"}
+async-io = { version = "1.7.0"}
 futures = {version = "0.3.21", features = ["executor", "thread-pool"]}
 futures-lite = {version = "1.12.0"}
