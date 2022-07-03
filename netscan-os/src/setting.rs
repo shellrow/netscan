@@ -10,6 +10,7 @@ pub enum ProbeType {
     IcmpAddressMaskProbe,
     IcmpInformationProbe,
     IcmpUnreachableProbe,
+    TcpProbe,
     TcpSynAckProbe,
     TcpRstAckProbe,
     TcpEcnProbe,

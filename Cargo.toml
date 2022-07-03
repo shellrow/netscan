@@ -1,6 +1,6 @@
 [package]
 name = "netscan"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2021"
 description = "Cross-platform network scan library"
@@ -11,17 +11,17 @@ categories = ["network-programming"]
 license = "MIT"
 
 [dependencies]
-rayon = "1.5.2"
+rayon = "1.5.3"
 rand = "0.8.5"
 default-net = "0.11.0"
-pnet_packet = "0.29.0"
-pnet_datalink = "0.29.0"
+pnet_packet = "0.31.0"
+pnet_datalink = "0.31.0"
 socket2 = { version = "0.4.4", features = ["all"] }
-async-io = { version = "1.6.0", optional = true }
+async-io = { version = "1.7.0", optional = true }
 futures = {version = "0.3.21", features = ["executor", "thread-pool"],  optional = true}
 futures-lite = {version = "1.12.0", optional = true}
-dns-lookup = { version = "1.0.8", optional = true }
-native-tls = { version = "0.2.10", optional = true }
+netscan-os = { path = "netscan-os", version = "0.11.0", optional = true }
+netscan-service = { path = "netscan-service", version = "0.11.0", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.9", features = [ "std" ] }
@@ -31,9 +31,10 @@ ipnet = "2.5"
 
 [features]
 async = ["async-io", "futures", "futures-lite"]
-service = ["dns-lookup", "native-tls"]
-os = []
+service = ["netscan-service"]
+os = ["netscan-os"]
 full = ["async", "service", "os"]
+default = ["async"]
 
 [lib]
 name = "netscan"

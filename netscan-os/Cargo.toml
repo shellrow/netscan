@@ -1,0 +1,20 @@
+[package]
+name = "netscan-os"
+version = "0.11.0"
+authors = ["shellrow <shellrow@protonmail.com>"]
+edition = "2021"
+description = "Cross-platform network scan library"
+repository = "https://github.com/shellrow/netscan"
+readme = "README.md"
+keywords = ["network","security","scan"]
+categories = ["network-programming"]
+license = "MIT"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rayon = "1.5.3"
+rand = "0.8.5"
+default-net = "0.11.0"
+pnet_packet = "0.31.0"
+pnet_datalink = "0.31.0"

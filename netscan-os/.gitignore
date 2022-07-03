@@ -11,6 +11,3 @@ Cargo.lock
 
 # mac
 .DS_Store
-
-# VS Code
-.vscode/
