@@ -35,6 +35,7 @@ async = ["async-io", "futures", "futures-lite"]
 service = ["netscan-service"]
 os = ["netscan-os"]
 full = ["async", "service", "os"]
+default = ["async"]
 
 [lib]
 name = "netscan"
