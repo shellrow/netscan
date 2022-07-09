@@ -2,7 +2,7 @@ use netscan::blocking::PortScanner;
 use netscan::setting::{ScanType, Destination};
 use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
-use netscan_service::{ServiceDetector, PortDatabase};
+use netscan::service::{ServiceDetector, PortDatabase};
 
 fn main() {
     let mut port_scanner = match PortScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {

@@ -1,6 +1,6 @@
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
-use netscan_os::{Fingerprinter, ProbeTarget};
+use netscan::os::{Fingerprinter, ProbeTarget};
 
 fn main() {
     let src_ip: IpAddr = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4));
