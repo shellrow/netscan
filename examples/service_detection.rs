@@ -23,7 +23,7 @@ fn main() {
         println!("{}", ip);
         let mut service_detector = ServiceDetector::new();
         service_detector.set_dst_ip(ip);
-        service_detector.set_open_ports(result.get_open_ports(ip));
+        service_detector.set_ports(result.get_open_ports(ip));
         let service_map = service_detector.detect(Some(PortDatabase::default()));
         println!("{:?}", service_map);
     }

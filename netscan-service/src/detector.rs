@@ -17,7 +17,7 @@ pub struct ServiceDetector {
     /// Destination Host Name
     pub dst_name: String,
     /// Target ports for service detection
-    pub open_ports: Vec<u16>,
+    pub ports: Vec<u16>,
     /// TCP connect (open) timeout
     pub connect_timeout: Duration,
     /// TCP read timeout
@@ -34,7 +34,7 @@ impl ServiceDetector {
         ServiceDetector{
             dst_ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             dst_name: String::new(),
-            open_ports: vec![],
+            ports: vec![],
             connect_timeout: Duration::from_millis(200),
             read_timeout: Duration::from_secs(5),
             accept_invalid_certs: false,
@@ -49,12 +49,12 @@ impl ServiceDetector {
         self.dst_ip = host_name;
     }
     /// Set target ports
-    pub fn set_open_ports(&mut self, open_ports: Vec<u16>){
-        self.open_ports = open_ports;
+    pub fn set_ports(&mut self, ports: Vec<u16>){
+        self.ports = ports;
     }
     /// Add target port
-    pub fn add_open_port(&mut self, open_port: u16){
-        self.open_ports.push(open_port);
+    pub fn add_port(&mut self, port: u16){
+        self.ports.push(port);
     }
     /// Set connect (open) timeout
     pub fn set_connect_timeout(&mut self, connect_timeout: Duration){
@@ -78,7 +78,7 @@ impl ServiceDetector {
 
 fn detect_service(setting: &ServiceDetector, port_db: PortDatabase) -> HashMap<u16, String> {
     let service_map: Arc<Mutex<HashMap<u16, String>>> = Arc::new(Mutex::new(HashMap::new()));
-    setting.clone().open_ports.into_par_iter().for_each(|port| 
+    setting.clone().ports.into_par_iter().for_each(|port| 
         {
             let sock_addr: SocketAddr = SocketAddr::new(setting.dst_ip, port);
             match TcpStream::connect_timeout(&sock_addr, setting.connect_timeout) {
