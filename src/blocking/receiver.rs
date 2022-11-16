@@ -76,6 +76,7 @@ fn tcp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, scan_setting: &ScanSet
         let host_info: HostInfo = HostInfo {
             ip_addr: IpAddr::V4(packet.get_source()),
             ttl: packet.get_ttl(),
+            ports: vec![],
         };
         handle_tcp_packet(tcp_packet, host_info, &scan_setting, scan_result);
     }
@@ -87,6 +88,7 @@ fn tcp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, scan_setting: &ScanSet
         let host_info: HostInfo = HostInfo {
             ip_addr: IpAddr::V6(packet.get_source()),
             ttl: packet.get_hop_limit(),
+            ports: vec![],
         };
         handle_tcp_packet(tcp_packet, host_info, &scan_setting, scan_result);
     }
@@ -114,6 +116,7 @@ fn icmp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, _scan_setting: &ScanS
                 HostInfo {
                     ip_addr: IpAddr::V4(packet.get_source()),
                     ttl: packet.get_ttl(),
+                    ports: vec![],
                 }
             );
             scan_result.lock().unwrap().ip_set.insert(IpAddr::V4(packet.get_source()));
@@ -129,6 +132,7 @@ fn icmp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, _scan_setting: &ScanS
                 HostInfo {
                     ip_addr: IpAddr::V6(packet.get_source()),
                     ttl: packet.get_hop_limit(),
+                    ports: vec![],
                 }
             );
             scan_result.lock().unwrap().ip_set.insert(IpAddr::V6(packet.get_source()));
@@ -136,16 +140,16 @@ fn icmp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, _scan_setting: &ScanS
     }
 }
 
-fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, host_info: HostInfo, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
+fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, mut host_info: HostInfo, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     let socket_addr: SocketAddr = SocketAddr::new(host_info.ip_addr, tcp_packet.get_source());
     if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::SYN | pnet_packet::tcp::TcpFlags::ACK {
+        let port_info = PortInfo{
+            port: socket_addr.port(),
+            status: PortStatus::Open,
+        };
         match scan_setting.scan_type {
             ScanType::TcpSynScan => {
                 if !scan_result.lock().unwrap().socket_set.contains(&socket_addr) {
-                    let port_info = PortInfo{
-                        port: socket_addr.port(),
-                        status: PortStatus::Open,
-                    };
                     // Avoid deadlock.
                     let exists: bool = 
                     if let Some(r) = scan_result.lock().unwrap().port_scan_result.result_map.get_mut(&socket_addr.ip()) {
@@ -161,8 +165,9 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, host_info: HostInf
                 }
             },
             _ => {
+                host_info.ports.push(port_info);
                 if !scan_result.lock().unwrap().ip_set.contains(&host_info.ip_addr) {
-                    scan_result.lock().unwrap().host_scan_result.hosts.push(host_info);
+                    scan_result.lock().unwrap().host_scan_result.hosts.push(host_info.clone());
                     match host_info.ip_addr {
                         IpAddr::V4(ip) => {
                             scan_result.lock().unwrap().ip_set.insert(IpAddr::V4(ip));
@@ -175,13 +180,13 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, host_info: HostInf
             },
         }
     }else if tcp_packet.get_flags() == pnet_packet::tcp::TcpFlags::RST | pnet_packet::tcp::TcpFlags::ACK {
+        let port_info = PortInfo{
+            port: socket_addr.port(),
+            status: PortStatus::Closed,
+        };
         match scan_setting.scan_type {
             ScanType::TcpSynScan => {
                 if !scan_result.lock().unwrap().socket_set.contains(&socket_addr) {
-                    let port_info = PortInfo{
-                        port: socket_addr.port(),
-                        status: PortStatus::Closed,
-                    };
                     // Avoid deadlock.
                     let exists: bool = 
                     if let Some(r) = scan_result.lock().unwrap().port_scan_result.result_map.get_mut(&socket_addr.ip()) {
@@ -197,8 +202,9 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, host_info: HostInf
                 }
             },
             _ => {
+                host_info.ports.push(port_info);
                 if !scan_result.lock().unwrap().ip_set.contains(&host_info.ip_addr) {
-                    scan_result.lock().unwrap().host_scan_result.hosts.push(host_info);
+                    scan_result.lock().unwrap().host_scan_result.hosts.push(host_info.clone());
                     match host_info.ip_addr {
                         IpAddr::V4(ip) => {
                             scan_result.lock().unwrap().ip_set.insert(IpAddr::V4(ip));

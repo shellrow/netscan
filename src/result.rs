@@ -20,12 +20,14 @@ pub enum PortStatus {
 }
 
 /// Information about the scanned host 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct HostInfo {
     /// IP address of the host
     pub ip_addr: IpAddr,
     /// IP Time to Live (Hop Limit)
     pub ttl: u8,
+    /// Ports used for host scan
+    pub ports: Vec<PortInfo>,
 }
 
 /// Information about the scanned port 
