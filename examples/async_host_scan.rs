@@ -8,7 +8,7 @@ use async_io;
 
 fn main() {
     let mut host_scanner = match HostScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
-        Ok(scanner) => (scanner),
+        Ok(scanner) => scanner,
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 0), 24).unwrap();

@@ -6,7 +6,7 @@ use std::thread;
 
 fn main() {
     let mut port_scanner = match PortScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
-        Ok(scanner) => (scanner),
+        Ok(scanner) => scanner,
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     // Add scan target
