@@ -1,6 +1,6 @@
 [package]
 name = "netscan-service"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2021"
 description = "Service detection library for netscan"
@@ -11,6 +11,6 @@ categories = ["network-programming"]
 license = "MIT"
 
 [dependencies]
-rayon = "1.5.3"
-dns-lookup = "1.0.8"
-native-tls = "0.2.10"
+rayon = "1.7.0"
+dns-lookup = "2.0.2"
+native-tls = "0.2.11"

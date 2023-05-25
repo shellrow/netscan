@@ -6,8 +6,9 @@ use ipnet::Ipv4Net;
 use std::thread;
 
 fn main() {
-    let mut host_scanner = match HostScanner::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 4))) {
-        Ok(scanner) => (scanner),
+    let interface = default_net::get_default_interface().unwrap();
+    let mut host_scanner = match HostScanner::new(IpAddr::V4(interface.ipv4[0].addr)) {
+        Ok(scanner) => scanner,
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 0), 24).unwrap();
@@ -21,7 +22,7 @@ fn main() {
     // Set options
     host_scanner.set_scan_type(ScanType::IcmpPingScan);
     host_scanner.set_timeout(Duration::from_millis(10000));
-    host_scanner.set_wait_time(Duration::from_millis(100));
+    host_scanner.set_wait_time(Duration::from_millis(500));
     //host_scanner.set_send_rate(Duration::from_millis(1));
     
     let rx = host_scanner.get_progress_receiver();
@@ -40,5 +41,5 @@ fn main() {
     for host in result.hosts {
         println!("{:?}", host);
     }
-    println!("Scan Time: {:?}", result.scan_time);
+    println!("Scan Time: {:?} (including waittime)", result.scan_time);
 }
