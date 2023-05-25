@@ -43,10 +43,16 @@ impl ServiceDetector {
     /// Set Destination IP address
     pub fn set_dst_ip(&mut self, dst_ip: IpAddr){
         self.dst_ip = dst_ip;
+        if self.dst_name.is_empty() {
+            self.dst_name = dns_lookup::lookup_addr(&self.dst_ip).unwrap_or(String::new());
+        }   
     }
     /// Set Destination Host Name
-    pub fn set_dst_name(&mut self, host_name: IpAddr){
-        self.dst_ip = host_name;
+    pub fn set_dst_name(&mut self, host_name: String){
+        self.dst_name = host_name;
+        if self.dst_ip == IpAddr::V4(Ipv4Addr::LOCALHOST) {
+            self.dst_ip = dns_lookup::lookup_host(&self.dst_name).unwrap_or(vec![IpAddr::V4(Ipv4Addr::LOCALHOST)]).first().unwrap().clone();
+        }   
     }
     /// Set target ports
     pub fn set_ports(&mut self, ports: Vec<u16>){
