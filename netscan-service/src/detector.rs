@@ -3,7 +3,6 @@ use std::io::{BufReader, BufWriter};
 use std::net::{TcpStream,SocketAddr};
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
-use native_tls::TlsConnector;
 use std::io::prelude::*;
 use rayon::prelude::*;
 use super::setting::PortDatabase;
@@ -146,23 +145,24 @@ fn write_head_request(writer: &mut BufWriter<&TcpStream>, _ip_addr:String) {
     writer.flush().unwrap();
 }
 
-fn head_request_secure(host_name: String, port: u16, accept_invalid_certs: bool) -> String {
-    if host_name.is_empty() {
+fn head_request_secure(hostname: String, port: u16, _accept_invalid_certs: bool) -> String {
+    if hostname.is_empty() {
         return String::from("Error: Invalid host name");
     }
-    let sock_addr: String = format!("{}:{}",host_name, port);
-    let connector = if accept_invalid_certs {
-        match TlsConnector::builder().danger_accept_invalid_certs(true).build() {
-            Ok(c) => c,
-            Err(e) => return format!("Error: {}",e.to_string()),
-        }
-    }else{
-        match TlsConnector::new() {
-            Ok(c) => c,
-            Err(e) => return format!("Error: {}",e.to_string()),
-        }
-    };
-    let stream = match TcpStream::connect(sock_addr.clone()) {
+    let sock_addr: String = format!("{}:{}",hostname, port);
+    let mut root_store = rustls::RootCertStore::empty();
+    match rustls_native_certs::load_native_certs() {
+        Ok(certs) => {
+            for cert in certs {
+                root_store.add(&rustls::Certificate(cert.0)).unwrap();
+            }
+        },
+        Err(e) => return format!("Error: {}", e.to_string()),
+    }
+    
+    let config = rustls::ClientConfig::builder().with_safe_defaults().with_root_certificates(root_store).with_no_client_auth();
+    let mut tls_connection: rustls::ClientConnection = rustls::ClientConnection::new(Arc::new(config), hostname.as_str().try_into().unwrap()).unwrap();
+    let mut stream: TcpStream = match TcpStream::connect(sock_addr.clone()) {
         Ok(s) => s,
         Err(e) => return format!("Error: {}",e.to_string()),
     };
@@ -170,21 +170,17 @@ fn head_request_secure(host_name: String, port: u16, accept_invalid_certs: bool)
         Ok(_) => {},
         Err(e) => return format!("Error: {}",e.to_string()),
     }
-    let mut stream = match connector.connect(host_name.as_str(), stream) {
-        Ok(s) => s,
-        Err(e) => return format!("Error: {}",e.to_string()),
-    };
-    let msg = format!("HEAD / HTTP/1.0\r\n\r\n");
-    match stream.write(msg.as_bytes()){
+    let mut tls_stream: rustls::Stream<rustls::ClientConnection, TcpStream> = rustls::Stream::new(&mut tls_connection, &mut stream);
+    let message: String = format!("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nAccept-Encoding: identity\r\n\r\n", hostname);
+    match tls_stream.write_all(message.as_bytes()) {
         Ok(_) => {},
-        Err(e) => return format!("Error: {}",e.to_string()),
+        Err(e) => return format!("Error: {}", e.to_string()),
     }
-    let mut res = vec![];
-    match stream.read_to_end(&mut res){
-        Ok(_) => {
-            let result = String::from_utf8_lossy(&res);
-            return result.to_string();
-        },
-        Err(e) => return format!("Error: {}",e.to_string()),
-    };
+    let mut plaintext = Vec::new();
+    match tls_stream.read_to_end(&mut plaintext) {
+        Ok(_) => {},
+        Err(e) => return format!("Error: {}", e.to_string()),
+    }
+    let result: String = plaintext.iter().map(|&c| c as char).collect();
+    result
 }

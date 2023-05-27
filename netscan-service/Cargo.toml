@@ -13,4 +13,5 @@ license = "MIT"
 [dependencies]
 rayon = "1.7.0"
 dns-lookup = "2.0.2"
-native-tls = "0.2.11"
+rustls = "0.21.1"
+rustls-native-certs = "0.6.2"
