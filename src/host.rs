@@ -34,6 +34,7 @@ pub struct HostInfo {
 }
 
 impl HostInfo {
+    /// Create new HostInfo with default values
     pub fn new() -> HostInfo {
         HostInfo{
             ip_addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
@@ -75,11 +76,12 @@ impl HostInfo {
             ports: vec![],
         }
     }
+    /// Set host name and return HostInfo
     pub fn with_host_name(&mut self, host_name: String) -> Self {
         self.host_name = host_name;
         self.clone()
     }
-    /// Create new HostInfo with IP address and ports 
+    /// Set ports and return HostInfo
     pub fn with_ports(&mut self, port_list: Vec<u16>) -> Self {
         let mut ports: Vec<PortInfo> = vec![];
         for port in port_list {
@@ -88,7 +90,7 @@ impl HostInfo {
         self.ports = ports;
         self.clone()
     }
-    /// Create new HostInfo with IP address and port range 
+    /// Set port range and return HostInfo
     pub fn with_port_range(&mut self, start_port: u16, end_port: u16) -> Self {
         let mut ports: Vec<PortInfo> = vec![];
         for p in start_port..end_port + 1 {
@@ -97,7 +99,7 @@ impl HostInfo {
         self.ports = ports;
         self.clone()
     }
-    /// Create new HostInfo with IP address and ports 
+    /// Set ports 
     pub fn set_ports(&mut self, port_list: Vec<u16>) {
         let mut ports: Vec<PortInfo> = vec![];
         for port in port_list {
@@ -105,7 +107,7 @@ impl HostInfo {
         }
         self.ports = ports;
     }
-    /// Create new HostInfo with IP address and port range 
+    /// Set port range 
     pub fn set_port_range(&mut self, start_port: u16, end_port: u16) {
         let mut ports: Vec<PortInfo> = vec![];
         for p in start_port..end_port + 1 {
@@ -113,11 +115,25 @@ impl HostInfo {
         }
         self.ports = ports;
     }
+    // Get ports (numbers)
     pub fn get_ports(&self) -> Vec<u16> {
         let mut ports: Vec<u16> = vec![];
         for port_info in self.ports.clone() {
             ports.push(port_info.port);
         }
         ports
+    }
+    // Get open ports (numbers)
+    pub fn get_open_ports(&self) -> Vec<u16> {
+        let mut open_ports: Vec<u16> = vec![];
+        for port_info in self.ports.clone() {
+            match port_info.status {
+                PortStatus::Open => {
+                    open_ports.push(port_info.port);
+                },
+                _ => {},
+            }
+        }
+        open_ports
     }
 }

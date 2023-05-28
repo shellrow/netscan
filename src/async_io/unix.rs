@@ -40,7 +40,7 @@ async fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_por
 }
 
 async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
-    let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
+    let fut_host = stream::iter(scan_setting.targets.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency, |dst| {
             let socket_addr = SocketAddr::new(dst.ip_addr, 0);
             let sock_addr = SockAddr::from(socket_addr);
@@ -66,7 +66,7 @@ async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting
 }
 
 async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>){
-    let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
+    let fut_host = stream::iter(scan_setting.targets.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency, |dst| {
             async move {
                 let fut_port = stream::iter(dst.get_ports()).for_each_concurrent(
@@ -100,7 +100,7 @@ async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, 
 }
 
 async fn send_udp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
-    let fut_host = stream::iter(scan_setting.destinations.clone()).for_each_concurrent(
+    let fut_host = stream::iter(scan_setting.targets.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency, |dst| {
             async move {
                 let fut_port = stream::iter(dst.get_ports()).for_each_concurrent(
@@ -186,7 +186,7 @@ async fn try_connect_ports(concurrency: usize, dst: HostInfo, ptx: &Arc<Mutex<Se
 }
 
 async fn run_connect_scan(scan_setting: ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) -> PortScanResult {
-    let results: Vec<HostInfo> = stream::iter(scan_setting.destinations.clone().into_iter())
+    let results: Vec<HostInfo> = stream::iter(scan_setting.targets.clone().into_iter())
         .map(|dst| try_connect_ports(scan_setting.ports_concurrency, dst, ptx))
         .buffer_unordered(scan_setting.hosts_concurrency)
         .collect()

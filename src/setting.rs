@@ -40,7 +40,7 @@ pub(crate) struct ScanSetting {
     pub dst_mac: MacAddr,
     pub src_ip: IpAddr,
     pub src_port: u16,
-    pub destinations: Vec<HostInfo>,
+    pub targets: Vec<HostInfo>,
     pub ip_map: HashMap<IpAddr, String>,
     pub timeout: Duration,
     pub wait_time: Duration,

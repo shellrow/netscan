@@ -35,7 +35,7 @@ fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16
 }
 
 fn send_icmp_echo_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
-    for dst in scan_setting.destinations.clone() {
+    for dst in scan_setting.targets.clone() {
         let socket_addr = SocketAddr::new(dst.ip_addr, 0);
         let sock_addr = SockAddr::from(socket_addr);
         let mut icmp_packet: Vec<u8> = build_icmpv4_echo_packet();
@@ -57,7 +57,7 @@ fn send_icmp_echo_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc
 }
 
 fn send_tcp_syn_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>){
-    for dst in scan_setting.destinations.clone() {
+    for dst in scan_setting.targets.clone() {
         for port in dst.get_ports() {
             let socket_addr = SocketAddr::new(dst.ip_addr, port);
             let sock_addr = SockAddr::from(socket_addr);
@@ -81,7 +81,7 @@ fn send_tcp_syn_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<M
 }
 
 fn send_udp_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
-    for dst in scan_setting.destinations.clone() {
+    for dst in scan_setting.targets.clone() {
         for port in dst.get_ports() {
             let socket_addr = SocketAddr::new(dst.ip_addr, port);
             let sock_addr = SockAddr::from(socket_addr);
@@ -107,7 +107,7 @@ fn send_udp_packets(socket: &Socket, scan_setting: &ScanSetting, ptx: &Arc<Mutex
 fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
     let start_time = Instant::now();
     let conn_timeout = Duration::from_millis(200);
-    for dst in scan_setting.destinations.clone() {
+    for dst in scan_setting.targets.clone() {
         let ip_addr: IpAddr = dst.ip_addr;
         dst.get_ports().into_par_iter().for_each(|port| {
             let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();

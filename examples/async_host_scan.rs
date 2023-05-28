@@ -19,7 +19,7 @@ fn main() {
     // Add scan target
     for host in hosts {
         let dst: HostInfo = HostInfo::new_with_ip_addr(IpAddr::V4(host));
-        host_scanner.add_destination(dst);
+        host_scanner.add_target(dst);
     }
     // Set options
     host_scanner.set_scan_type(ScanType::IcmpPingScan);

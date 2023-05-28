@@ -28,7 +28,7 @@ fn main() {
     };
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![22, 80, 443, 5000, 8080]);
     let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
-    port_scanner.add_destination(dst);
+    port_scanner.add_target(dst);
     // Set options
     port_scanner.set_scan_type(ScanType::TcpSynScan);
     port_scanner.set_timeout(Duration::from_millis(10000));
