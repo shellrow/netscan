@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 use std::time::Duration;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use pnet_datalink::MacAddr;
 
 use crate::host::HostInfo;
@@ -41,7 +41,7 @@ pub(crate) struct ScanSetting {
     pub src_ip: IpAddr,
     pub src_port: u16,
     pub destinations: Vec<HostInfo>,
-    pub ip_set: HashSet<IpAddr>,
+    pub ip_map: HashMap<IpAddr, String>,
     pub timeout: Duration,
     pub wait_time: Duration,
     pub send_rate: Duration,

@@ -14,6 +14,7 @@ license = "MIT"
 rayon = "1.7.0"
 rand = "0.8.5"
 default-net = "0.15.0"
+dns-lookup = "2.0.2"
 pnet_packet = "0.33.0"
 pnet_datalink = "0.33.0"
 socket2 = { version = "0.5.3", features = ["all"] }

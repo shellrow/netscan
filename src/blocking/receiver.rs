@@ -35,7 +35,7 @@ pub(crate) fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>,
 
 fn ipv4_handler(ethernet: &pnet_packet::ethernet::EthernetPacket, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     if let Some(packet) = pnet_packet::ipv4::Ipv4Packet::new(ethernet.payload()){
-        if scan_setting.ip_set.contains(&IpAddr::V4(packet.get_source())) {
+        if scan_setting.ip_map.contains_key(&IpAddr::V4(packet.get_source())) {
             match packet.get_next_level_protocol() {
                 pnet_packet::ip::IpNextHeaderProtocols::Tcp => {
                     tcp_handler_v4(&packet, scan_setting, scan_result);
@@ -54,7 +54,7 @@ fn ipv4_handler(ethernet: &pnet_packet::ethernet::EthernetPacket, scan_setting: 
 
 fn ipv6_handler(ethernet: &pnet_packet::ethernet::EthernetPacket, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     if let Some(packet) = pnet_packet::ipv6::Ipv6Packet::new(ethernet.payload()){
-        if scan_setting.ip_set.contains(&IpAddr::V6(packet.get_source())) {
+        if scan_setting.ip_map.contains_key(&IpAddr::V6(packet.get_source())) {
             match packet.get_next_header() {
                 pnet_packet::ip::IpNextHeaderProtocols::Tcp => {
                     tcp_handler_v6(&packet, scan_setting, scan_result);
@@ -76,7 +76,7 @@ fn tcp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, scan_setting: &ScanSet
     if let Some(tcp_packet) = tcp_packet {
         let host_info: HostInfo = HostInfo {
             ip_addr: IpAddr::V4(packet.get_source()),
-            host_name: String::new(),
+            host_name: scan_setting.ip_map.get(&IpAddr::V4(packet.get_source())).unwrap_or(&String::new()).to_string(),
             ttl: packet.get_ttl(),
             ports: vec![],
         };
@@ -89,7 +89,7 @@ fn tcp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, scan_setting: &ScanSet
     if let Some(tcp_packet) = tcp_packet {
         let host_info: HostInfo = HostInfo {
             ip_addr: IpAddr::V6(packet.get_source()),
-            host_name: String::new(),
+            host_name: scan_setting.ip_map.get(&IpAddr::V6(packet.get_source())).unwrap_or(&String::new()).to_string(),
             ttl: packet.get_hop_limit(),
             ports: vec![],
         };
@@ -111,14 +111,14 @@ fn udp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, scan_setting: &ScanSet
     }
 }
 
-fn icmp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, _scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
+fn icmp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     let icmp_packet = pnet_packet::icmp::IcmpPacket::new(packet.payload());
     if let Some(_icmp) = icmp_packet {
         if !scan_result.lock().unwrap().ip_set.contains(&IpAddr::V4(packet.get_source())) {
             scan_result.lock().unwrap().host_scan_result.hosts.push(
                 HostInfo {
                     ip_addr: IpAddr::V4(packet.get_source()),
-                    host_name: String::new(),
+                    host_name: scan_setting.ip_map.get(&IpAddr::V4(packet.get_source())).unwrap_or(&String::new()).to_string(),
                     ttl: packet.get_ttl(),
                     ports: vec![],
                 }
@@ -128,14 +128,14 @@ fn icmp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, _scan_setting: &ScanS
     }
 }
 
-fn icmp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, _scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
+fn icmp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, scan_setting: &ScanSetting, scan_result: &Arc<Mutex<ScanResult>>) {
     let icmp_packet = pnet_packet::icmp::IcmpPacket::new(packet.payload());
     if let Some(_icmp) = icmp_packet {
         if !scan_result.lock().unwrap().ip_set.contains(&IpAddr::V6(packet.get_source())) {
             scan_result.lock().unwrap().host_scan_result.hosts.push(
                 HostInfo {
                     ip_addr: IpAddr::V6(packet.get_source()),
-                    host_name: String::new(),
+                    host_name: scan_setting.ip_map.get(&IpAddr::V6(packet.get_source())).unwrap_or(&String::new()).to_string(),
                     ttl: packet.get_hop_limit(),
                     ports: vec![],
                 }
@@ -166,6 +166,7 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, mut host_info: Hos
                     if !exists {
                         let mut host = HostInfo::new();
                         host.ip_addr = socket_addr.ip();
+                        host.host_name = host_info.host_name;
                         host.ttl = host_info.ttl;
                         host.ports.push(port_info);
                         scan_result.lock().unwrap().port_scan_result.results.push(host);
@@ -207,6 +208,7 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, mut host_info: Hos
                     if !exists {
                         let mut host = HostInfo::new();
                         host.ip_addr = socket_addr.ip();
+                        host.host_name = host_info.host_name;
                         host.ttl = host_info.ttl;
                         host.ports.push(port_info);
                         scan_result.lock().unwrap().port_scan_result.results.push(host);

@@ -1,5 +1,5 @@
 use std::net::{IpAddr, SocketAddr};
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use std::sync::{Mutex, Arc};
 use std::sync::mpsc::{channel ,Sender, Receiver};
@@ -177,9 +177,9 @@ impl HostScanner {
     }
     /// Run Host Scan
     pub fn run_scan(&mut self){
-        let mut ip_set: HashSet<IpAddr> = HashSet::new();
+        let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
         for dst in self.destinations.clone() {
-            ip_set.insert(dst.ip_addr);
+            ip_map.insert(dst.ip_addr, dst.host_name);
         }
         let scan_setting: ScanSetting = ScanSetting {
             if_index: self.if_index.clone(),
@@ -188,7 +188,7 @@ impl HostScanner {
             src_ip: self.src_ip.clone(),
             src_port: self.src_port.clone(),
             destinations: self.destinations.clone(),
-            ip_set: ip_set,
+            ip_map: ip_map,
             timeout: self.timeout.clone(),
             wait_time: self.wait_time.clone(),
             send_rate: self.send_rate.clone(),
@@ -315,9 +315,9 @@ impl PortScanner {
     }
     /// Run Port Scan
     pub fn run_scan(&mut self){
-        let mut ip_set: HashSet<IpAddr> = HashSet::new();
+        let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
         for dst in self.destinations.clone() {
-            ip_set.insert(dst.ip_addr);
+            ip_map.insert(dst.ip_addr, dst.host_name);
         }
         let scan_setting: ScanSetting = ScanSetting {
             if_index: self.if_index.clone(),
@@ -326,7 +326,7 @@ impl PortScanner {
             src_ip: self.src_ip.clone(),
             src_port: self.src_port.clone(),
             destinations: self.destinations.clone(),
-            ip_set: ip_set,
+            ip_map: ip_map,
             timeout: self.timeout.clone(),
             wait_time: self.wait_time.clone(),
             send_rate: self.send_rate.clone(),
