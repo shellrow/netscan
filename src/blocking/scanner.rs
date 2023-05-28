@@ -3,7 +3,8 @@ use std::collections::HashSet;
 use std::time::{Duration, Instant};
 use std::sync::{Mutex, Arc};
 use std::sync::mpsc::{channel ,Sender, Receiver};
-use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
+use crate::host::HostInfo;
+use crate::setting::{ScanType, DEFAULT_SRC_PORT, ScanSetting, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
 use crate::result::{HostScanResult, PortScanResult, ScanStatus};
 use crate::blocking::{scan_hosts, scan_ports};
 use crate::interface;
@@ -24,7 +25,7 @@ pub struct HostScanner {
     /// Source port 
     pub src_port: u16,
     /// Destinations 
-    pub destinations: Vec<Destination>,
+    pub destinations: Vec<HostInfo>,
     /// Scan Type 
     pub scan_type: ScanType,
     /// Timeout setting for entire scan task 
@@ -57,7 +58,7 @@ pub struct PortScanner {
     /// Source port 
     pub src_port: u16,
     /// Destinations 
-    pub destinations: Vec<Destination>,
+    pub destinations: Vec<HostInfo>,
     /// Scan Type 
     pub scan_type: ScanType,
     /// Timeout setting for entire scan task 
@@ -123,15 +124,15 @@ impl HostScanner {
         self.src_ip.clone()
     }
     /// Add Destination
-    pub fn add_destination(&mut self, dst: Destination){
+    pub fn add_destination(&mut self, dst: HostInfo){
         self.destinations.push(dst);
     }
     /// Set Destinations
-    pub fn set_destinations(&mut self, dst: Vec<Destination>){
+    pub fn set_destinations(&mut self, dst: Vec<HostInfo>){
         self.destinations = dst;
     }
     /// Get Destinations
-    pub fn get_destinations(&self) -> Vec<Destination> {
+    pub fn get_destinations(&self) -> Vec<HostInfo> {
         self.destinations.clone()
     }
     /// Set ScanType
@@ -178,7 +179,7 @@ impl HostScanner {
     pub fn run_scan(&mut self){
         let mut ip_set: HashSet<IpAddr> = HashSet::new();
         for dst in self.destinations.clone() {
-            ip_set.insert(dst.dst_ip);
+            ip_set.insert(dst.ip_addr);
         }
         let scan_setting: ScanSetting = ScanSetting {
             if_index: self.if_index.clone(),
@@ -261,15 +262,15 @@ impl PortScanner {
         self.src_ip.clone()
     }
     /// Add Destination
-    pub fn add_destination(&mut self, dst: Destination){
+    pub fn add_destination(&mut self, dst: HostInfo){
         self.destinations.push(dst);
     }
     /// Set Destinations
-    pub fn set_destinations(&mut self, dst: Vec<Destination>){
+    pub fn set_destinations(&mut self, dst: Vec<HostInfo>){
         self.destinations = dst;
     }
     /// Get Destinations
-    pub fn get_destinations(&self) -> Vec<Destination> {
+    pub fn get_destinations(&self) -> Vec<HostInfo> {
         self.destinations.clone()
     }
     /// Set ScanType
@@ -316,7 +317,7 @@ impl PortScanner {
     pub fn run_scan(&mut self){
         let mut ip_set: HashSet<IpAddr> = HashSet::new();
         for dst in self.destinations.clone() {
-            ip_set.insert(dst.dst_ip);
+            ip_set.insert(dst.ip_addr);
         }
         let scan_setting: ScanSetting = ScanSetting {
             if_index: self.if_index.clone(),

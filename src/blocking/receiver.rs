@@ -2,7 +2,8 @@ use std::time::Instant;
 use std::sync::{Arc, Mutex};
 use std::net::{IpAddr, SocketAddr};
 use pnet_packet::Packet;
-use crate::result::{ScanResult, PortInfo, PortStatus, HostInfo};
+use crate::host::{HostInfo, PortInfo, PortStatus};
+use crate::result::ScanResult;
 use crate::setting::{ScanSetting, ScanType};
 
 pub(crate) fn receive_packets(rx: &mut Box<dyn pnet_datalink::DataLinkReceiver>, scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
@@ -75,6 +76,7 @@ fn tcp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, scan_setting: &ScanSet
     if let Some(tcp_packet) = tcp_packet {
         let host_info: HostInfo = HostInfo {
             ip_addr: IpAddr::V4(packet.get_source()),
+            host_name: String::new(),
             ttl: packet.get_ttl(),
             ports: vec![],
         };
@@ -87,6 +89,7 @@ fn tcp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, scan_setting: &ScanSet
     if let Some(tcp_packet) = tcp_packet {
         let host_info: HostInfo = HostInfo {
             ip_addr: IpAddr::V6(packet.get_source()),
+            host_name: String::new(),
             ttl: packet.get_hop_limit(),
             ports: vec![],
         };
@@ -115,6 +118,7 @@ fn icmp_handler_v4(packet: &pnet_packet::ipv4::Ipv4Packet, _scan_setting: &ScanS
             scan_result.lock().unwrap().host_scan_result.hosts.push(
                 HostInfo {
                     ip_addr: IpAddr::V4(packet.get_source()),
+                    host_name: String::new(),
                     ttl: packet.get_ttl(),
                     ports: vec![],
                 }
@@ -131,6 +135,7 @@ fn icmp_handler_v6(packet: &pnet_packet::ipv6::Ipv6Packet, _scan_setting: &ScanS
             scan_result.lock().unwrap().host_scan_result.hosts.push(
                 HostInfo {
                     ip_addr: IpAddr::V6(packet.get_source()),
+                    host_name: String::new(),
                     ttl: packet.get_hop_limit(),
                     ports: vec![],
                 }
@@ -151,15 +156,19 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, mut host_info: Hos
             ScanType::TcpSynScan => {
                 if !scan_result.lock().unwrap().socket_set.contains(&socket_addr) {
                     // Avoid deadlock.
-                    let exists: bool = 
-                    if let Some(r) = scan_result.lock().unwrap().port_scan_result.result_map.get_mut(&socket_addr.ip()) {
-                        r.push(port_info);
-                        true
-                    }else {
-                        false
-                    };
+                    let mut exists: bool = false;
+                    for host in scan_result.lock().unwrap().port_scan_result.results.iter_mut() {
+                        if host.ip_addr == socket_addr.ip() {
+                            host.ports.push(port_info);
+                            exists = true;
+                        }
+                    }
                     if !exists {
-                        scan_result.lock().unwrap().port_scan_result.result_map.insert(socket_addr.ip(), vec![port_info]);
+                        let mut host = HostInfo::new();
+                        host.ip_addr = socket_addr.ip();
+                        host.ttl = host_info.ttl;
+                        host.ports.push(port_info);
+                        scan_result.lock().unwrap().port_scan_result.results.push(host);
                     }
                     scan_result.lock().unwrap().socket_set.insert(socket_addr);
                 }
@@ -188,15 +197,19 @@ fn handle_tcp_packet(tcp_packet: pnet_packet::tcp::TcpPacket, mut host_info: Hos
             ScanType::TcpSynScan => {
                 if !scan_result.lock().unwrap().socket_set.contains(&socket_addr) {
                     // Avoid deadlock.
-                    let exists: bool = 
-                    if let Some(r) = scan_result.lock().unwrap().port_scan_result.result_map.get_mut(&socket_addr.ip()) {
-                        r.push(port_info);
-                        true
-                    }else {
-                        false
-                    };
+                    let mut exists: bool = false;
+                    for host in scan_result.lock().unwrap().port_scan_result.results.iter_mut() {
+                        if host.ip_addr == socket_addr.ip() {
+                            host.ports.push(port_info);
+                            exists = true;
+                        }
+                    }
                     if !exists {
-                        scan_result.lock().unwrap().port_scan_result.result_map.insert(socket_addr.ip(), vec![port_info]);
+                        let mut host = HostInfo::new();
+                        host.ip_addr = socket_addr.ip();
+                        host.ttl = host_info.ttl;
+                        host.ports.push(port_info);
+                        scan_result.lock().unwrap().port_scan_result.results.push(host);
                     }
                     scan_result.lock().unwrap().socket_set.insert(socket_addr);    
                 }

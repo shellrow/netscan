@@ -1,5 +1,6 @@
 use netscan::async_io::HostScanner;
-use netscan::setting::{ScanType, Destination};
+use netscan::host::HostInfo;
+use netscan::setting::{ScanType};
 use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 use std::thread;
@@ -17,7 +18,7 @@ fn main() {
     let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
     // Add scan target
     for host in hosts {
-        let dst: Destination = Destination::new(IpAddr::V4(host), vec![]);
+        let dst: HostInfo = HostInfo::new_with_ip_addr(IpAddr::V4(host));
         host_scanner.add_destination(dst);
     }
     // Set options
@@ -43,5 +44,5 @@ fn main() {
     for host in result.hosts {
         println!("{:?}", host);
     }
-    println!("Scan Time: {:?} (including waittime)", result.scan_time);
+    println!("Scan Time: {:?} (including wait-time)", result.scan_time);
 }

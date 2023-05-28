@@ -2,7 +2,8 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use std::thread;
 use netscan::async_io::PortScanner;
-use netscan::setting::{ScanType, Destination};
+use netscan::host::HostInfo;
+use netscan::setting::{ScanType};
 use async_io;
 
 fn main() {
@@ -28,8 +29,8 @@ fn main() {
         },
         Err(e) => panic!("Error resolving host: {}", e),
     };
-    //let dst: Destination = Destination::new(dst_ip, vec![22, 80, 443, 5000, 8080]);
-    let dst: Destination = Destination::new_with_port_range(dst_ip, 1, 1000);
+    //let dst: HostInfo = HostInfo::new_with_ports(dst_ip, vec![22, 80, 443, 5000, 8080]);
+    let dst: HostInfo = HostInfo::new_with_port_range(dst_ip, 1, 1000);
     port_scanner.add_destination(dst);
     // Set options
     port_scanner.set_scan_type(ScanType::TcpSynScan);
@@ -51,11 +52,8 @@ fn main() {
     // Print results 
     println!("Status: {:?}", result.scan_status);
     println!("Results:");
-    for (ip, ports) in result.result_map {
-        println!("{}", ip);
-        for port in ports {
-            println!("{:?}", port);
-        }
+    for host_info in result.results {
+        println!("{:?}", host_info);
     }
-    println!("Scan Time: {:?} (including waittime)", result.scan_time);
+    println!("Scan Time: {:?} (including wait-time)", result.scan_time);
 }

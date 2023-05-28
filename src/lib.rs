@@ -1,6 +1,7 @@
 mod interface;
 mod packet;
 
+pub mod host;
 pub mod setting;
 pub mod result;
 pub mod blocking;
