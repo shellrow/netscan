@@ -5,7 +5,7 @@ use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::io::prelude::*;
 use rayon::prelude::*;
-use super::setting::PortDatabase;
+use crate::setting::{PortDatabase, NoCertificateVerification};
 use std::net::{IpAddr, Ipv4Addr};
 
 /// Struct for service detection
@@ -145,7 +145,7 @@ fn write_head_request(writer: &mut BufWriter<&TcpStream>, _ip_addr:String) {
     writer.flush().unwrap();
 }
 
-fn head_request_secure(hostname: String, port: u16, _accept_invalid_certs: bool) -> String {
+fn head_request_secure(hostname: String, port: u16, accept_invalid_certs: bool) -> String {
     if hostname.is_empty() {
         return String::from("Error: Invalid host name");
     }
@@ -160,8 +160,16 @@ fn head_request_secure(hostname: String, port: u16, _accept_invalid_certs: bool)
         Err(e) => return format!("Error: {}", e.to_string()),
     }
     
-    let config = rustls::ClientConfig::builder().with_safe_defaults().with_root_certificates(root_store).with_no_client_auth();
+    let mut config = rustls::ClientConfig::builder().with_safe_defaults().with_root_certificates(root_store).with_no_client_auth();
+    if accept_invalid_certs {
+        // Create dangerous config
+        let mut dangerous_config: rustls::client::DangerousClientConfig = rustls::ClientConfig::dangerous(&mut config);
+        // Disable certificate verification
+        dangerous_config.set_certificate_verifier(Arc::new(NoCertificateVerification {}));
+    }
+    
     let mut tls_connection: rustls::ClientConnection = rustls::ClientConnection::new(Arc::new(config), hostname.as_str().try_into().unwrap()).unwrap();
+    
     let mut stream: TcpStream = match TcpStream::connect(sock_addr.clone()) {
         Ok(s) => s,
         Err(e) => return format!("Error: {}",e.to_string()),
