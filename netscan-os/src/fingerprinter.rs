@@ -75,7 +75,7 @@ impl Fingerprinter {
             probe_targets: vec![], 
             probe_types: vec![],
             timeout: Duration::from_millis(30000),
-            wait_time: Duration::from_millis(100),
+            wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),  
             probe_results: vec![],
         };
@@ -122,7 +122,7 @@ impl Fingerprinter {
             probe_targets: vec![], 
             probe_types: vec![],
             timeout: Duration::from_millis(30000),
-            wait_time: Duration::from_millis(100),
+            wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),  
             probe_results: vec![],
         };
