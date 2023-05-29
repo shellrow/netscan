@@ -24,9 +24,6 @@ futures-lite = {version = "1.13.0", optional = true}
 netscan-os = { path = "netscan-os", version = "0.14.0", optional = true }
 netscan-service = { path = "netscan-service", version = "0.14.0", optional = true }
 
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = [ "std" ] }
-
 [dev-dependencies]
 ipnet = "2.7.2"
 dns-lookup = "2.0.2"

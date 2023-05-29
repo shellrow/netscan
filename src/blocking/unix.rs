@@ -130,6 +130,8 @@ fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResul
                     if !exists {
                         let mut host_info = HostInfo::new();
                         host_info.ip_addr = socket_addr.ip();
+                        host_info.host_name = scan_setting.ip_map.get(&socket_addr.ip()).unwrap_or(&String::new()).to_string();
+                        host_info.ttl = socket.ttl().unwrap_or(0) as u8;
                         host_info.ports.push(port_info);
                         scan_result.lock().unwrap().port_scan_result.results.push(host_info);
                     }

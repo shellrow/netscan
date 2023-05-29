@@ -7,7 +7,8 @@ use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use pnet_packet::ethernet::EtherTypes;
 use pnet_packet::ip::IpNextHeaderProtocols;
 use rayon::prelude::*;
-use crate::result::{HostScanResult, PortScanResult, ScanResult, PortInfo, PortStatus};
+use crate::host::{HostInfo, PortInfo, PortStatus};
+use crate::result::{HostScanResult, PortScanResult, ScanResult};
 use crate::setting::{ScanSetting};
 use crate::setting::{ScanType};
 use crate::packet;
@@ -82,13 +83,13 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
 fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &ScanSetting, stop: &Arc<Mutex<bool>>, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::TcpSynScan | ScanType::TcpPingScan => {
-            for dst in scan_setting.destinations.clone() {
-                let dst_ip: IpAddr = dst.dst_ip;
-                for port in dst.dst_ports {
+            for dst in scan_setting.targets.clone() {
+                let dst_ip: IpAddr = dst.ip_addr;
+                for port in dst.get_ports() {
                     tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
                         build_tcp_syn_packet(scan_setting, packet, dst_ip, port);
                     });
-                    let socket_addr = SocketAddr::new(dst.dst_ip, port);
+                    let socket_addr = SocketAddr::new(dst.ip_addr, port);
                     match ptx.lock() {
                         Ok(lr) => {
                             match lr.send(socket_addr) {
@@ -103,13 +104,13 @@ fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &
             }
         },
         ScanType::UdpPingScan => {
-            for dst in scan_setting.destinations.clone() {
-                let dst_ip: IpAddr = dst.dst_ip;
-                for port in dst.dst_ports {
+            for dst in scan_setting.targets.clone() {
+                let dst_ip: IpAddr = dst.ip_addr;
+                for port in dst.get_ports() {
                     tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
                         build_udp_packet(scan_setting, packet, dst_ip, port);
                     });
-                    let socket_addr = SocketAddr::new(dst.dst_ip, port);
+                    let socket_addr = SocketAddr::new(dst.ip_addr, port);
                     match ptx.lock() {
                         Ok(lr) => {
                             match lr.send(socket_addr) {
@@ -124,11 +125,11 @@ fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &
             }
         },
         ScanType::IcmpPingScan => {
-            for dst in scan_setting.destinations.clone() {
+            for dst in scan_setting.targets.clone() {
                 tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
-                    build_icmp_echo_packet(scan_setting, packet, dst.dst_ip);
+                    build_icmp_echo_packet(scan_setting, packet, dst.ip_addr);
                 });
-                let socket_addr = SocketAddr::new(dst.dst_ip, 0);
+                let socket_addr = SocketAddr::new(dst.ip_addr, 0);
                 match ptx.lock() {
                     Ok(lr) => {
                         match lr.send(socket_addr) {
@@ -150,9 +151,9 @@ fn send_packets(tx: &mut Box<dyn pnet_datalink::DataLinkSender>, scan_setting: &
 fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResult>>, stop: &Arc<Mutex<bool>>) {
     let start_time = Instant::now();
     let conn_timeout = Duration::from_millis(200);
-    for dst in scan_setting.destinations.clone() {
-        let ip_addr: IpAddr = dst.dst_ip;
-        dst.dst_ports.into_par_iter().for_each(|port| {
+    for dst in scan_setting.targets.clone() {
+        let ip_addr: IpAddr = dst.ip_addr;
+        dst.get_ports().into_par_iter().for_each(|port| {
             let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap();
             let socket_addr: SocketAddr = SocketAddr::new(ip_addr, port);
             let sock_addr = SockAddr::from(socket_addr);
@@ -163,15 +164,20 @@ fn run_connect_scan(scan_setting: ScanSetting, scan_result: &Arc<Mutex<ScanResul
                         status: PortStatus::Open,
                     };
                     // Avoid deadlock.
-                    let exists: bool = 
-                    if let Some(r) = scan_result.lock().unwrap().port_scan_result.result_map.get_mut(&socket_addr.ip()) {
-                        r.push(port_info);
-                        true
-                    }else {
-                        false
-                    };
+                    let mut exists: bool = false;
+                    for host in scan_result.lock().unwrap().port_scan_result.results.iter_mut() {
+                        if host.ip_addr == socket_addr.ip() {
+                            host.ports.push(port_info);
+                            exists = true;
+                        }
+                    }
                     if !exists {
-                        scan_result.lock().unwrap().port_scan_result.result_map.insert(socket_addr.ip(), vec![port_info]);
+                        let mut host_info = HostInfo::new();
+                        host_info.ip_addr = socket_addr.ip();
+                        host_info.host_name = scan_setting.ip_map.get(&socket_addr.ip()).unwrap_or(&String::new()).to_string();
+                        host_info.ttl = socket.ttl().unwrap_or(0) as u8;
+                        host_info.ports.push(port_info);
+                        scan_result.lock().unwrap().port_scan_result.results.push(host_info);
                     }
                 },
                 Err(_) => {},
