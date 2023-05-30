@@ -45,10 +45,9 @@ impl HostInfo {
     }
     /// Create new HostInfo with IP address
     pub fn new_with_ip_addr(ip_addr: IpAddr) -> HostInfo {
-        let host_name = dns_lookup::lookup_addr(&ip_addr).unwrap_or(String::new());
         HostInfo{
             ip_addr: ip_addr,
-            host_name: host_name,
+            host_name: String::new(),
             ttl: 64,
             ports: vec![],
         }
