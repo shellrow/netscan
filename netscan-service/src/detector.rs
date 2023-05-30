@@ -42,9 +42,6 @@ impl ServiceDetector {
     /// Set Destination IP address
     pub fn set_dst_ip(&mut self, dst_ip: IpAddr){
         self.dst_ip = dst_ip;
-        if self.dst_name.is_empty() {
-            self.dst_name = dns_lookup::lookup_addr(&self.dst_ip).unwrap_or(String::new());
-        }   
     }
     /// Set Destination Host Name
     pub fn set_dst_name(&mut self, host_name: String){
