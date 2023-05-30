@@ -1,6 +1,6 @@
 [package]
 name = "netscan-os"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2021"
 description = "TCP/IP stack fingerprinting library for netscan"

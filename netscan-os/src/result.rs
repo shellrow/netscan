@@ -1,5 +1,5 @@
+use super::setting::{ProbeType, TcpOptionKind};
 use std::net::IpAddr;
-use super::setting::{TcpOptionKind, ProbeType};
 
 #[derive(Clone, Copy, Debug)]
 pub struct IcmpEchoResult {
@@ -75,7 +75,7 @@ impl IcmpInformationResult {
 
 #[derive(Clone, Copy, Debug)]
 pub struct IcmpUnreachableIpResult {
-    pub icmp_unreachable_reply: bool, 
+    pub icmp_unreachable_reply: bool,
     pub icmp_unreachable_size: u16,
     pub ip_total_length: u16,
     pub ip_id: u16,
@@ -86,7 +86,7 @@ pub struct IcmpUnreachableIpResult {
 impl IcmpUnreachableIpResult {
     pub fn new() -> IcmpUnreachableIpResult {
         IcmpUnreachableIpResult {
-            icmp_unreachable_reply: false, 
+            icmp_unreachable_reply: false,
             icmp_unreachable_size: 0,
             ip_total_length: 0,
             ip_id: 0,
@@ -255,15 +255,47 @@ impl ProbeResult {
     pub fn new_with_types(ip_addr: IpAddr, types: Vec<ProbeType>) -> ProbeResult {
         ProbeResult {
             ip_addr: ip_addr,
-            icmp_echo_result: if types.contains(&ProbeType::IcmpEchoProbe) {Some(IcmpEchoResult::new())}else {None},
-            icmp_timestamp_result: if types.contains(&ProbeType::IcmpTimestampProbe) {Some(IcmpTimestampResult::new())}else {None},
-            icmp_address_mask_result: if types.contains(&ProbeType::IcmpAddressMaskProbe) {Some(IcmpAddressMaskResult::new())}else {None},
-            icmp_information_result: if types.contains(&ProbeType::IcmpInformationProbe) {Some(IcmpInformationResult::new())}else {None},
-            icmp_unreachable_ip_result: if types.contains(&ProbeType::IcmpUnreachableProbe) {Some(IcmpUnreachableIpResult::new())}else {None},
+            icmp_echo_result: if types.contains(&ProbeType::IcmpEchoProbe) {
+                Some(IcmpEchoResult::new())
+            } else {
+                None
+            },
+            icmp_timestamp_result: if types.contains(&ProbeType::IcmpTimestampProbe) {
+                Some(IcmpTimestampResult::new())
+            } else {
+                None
+            },
+            icmp_address_mask_result: if types.contains(&ProbeType::IcmpAddressMaskProbe) {
+                Some(IcmpAddressMaskResult::new())
+            } else {
+                None
+            },
+            icmp_information_result: if types.contains(&ProbeType::IcmpInformationProbe) {
+                Some(IcmpInformationResult::new())
+            } else {
+                None
+            },
+            icmp_unreachable_ip_result: if types.contains(&ProbeType::IcmpUnreachableProbe) {
+                Some(IcmpUnreachableIpResult::new())
+            } else {
+                None
+            },
             icmp_unreachable_data_result: None,
-            tcp_syn_ack_result: if types.contains(&ProbeType::TcpSynAckProbe) {Some(TcpSynAckResult::new())}else {None},
-            tcp_rst_ack_result: if types.contains(&ProbeType::TcpRstAckProbe) {Some(TcpRstAckResult::new())}else {None},
-            tcp_ecn_result: if types.contains(&ProbeType::TcpEcnProbe) {Some(TcpEcnResult::new())}else {None},
+            tcp_syn_ack_result: if types.contains(&ProbeType::TcpSynAckProbe) {
+                Some(TcpSynAckResult::new())
+            } else {
+                None
+            },
+            tcp_rst_ack_result: if types.contains(&ProbeType::TcpRstAckProbe) {
+                Some(TcpRstAckResult::new())
+            } else {
+                None
+            },
+            tcp_ecn_result: if types.contains(&ProbeType::TcpEcnProbe) {
+                Some(TcpEcnResult::new())
+            } else {
+                None
+            },
             tcp_header_result: None,
             tcp_fingerprint: TcpFingerprint::new(),
         }

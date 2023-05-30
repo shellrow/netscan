@@ -1,8 +1,10 @@
+use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
-use std::collections::{HashSet, HashMap};
 
-/// Status of scan task 
+use crate::host::{HostInfo, PortStatus};
+
+/// Status of scan task
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScanStatus {
     Ready,
@@ -11,35 +13,7 @@ pub enum ScanStatus {
     Error,
 }
 
-/// Status of the scanned port 
-#[derive(Clone, Copy, Debug)]
-pub enum PortStatus {
-    Open,
-    Closed,
-    Filtered,
-}
-
-/// Information about the scanned host 
-#[derive(Clone, Debug)]
-pub struct HostInfo {
-    /// IP address of the host
-    pub ip_addr: IpAddr,
-    /// IP Time to Live (Hop Limit)
-    pub ttl: u8,
-    /// Ports used for host scan
-    pub ports: Vec<PortInfo>,
-}
-
-/// Information about the scanned port 
-#[derive(Clone, Copy, Debug)]
-pub struct PortInfo {
-    /// Port number
-    pub port: u16,
-    /// Port status
-    pub status: PortStatus,
-}
-
-/// Result of host scan 
+/// Result of host scan
 #[derive(Clone, Debug)]
 pub struct HostScanResult {
     /// Hosts that responded
@@ -52,7 +26,7 @@ pub struct HostScanResult {
 
 impl HostScanResult {
     pub fn new() -> HostScanResult {
-        HostScanResult{
+        HostScanResult {
             hosts: vec![],
             scan_time: Duration::from_millis(0),
             scan_status: ScanStatus::Ready,
@@ -71,8 +45,8 @@ impl HostScanResult {
 /// Result of port scan
 #[derive(Clone, Debug)]
 pub struct PortScanResult {
-    /// HashMap of scanned IP addresses and their respective port scan results.
-    pub result_map: HashMap<IpAddr, Vec<PortInfo>>,
+    /// List of scanned HostInfo and their respective port scan results.
+    pub results: Vec<HostInfo>,
     /// Time taken to scan
     pub scan_time: Duration,
     /// Status of the scan task
@@ -81,8 +55,8 @@ pub struct PortScanResult {
 
 impl PortScanResult {
     pub fn new() -> PortScanResult {
-        PortScanResult{
-            result_map: HashMap::new(),
+        PortScanResult {
+            results: vec![],
             scan_time: Duration::from_millis(0),
             scan_status: ScanStatus::Ready,
         }
@@ -90,16 +64,19 @@ impl PortScanResult {
     /// Get open ports of the specified IP address from the scan results
     pub fn get_open_ports(&self, ip_addr: IpAddr) -> Vec<u16> {
         let mut open_ports: Vec<u16> = vec![];
-        if let Some(ports) = self.result_map.get(&ip_addr) {
-            for port_info in ports {
-                match port_info.status {
-                    PortStatus::Open => {
-                        open_ports.push(port_info.port);
-                    },
-                    _ => {},
-                }
+        self.results.iter().for_each(|host_info| {
+            if host_info.ip_addr == ip_addr {
+                host_info
+                    .ports
+                    .iter()
+                    .for_each(|port_info| match port_info.status {
+                        PortStatus::Open => {
+                            open_ports.push(port_info.port);
+                        }
+                        _ => {}
+                    });
             }
-        }
+        });
         open_ports
     }
 }

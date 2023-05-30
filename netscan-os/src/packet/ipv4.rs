@@ -1,20 +1,25 @@
-use std::net::Ipv4Addr;
 use pnet_packet::ip::{IpNextHeaderProtocol, IpNextHeaderProtocols};
-use pnet_packet::ipv4::{MutableIpv4Packet, Ipv4Flags};
+use pnet_packet::ipv4::{Ipv4Flags, MutableIpv4Packet};
+use std::net::Ipv4Addr;
 
 pub const IPV4_HEADER_LEN: usize = 20;
 pub const IPV4_TOTAL_LEN: u16 = 52;
 
-#[cfg(not(target_family="windows"))]
+#[cfg(not(target_family = "windows"))]
 pub const IPV4_TOTAL_LEN_TCP: u16 = 64;
 
-#[cfg(target_family="windows")]
+#[cfg(target_family = "windows")]
 pub const IPV4_TOTAL_LEN_TCP: u16 = 52;
 
 pub const IPV4_DEFAULT_ID: u16 = 4162;
 pub const IPV4_DEFAULT_TTL: u8 = 64;
 
-pub fn build_ipv4_packet(ipv4_packet: &mut MutableIpv4Packet, src_ip: Ipv4Addr, dst_ip: Ipv4Addr, next_protocol: IpNextHeaderProtocol) {
+pub fn build_ipv4_packet(
+    ipv4_packet: &mut MutableIpv4Packet,
+    src_ip: Ipv4Addr,
+    dst_ip: Ipv4Addr,
+    next_protocol: IpNextHeaderProtocol,
+) {
     ipv4_packet.set_header_length(69);
     ipv4_packet.set_source(src_ip);
     ipv4_packet.set_destination(dst_ip);
@@ -27,16 +32,16 @@ pub fn build_ipv4_packet(ipv4_packet: &mut MutableIpv4Packet, src_ip: Ipv4Addr, 
         IpNextHeaderProtocols::Tcp => {
             ipv4_packet.set_total_length(IPV4_TOTAL_LEN_TCP);
             ipv4_packet.set_next_level_protocol(IpNextHeaderProtocols::Tcp);
-        },
+        }
         IpNextHeaderProtocols::Udp => {
             ipv4_packet.set_total_length(IPV4_TOTAL_LEN);
             ipv4_packet.set_next_level_protocol(IpNextHeaderProtocols::Udp);
-        },
+        }
         IpNextHeaderProtocols::Icmp => {
             ipv4_packet.set_total_length(IPV4_TOTAL_LEN);
             ipv4_packet.set_next_level_protocol(IpNextHeaderProtocols::Icmp);
-        },
-        _ => {},
+        }
+        _ => {}
     }
     let checksum = pnet_packet::ipv4::checksum(&ipv4_packet.to_immutable());
     ipv4_packet.set_checksum(checksum);

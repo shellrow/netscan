@@ -1,73 +1,43 @@
-use std::net::{IpAddr, SocketAddr};
-use std::collections::HashSet;
-use std::time::{Duration, Instant};
-use std::sync::{Mutex, Arc};
-use std::sync::mpsc::{channel ,Sender, Receiver};
-use crate::setting::{Destination, ScanType, DEFAULT_SRC_PORT, ScanSetting, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
-use crate::result::{HostScanResult, PortScanResult, ScanStatus};
 use crate::blocking::{scan_hosts, scan_ports};
+use crate::host::HostInfo;
 use crate::interface;
+use crate::result::{HostScanResult, PortScanResult, ScanStatus};
+use crate::setting::{
+    ScanSetting, ScanType, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY, DEFAULT_SRC_PORT,
+};
+use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
-/// Host Scanner 
+/// Host Scanner
 #[derive(Clone, Debug)]
 pub struct HostScanner {
-    /// Index of network interface 
+    /// Index of network interface
     pub if_index: u32,
-    /// Name of network interface 
+    /// Name of network interface
     pub if_name: String,
-    /// MAC address of network interface 
+    /// MAC address of network interface
     pub src_mac: [u8; 6],
-    /// MAC address of default gateway(or scan target host) 
+    /// MAC address of default gateway(or scan target host)
     pub dst_mac: [u8; 6],
-    /// Source IP address 
+    /// Source IP address
     pub src_ip: IpAddr,
-    /// Source port 
+    /// Source port
     pub src_port: u16,
-    /// Destinations 
-    pub destinations: Vec<Destination>,
-    /// Scan Type 
+    /// Scan Targets
+    pub targets: Vec<HostInfo>,
+    /// Scan Type
     pub scan_type: ScanType,
-    /// Timeout setting for entire scan task 
+    /// Timeout setting for entire scan task
     pub timeout: Duration,
-    /// Waiting time after packet sending task is completed 
+    /// Waiting time after packet sending task is completed
     pub wait_time: Duration,
-    /// Packet sending interval(0 for unlimited) 
+    /// Packet sending interval(0 for unlimited)
     pub send_rate: Duration,
-    /// Scan Result 
+    /// Scan Result
     pub scan_result: HostScanResult,
-    /// Sender for progress messaging
-    pub tx: Arc<Mutex<Sender<SocketAddr>>>,
-    /// Receiver for progress messaging
-    pub rx: Arc<Mutex<Receiver<SocketAddr>>>,
-}
-
-/// Port Scanner 
-#[derive(Clone, Debug)]
-pub struct PortScanner {
-    /// Index of network interface 
-    pub if_index: u32,
-    /// Name of network interface 
-    pub if_name: String,
-    /// MAC address of network interface 
-    pub src_mac: [u8; 6],
-    /// MAC address of default gateway(or scan target host) 
-    pub dst_mac: [u8; 6],  
-    /// Source IP address 
-    pub src_ip: IpAddr,
-    /// Source port 
-    pub src_port: u16,
-    /// Destinations 
-    pub destinations: Vec<Destination>,
-    /// Scan Type 
-    pub scan_type: ScanType,
-    /// Timeout setting for entire scan task 
-    pub timeout: Duration,
-    /// Waiting time after packet sending task is completed 
-    pub wait_time: Duration,
-    /// Packet sending interval(0 for unlimited) 
-    pub send_rate: Duration,
-    /// Scan Result 
-    pub scan_result: PortScanResult,
     /// Sender for progress messaging
     pub tx: Arc<Mutex<Sender<SocketAddr>>>,
     /// Receiver for progress messaging
@@ -76,7 +46,7 @@ pub struct PortScanner {
 
 impl HostScanner {
     /// Create new HostScanner with source IP address
-    /// 
+    ///
     /// Initialized with default value based on the specified IP address
     pub fn new(src_ip: IpAddr) -> Result<HostScanner, String> {
         let mut if_index: u32 = 0;
@@ -90,10 +60,12 @@ impl HostScanner {
                     src_mac = iface.mac.unwrap_or(pnet_datalink::MacAddr::zero());
                     break;
                 }
-            }   
+            }
         }
         if if_index == 0 || if_name.is_empty() || src_mac == pnet_datalink::MacAddr::zero() {
-            return Err(String::from("Failed to create Scanner. Network Interface not found."));
+            return Err(String::from(
+                "Failed to create Scanner. Network Interface not found.",
+            ));
         }
         let (tx, rx) = channel();
         let host_scanner = HostScanner {
@@ -103,7 +75,7 @@ impl HostScanner {
             dst_mac: interface::get_default_gateway_macaddr(),
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
-            destinations: vec![],
+            targets: vec![],
             scan_type: ScanType::IcmpPingScan,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
@@ -115,43 +87,43 @@ impl HostScanner {
         Ok(host_scanner)
     }
     /// Set source IP address
-    pub fn set_src_ip(&mut self, src_ip: IpAddr){
+    pub fn set_src_ip(&mut self, src_ip: IpAddr) {
         self.src_ip = src_ip;
     }
     /// Get source IP address
     pub fn get_src_ip(&self) -> IpAddr {
         self.src_ip.clone()
     }
-    /// Add Destination
-    pub fn add_destination(&mut self, dst: Destination){
-        self.destinations.push(dst);
+    /// Add Target
+    pub fn add_target(&mut self, dst: HostInfo) {
+        self.targets.push(dst);
     }
-    /// Set Destinations
-    pub fn set_destinations(&mut self, dst: Vec<Destination>){
-        self.destinations = dst;
+    /// Set Targets
+    pub fn set_targets(&mut self, dst: Vec<HostInfo>) {
+        self.targets = dst;
     }
-    /// Get Destinations
-    pub fn get_destinations(&self) -> Vec<Destination> {
-        self.destinations.clone()
+    /// Get Targets
+    pub fn get_targets(&self) -> Vec<HostInfo> {
+        self.targets.clone()
     }
     /// Set ScanType
-    pub fn set_scan_type(&mut self, scan_type: ScanType){
+    pub fn set_scan_type(&mut self, scan_type: ScanType) {
         self.scan_type = scan_type;
     }
     /// Get ScanType
     pub fn get_scan_type(&self) -> ScanType {
         self.scan_type.clone()
     }
-    /// Set timeout 
-    pub fn set_timeout(&mut self, timeout: Duration){
+    /// Set timeout
+    pub fn set_timeout(&mut self, timeout: Duration) {
         self.timeout = timeout;
     }
     /// Get timeout
     pub fn get_timeout(&self) -> Duration {
         self.timeout.clone()
-    }  
+    }
     /// Set wait time
-    pub fn set_wait_time(&mut self, wait_time: Duration){
+    pub fn set_wait_time(&mut self, wait_time: Duration) {
         self.wait_time = wait_time;
     }
     /// Get wait time
@@ -159,7 +131,7 @@ impl HostScanner {
         self.wait_time.clone()
     }
     /// Set send rate
-    pub fn set_send_rate(&mut self, send_rate: Duration){
+    pub fn set_send_rate(&mut self, send_rate: Duration) {
         self.send_rate = send_rate;
     }
     /// Get send rate
@@ -175,10 +147,10 @@ impl HostScanner {
         self.rx.clone()
     }
     /// Run Host Scan
-    pub fn run_scan(&mut self){
-        let mut ip_set: HashSet<IpAddr> = HashSet::new();
-        for dst in self.destinations.clone() {
-            ip_set.insert(dst.dst_ip);
+    pub fn run_scan(&mut self) {
+        let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
+        for dst in self.targets.clone() {
+            ip_map.insert(dst.ip_addr, dst.host_name);
         }
         let scan_setting: ScanSetting = ScanSetting {
             if_index: self.if_index.clone(),
@@ -186,8 +158,8 @@ impl HostScanner {
             dst_mac: pnet_datalink::MacAddr::from(self.dst_mac),
             src_ip: self.src_ip.clone(),
             src_port: self.src_port.clone(),
-            destinations: self.destinations.clone(),
-            ip_set: ip_set,
+            targets: self.targets.clone(),
+            ip_map: ip_map,
             timeout: self.timeout.clone(),
             wait_time: self.wait_time.clone(),
             send_rate: self.send_rate.clone(),
@@ -212,9 +184,42 @@ impl HostScanner {
     }
 }
 
+/// Port Scanner
+#[derive(Clone, Debug)]
+pub struct PortScanner {
+    /// Index of network interface
+    pub if_index: u32,
+    /// Name of network interface
+    pub if_name: String,
+    /// MAC address of network interface
+    pub src_mac: [u8; 6],
+    /// MAC address of default gateway(or scan target host)
+    pub dst_mac: [u8; 6],
+    /// Source IP address
+    pub src_ip: IpAddr,
+    /// Source port
+    pub src_port: u16,
+    /// Scan Targets
+    pub targets: Vec<HostInfo>,
+    /// Scan Type
+    pub scan_type: ScanType,
+    /// Timeout setting for entire scan task
+    pub timeout: Duration,
+    /// Waiting time after packet sending task is completed
+    pub wait_time: Duration,
+    /// Packet sending interval(0 for unlimited)
+    pub send_rate: Duration,
+    /// Scan Result
+    pub scan_result: PortScanResult,
+    /// Sender for progress messaging
+    pub tx: Arc<Mutex<Sender<SocketAddr>>>,
+    /// Receiver for progress messaging
+    pub rx: Arc<Mutex<Receiver<SocketAddr>>>,
+}
+
 impl PortScanner {
     /// Create new PortScanner with source IP address
-    /// 
+    ///
     /// Initialized with default value based on the specified IP address
     pub fn new(src_ip: IpAddr) -> Result<PortScanner, String> {
         let mut if_index: u32 = 0;
@@ -228,10 +233,12 @@ impl PortScanner {
                     src_mac = iface.mac.unwrap_or(pnet_datalink::MacAddr::zero());
                     break;
                 }
-            }   
+            }
         }
         if if_index == 0 || if_name.is_empty() || src_mac == pnet_datalink::MacAddr::zero() {
-            return Err(String::from("Failed to create Scanner. Network Interface not found."));
+            return Err(String::from(
+                "Failed to create Scanner. Network Interface not found.",
+            ));
         }
         let (tx, rx) = channel();
         let port_scanner = PortScanner {
@@ -241,7 +248,7 @@ impl PortScanner {
             dst_mac: interface::get_default_gateway_macaddr(),
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
-            destinations: vec![],
+            targets: vec![],
             scan_type: ScanType::TcpSynScan,
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
@@ -253,43 +260,43 @@ impl PortScanner {
         Ok(port_scanner)
     }
     /// Set source IP address
-    pub fn set_src_ip(&mut self, src_ip: IpAddr){
+    pub fn set_src_ip(&mut self, src_ip: IpAddr) {
         self.src_ip = src_ip;
     }
     /// Get source IP address
     pub fn get_src_ip(&self) -> IpAddr {
         self.src_ip.clone()
     }
-    /// Add Destination
-    pub fn add_destination(&mut self, dst: Destination){
-        self.destinations.push(dst);
+    /// Add Targets
+    pub fn add_target(&mut self, dst: HostInfo) {
+        self.targets.push(dst);
     }
-    /// Set Destinations
-    pub fn set_destinations(&mut self, dst: Vec<Destination>){
-        self.destinations = dst;
+    /// Set Target
+    pub fn set_targets(&mut self, dst: Vec<HostInfo>) {
+        self.targets = dst;
     }
-    /// Get Destinations
-    pub fn get_destinations(&self) -> Vec<Destination> {
-        self.destinations.clone()
+    /// Get Targets
+    pub fn get_targets(&self) -> Vec<HostInfo> {
+        self.targets.clone()
     }
     /// Set ScanType
-    pub fn set_scan_type(&mut self, scan_type: ScanType){
+    pub fn set_scan_type(&mut self, scan_type: ScanType) {
         self.scan_type = scan_type;
     }
     /// Get ScanType
     pub fn get_scan_type(&self) -> ScanType {
         self.scan_type.clone()
-    } 
-    /// Set timeout 
-    pub fn set_timeout(&mut self, timeout: Duration){
+    }
+    /// Set timeout
+    pub fn set_timeout(&mut self, timeout: Duration) {
         self.timeout = timeout;
     }
     /// Get timeout
     pub fn get_timeout(&self) -> Duration {
         self.timeout.clone()
-    }  
+    }
     /// Set wait time
-    pub fn set_wait_time(&mut self, wait_time: Duration){
+    pub fn set_wait_time(&mut self, wait_time: Duration) {
         self.wait_time = wait_time;
     }
     /// Get wait time
@@ -297,7 +304,7 @@ impl PortScanner {
         self.wait_time.clone()
     }
     /// Set send rate
-    pub fn set_send_rate(&mut self, send_rate: Duration){
+    pub fn set_send_rate(&mut self, send_rate: Duration) {
         self.send_rate = send_rate;
     }
     /// Get send rate
@@ -313,10 +320,10 @@ impl PortScanner {
         self.rx.clone()
     }
     /// Run Port Scan
-    pub fn run_scan(&mut self){
-        let mut ip_set: HashSet<IpAddr> = HashSet::new();
-        for dst in self.destinations.clone() {
-            ip_set.insert(dst.dst_ip);
+    pub fn run_scan(&mut self) {
+        let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
+        for dst in self.targets.clone() {
+            ip_map.insert(dst.ip_addr, dst.host_name);
         }
         let scan_setting: ScanSetting = ScanSetting {
             if_index: self.if_index.clone(),
@@ -324,8 +331,8 @@ impl PortScanner {
             dst_mac: pnet_datalink::MacAddr::from(self.dst_mac),
             src_ip: self.src_ip.clone(),
             src_port: self.src_port.clone(),
-            destinations: self.destinations.clone(),
-            ip_set: ip_set,
+            targets: self.targets.clone(),
+            ip_map: ip_map,
             timeout: self.timeout.clone(),
             wait_time: self.wait_time.clone(),
             send_rate: self.send_rate.clone(),

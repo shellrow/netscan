@@ -1,6 +1,6 @@
 [package]
 name = "netscan"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2021"
 description = "Cross-platform network scan library"
@@ -14,17 +14,15 @@ license = "MIT"
 rayon = "1.7.0"
 rand = "0.8.5"
 default-net = "0.15.0"
+dns-lookup = "2.0.2"
 pnet_packet = "0.33.0"
 pnet_datalink = "0.33.0"
 socket2 = { version = "0.5.3", features = ["all"] }
 async-io = { version = "1.13.0", optional = true }
 futures = {version = "0.3.28", features = ["executor", "thread-pool"],  optional = true}
 futures-lite = {version = "1.13.0", optional = true}
-netscan-os = { path = "netscan-os", version = "0.14.0", optional = true }
-netscan-service = { path = "netscan-service", version = "0.14.0", optional = true }
-
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.9", features = [ "std" ] }
+netscan-os = { path = "netscan-os", version = "0.15.0", optional = true }
+netscan-service = { path = "netscan-service", version = "0.15.0", optional = true }
 
 [dev-dependencies]
 ipnet = "2.7.2"

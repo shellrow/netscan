@@ -1,9 +1,9 @@
-use std::io;
-use std::mem::MaybeUninit;
-use std::sync::Arc;
-use std::net::IpAddr;
 use async_io::Async;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+use std::io;
+use std::mem::MaybeUninit;
+use std::net::IpAddr;
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct AsyncSocket {
@@ -24,7 +24,11 @@ impl AsyncSocket {
     pub async fn send_to(&self, buf: &mut [u8], target: &SockAddr) -> io::Result<usize> {
         loop {
             self.inner.writable().await?;
-            match self.inner.write_with(|inner| inner.send_to(buf, target)).await {
+            match self
+                .inner
+                .write_with(|inner| inner.send_to(buf, target))
+                .await
+            {
                 Ok(n) => return Ok(n),
                 Err(_) => continue,
             }

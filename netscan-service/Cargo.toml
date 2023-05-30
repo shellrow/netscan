@@ -1,6 +1,6 @@
 [package]
 name = "netscan-service"
-version = "0.14.0"
+version = "0.15.0"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2021"
 description = "Service detection library for netscan"
@@ -13,5 +13,5 @@ license = "MIT"
 [dependencies]
 rayon = "1.7.0"
 dns-lookup = "2.0.2"
-rustls = "0.21.1"
+rustls = {version="0.21.1", features=["dangerous_configuration"]}
 rustls-native-certs = "0.6.2"
