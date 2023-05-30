@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use std::io::{BufReader, BufWriter};
-use std::net::{TcpStream,SocketAddr};
-use std::time::Duration;
-use std::sync::{Arc, Mutex};
-use std::io::prelude::*;
+use crate::setting::{NoCertificateVerification, PortDatabase};
 use rayon::prelude::*;
-use crate::setting::{PortDatabase, NoCertificateVerification};
+use std::collections::HashMap;
+use std::io::prelude::*;
+use std::io::{BufReader, BufWriter};
 use std::net::{IpAddr, Ipv4Addr};
+use std::net::{SocketAddr, TcpStream};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 /// Struct for service detection
 #[derive(Clone, Debug)]
@@ -22,15 +22,15 @@ pub struct ServiceDetector {
     /// TCP read timeout
     pub read_timeout: Duration,
     /// SSL/TLS certificate validation when detecting HTTPS services.  
-    /// 
-    /// Default value is false, which means validation is enabled. 
+    ///
+    /// Default value is false, which means validation is enabled.
     pub accept_invalid_certs: bool,
 }
 
 impl ServiceDetector {
     /// Create new ServiceDetector
     pub fn new() -> ServiceDetector {
-        ServiceDetector{
+        ServiceDetector {
             dst_ip: IpAddr::V4(Ipv4Addr::LOCALHOST),
             dst_name: String::new(),
             ports: vec![],
@@ -40,39 +40,43 @@ impl ServiceDetector {
         }
     }
     /// Set Destination IP address
-    pub fn set_dst_ip(&mut self, dst_ip: IpAddr){
+    pub fn set_dst_ip(&mut self, dst_ip: IpAddr) {
         self.dst_ip = dst_ip;
     }
     /// Set Destination Host Name
-    pub fn set_dst_name(&mut self, host_name: String){
+    pub fn set_dst_name(&mut self, host_name: String) {
         self.dst_name = host_name;
         if self.dst_ip == IpAddr::V4(Ipv4Addr::LOCALHOST) {
-            self.dst_ip = dns_lookup::lookup_host(&self.dst_name).unwrap_or(vec![IpAddr::V4(Ipv4Addr::LOCALHOST)]).first().unwrap().clone();
-        }   
+            self.dst_ip = dns_lookup::lookup_host(&self.dst_name)
+                .unwrap_or(vec![IpAddr::V4(Ipv4Addr::LOCALHOST)])
+                .first()
+                .unwrap()
+                .clone();
+        }
     }
     /// Set target ports
-    pub fn set_ports(&mut self, ports: Vec<u16>){
+    pub fn set_ports(&mut self, ports: Vec<u16>) {
         self.ports = ports;
     }
     /// Add target port
-    pub fn add_port(&mut self, port: u16){
+    pub fn add_port(&mut self, port: u16) {
         self.ports.push(port);
     }
     /// Set connect (open) timeout
-    pub fn set_connect_timeout(&mut self, connect_timeout: Duration){
+    pub fn set_connect_timeout(&mut self, connect_timeout: Duration) {
         self.connect_timeout = connect_timeout;
     }
     /// Set TCP read timeout
-    pub fn set_read_timeout(&mut self, read_timeout: Duration){
+    pub fn set_read_timeout(&mut self, read_timeout: Duration) {
         self.read_timeout = read_timeout;
     }
     /// Set SSL/TLS certificate validation enable/disable.
-    pub fn set_accept_invalid_certs(&mut self, accept_invalid_certs: bool){
+    pub fn set_accept_invalid_certs(&mut self, accept_invalid_certs: bool) {
         self.accept_invalid_certs = accept_invalid_certs;
     }
     /// Run service detection and return result
-    /// 
-    /// PortDatabase can be omitted with None (use default list) 
+    ///
+    /// PortDatabase can be omitted with None (use default list)
     pub fn detect(&self, port_db: Option<PortDatabase>) -> HashMap<u16, String> {
         detect_service(self, port_db.unwrap_or(PortDatabase::default()))
     }
@@ -80,33 +84,36 @@ impl ServiceDetector {
 
 fn detect_service(setting: &ServiceDetector, port_db: PortDatabase) -> HashMap<u16, String> {
     let service_map: Arc<Mutex<HashMap<u16, String>>> = Arc::new(Mutex::new(HashMap::new()));
-    setting.clone().ports.into_par_iter().for_each(|port| 
-        {
-            let sock_addr: SocketAddr = SocketAddr::new(setting.dst_ip, port);
-            match TcpStream::connect_timeout(&sock_addr, setting.connect_timeout) {
-                Ok(stream) => {
-                    stream.set_read_timeout(Some(setting.read_timeout)).expect("Failed to set read timeout.");
-                    let mut reader = BufReader::new(&stream);
-                    let mut writer = BufWriter::new(&stream);
-                    let msg: String = 
-                    if port_db.http_ports.contains(&port) {
-                        write_head_request(&mut writer, setting.dst_ip.to_string());
-                        let header = read_response(&mut reader);
-                        parse_header(header)
-                    }else if port_db.https_ports.contains(&port) {
-                        let header = head_request_secure(setting.dst_name.clone(), port, setting.accept_invalid_certs);
-                        parse_header(header)
-                    }else{
-                        read_response(&mut reader).replace("\r\n", "")
-                    };
-                    service_map.lock().unwrap().insert(port, msg);
-                },
-                Err(e) => {
-                    service_map.lock().unwrap().insert(port, e.to_string());
-                },
+    setting.clone().ports.into_par_iter().for_each(|port| {
+        let sock_addr: SocketAddr = SocketAddr::new(setting.dst_ip, port);
+        match TcpStream::connect_timeout(&sock_addr, setting.connect_timeout) {
+            Ok(stream) => {
+                stream
+                    .set_read_timeout(Some(setting.read_timeout))
+                    .expect("Failed to set read timeout.");
+                let mut reader = BufReader::new(&stream);
+                let mut writer = BufWriter::new(&stream);
+                let msg: String = if port_db.http_ports.contains(&port) {
+                    write_head_request(&mut writer, setting.dst_ip.to_string());
+                    let header = read_response(&mut reader);
+                    parse_header(header)
+                } else if port_db.https_ports.contains(&port) {
+                    let header = head_request_secure(
+                        setting.dst_name.clone(),
+                        port,
+                        setting.accept_invalid_certs,
+                    );
+                    parse_header(header)
+                } else {
+                    read_response(&mut reader).replace("\r\n", "")
+                };
+                service_map.lock().unwrap().insert(port, msg);
+            }
+            Err(e) => {
+                service_map.lock().unwrap().insert(port, e.to_string());
             }
         }
-    );
+    });
     let result_map: HashMap<u16, String> = service_map.lock().unwrap().clone();
     result_map
 }
@@ -114,14 +121,14 @@ fn detect_service(setting: &ServiceDetector, port_db: PortDatabase) -> HashMap<u
 fn read_response(reader: &mut BufReader<&TcpStream>) -> String {
     let mut msg = String::new();
     match reader.read_to_string(&mut msg) {
-        Ok(_) => {},
-        Err(_) => {},
+        Ok(_) => {}
+        Err(_) => {}
     }
     msg
 }
 
 fn parse_header(response_header: String) -> String {
-    let header_fields: Vec<&str>  = response_header.split("\r\n").collect();
+    let header_fields: Vec<&str> = response_header.split("\r\n").collect();
     if header_fields.len() == 1 {
         return response_header;
     }
@@ -133,11 +140,11 @@ fn parse_header(response_header: String) -> String {
     String::new()
 }
 
-fn write_head_request(writer: &mut BufWriter<&TcpStream>, _ip_addr:String) {
+fn write_head_request(writer: &mut BufWriter<&TcpStream>, _ip_addr: String) {
     let msg = format!("HEAD / HTTP/1.0\r\n\r\n");
     match writer.write(msg.as_bytes()) {
-        Ok(_) => {},
-        Err(_) => {},
+        Ok(_) => {}
+        Err(_) => {}
     }
     writer.flush().unwrap();
 }
@@ -146,44 +153,54 @@ fn head_request_secure(hostname: String, port: u16, accept_invalid_certs: bool) 
     if hostname.is_empty() {
         return String::from("Error: Invalid host name");
     }
-    let sock_addr: String = format!("{}:{}",hostname, port);
+    let sock_addr: String = format!("{}:{}", hostname, port);
     let mut root_store = rustls::RootCertStore::empty();
     match rustls_native_certs::load_native_certs() {
         Ok(certs) => {
             for cert in certs {
                 root_store.add(&rustls::Certificate(cert.0)).unwrap();
             }
-        },
+        }
         Err(e) => return format!("Error: {}", e.to_string()),
     }
-    
-    let mut config = rustls::ClientConfig::builder().with_safe_defaults().with_root_certificates(root_store).with_no_client_auth();
+
+    let mut config = rustls::ClientConfig::builder()
+        .with_safe_defaults()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
     if accept_invalid_certs {
         // Create dangerous config
-        let mut dangerous_config: rustls::client::DangerousClientConfig = rustls::ClientConfig::dangerous(&mut config);
+        let mut dangerous_config: rustls::client::DangerousClientConfig =
+            rustls::ClientConfig::dangerous(&mut config);
         // Disable certificate verification
         dangerous_config.set_certificate_verifier(Arc::new(NoCertificateVerification {}));
     }
-    
-    let mut tls_connection: rustls::ClientConnection = rustls::ClientConnection::new(Arc::new(config), hostname.as_str().try_into().unwrap()).unwrap();
-    
+
+    let mut tls_connection: rustls::ClientConnection =
+        rustls::ClientConnection::new(Arc::new(config), hostname.as_str().try_into().unwrap())
+            .unwrap();
+
     let mut stream: TcpStream = match TcpStream::connect(sock_addr.clone()) {
         Ok(s) => s,
-        Err(e) => return format!("Error: {}",e.to_string()),
+        Err(e) => return format!("Error: {}", e.to_string()),
     };
     match stream.set_read_timeout(Some(Duration::from_secs(10))) {
-        Ok(_) => {},
-        Err(e) => return format!("Error: {}",e.to_string()),
+        Ok(_) => {}
+        Err(e) => return format!("Error: {}", e.to_string()),
     }
-    let mut tls_stream: rustls::Stream<rustls::ClientConnection, TcpStream> = rustls::Stream::new(&mut tls_connection, &mut stream);
-    let message: String = format!("HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nAccept-Encoding: identity\r\n\r\n", hostname);
+    let mut tls_stream: rustls::Stream<rustls::ClientConnection, TcpStream> =
+        rustls::Stream::new(&mut tls_connection, &mut stream);
+    let message: String = format!(
+        "HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nAccept-Encoding: identity\r\n\r\n",
+        hostname
+    );
     match tls_stream.write_all(message.as_bytes()) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => return format!("Error: {}", e.to_string()),
     }
     let mut plaintext = Vec::new();
     match tls_stream.read_to_end(&mut plaintext) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => return format!("Error: {}", e.to_string()),
     }
     let result: String = plaintext.iter().map(|&c| c as char).collect();

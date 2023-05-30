@@ -1,14 +1,14 @@
-mod scanner;
 mod receiver;
+mod scanner;
 
-#[cfg(not(target_os="windows"))]
+#[cfg(not(target_os = "windows"))]
 mod unix;
-#[cfg(not(target_os="windows"))]
+#[cfg(not(target_os = "windows"))]
 use unix::*;
 
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 mod windows;
-#[cfg(target_os="windows")]
+#[cfg(target_os = "windows")]
 use windows::*;
 
 pub use scanner::*;

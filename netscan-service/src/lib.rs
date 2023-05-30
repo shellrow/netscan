@@ -1,5 +1,5 @@
-mod setting;
 mod detector;
+mod setting;
 
-pub use setting::*;
 pub use detector::*;
+pub use setting::*;

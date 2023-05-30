@@ -1,10 +1,10 @@
+use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
-use std::collections::{HashSet};
 
 use crate::host::{HostInfo, PortStatus};
 
-/// Status of scan task 
+/// Status of scan task
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScanStatus {
     Ready,
@@ -13,7 +13,7 @@ pub enum ScanStatus {
     Error,
 }
 
-/// Result of host scan 
+/// Result of host scan
 #[derive(Clone, Debug)]
 pub struct HostScanResult {
     /// Hosts that responded
@@ -26,7 +26,7 @@ pub struct HostScanResult {
 
 impl HostScanResult {
     pub fn new() -> HostScanResult {
-        HostScanResult{
+        HostScanResult {
             hosts: vec![],
             scan_time: Duration::from_millis(0),
             scan_status: ScanStatus::Ready,
@@ -55,7 +55,7 @@ pub struct PortScanResult {
 
 impl PortScanResult {
     pub fn new() -> PortScanResult {
-        PortScanResult{
+        PortScanResult {
             results: vec![],
             scan_time: Duration::from_millis(0),
             scan_status: ScanStatus::Ready,
@@ -66,14 +66,15 @@ impl PortScanResult {
         let mut open_ports: Vec<u16> = vec![];
         self.results.iter().for_each(|host_info| {
             if host_info.ip_addr == ip_addr {
-                host_info.ports.iter().for_each(|port_info| {
-                    match port_info.status {
+                host_info
+                    .ports
+                    .iter()
+                    .for_each(|port_info| match port_info.status {
                         PortStatus::Open => {
                             open_ports.push(port_info.port);
-                        },
-                        _ => {},
-                    }
-                });
+                        }
+                        _ => {}
+                    });
             }
         });
         open_ports

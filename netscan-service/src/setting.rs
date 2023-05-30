@@ -1,5 +1,5 @@
-/// List of ports for which more detailed information can be obtained, by service. 
-/// 
+/// List of ports for which more detailed information can be obtained, by service.
+///
 /// HTTP/HTTPS, etc.
 #[derive(Clone, Debug)]
 pub struct PortDatabase {

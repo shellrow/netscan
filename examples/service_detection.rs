@@ -1,11 +1,11 @@
-use netscan::blocking::PortScanner;
-use netscan::host::{HostInfo, PortStatus};
-use netscan::setting::{ScanType};
-use std::time::Duration;
-use std::net::IpAddr;
-use netscan::service::{ServiceDetector, PortDatabase};
 use default_net;
 use dns_lookup;
+use netscan::blocking::PortScanner;
+use netscan::host::{HostInfo, PortStatus};
+use netscan::service::{PortDatabase, ServiceDetector};
+use netscan::setting::ScanType;
+use std::net::IpAddr;
+use std::time::Duration;
 
 fn main() {
     let interface = default_net::get_default_interface().unwrap();
@@ -13,8 +13,7 @@ fn main() {
         Ok(scanner) => scanner,
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    let dst_ip: IpAddr = 
-    match dns_lookup::lookup_host("scanme.nmap.org") {
+    let dst_ip: IpAddr = match dns_lookup::lookup_host("scanme.nmap.org") {
         Ok(ips) => {
             let mut ip_addr = ips.first().unwrap().clone();
             for ip in ips {
@@ -24,10 +23,11 @@ fn main() {
                 }
             }
             ip_addr
-        },
+        }
         Err(e) => panic!("Error resolving host: {}", e),
     };
-    let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![22, 80, 443, 5000, 8080]);
+    let dst: HostInfo =
+        HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![22, 80, 443, 5000, 8080]);
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_host_name("scanme.nmap.org".to_string()).with_ports(vec![22, 80, 443, 5000, 8080]);
     //let dst: HostInfo = HostInfo::new_with_host_name("scanme.nmap.org".to_string()).with_ports(vec![22, 80, 443, 5000, 8080]);

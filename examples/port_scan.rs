@@ -1,9 +1,9 @@
 use netscan::blocking::PortScanner;
 use netscan::host::{HostInfo, PortStatus};
-use netscan::setting::{ScanType};
-use std::time::Duration;
+use netscan::setting::ScanType;
 use std::net::IpAddr;
 use std::thread;
+use std::time::Duration;
 
 fn main() {
     let interface = default_net::get_default_interface().unwrap();
@@ -12,8 +12,7 @@ fn main() {
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     // Add scan target
-    let dst_ip: IpAddr = 
-    match dns_lookup::lookup_host("scanme.nmap.org") {
+    let dst_ip: IpAddr = match dns_lookup::lookup_host("scanme.nmap.org") {
         Ok(ips) => {
             let mut ip_addr = ips.first().unwrap().clone();
             for ip in ips {
@@ -23,7 +22,7 @@ fn main() {
                 }
             }
             ip_addr
-        },
+        }
         Err(e) => panic!("Error resolving host: {}", e),
     };
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![22, 80, 443, 5000, 8080]);
@@ -34,18 +33,16 @@ fn main() {
     port_scanner.set_timeout(Duration::from_millis(10000));
     port_scanner.set_wait_time(Duration::from_millis(500));
     //port_scanner.set_send_rate(Duration::from_millis(1));
-    
+
     let rx = port_scanner.get_progress_receiver();
-    // Run scan 
-    let handle = thread::spawn(move|| {
-        port_scanner.scan()
-    });
+    // Run scan
+    let handle = thread::spawn(move || port_scanner.scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);
     }
     let result = handle.join().unwrap();
-    // Print results 
+    // Print results
     println!("Status: {:?}", result.scan_status);
     println!("Results:");
     for host_info in result.results {

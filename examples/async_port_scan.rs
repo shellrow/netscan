@@ -1,10 +1,10 @@
-use std::net::IpAddr;
-use std::time::Duration;
-use std::thread;
+use async_io;
 use netscan::async_io::PortScanner;
 use netscan::host::{HostInfo, PortStatus};
-use netscan::setting::{ScanType};
-use async_io;
+use netscan::setting::ScanType;
+use std::net::IpAddr;
+use std::thread;
+use std::time::Duration;
 
 fn main() {
     let interface = default_net::get_default_interface().unwrap();
@@ -13,8 +13,7 @@ fn main() {
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     // Add scan target
-    let dst_ip: IpAddr = 
-    match dns_lookup::lookup_host("scanme.nmap.org") {
+    let dst_ip: IpAddr = match dns_lookup::lookup_host("scanme.nmap.org") {
         Ok(ips) => {
             let mut ip_addr = ips.first().unwrap().clone();
             for ip in ips {
@@ -24,11 +23,11 @@ fn main() {
                 }
             }
             ip_addr
-        },
+        }
         Err(e) => panic!("Error resolving host: {}", e),
     };
-   //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![22, 80, 443, 5000, 8080]);
-   let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
+    //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![22, 80, 443, 5000, 8080]);
+    let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
     port_scanner.add_target(dst);
     // Set options
     port_scanner.set_scan_type(ScanType::TcpSynScan);
@@ -36,18 +35,14 @@ fn main() {
     port_scanner.set_wait_time(Duration::from_millis(500));
 
     let rx = port_scanner.get_progress_receiver();
-    // Run scan 
-    let handle = thread::spawn(move|| {
-        async_io::block_on(async {
-            port_scanner.scan().await
-        })
-    });
+    // Run scan
+    let handle = thread::spawn(move || async_io::block_on(async { port_scanner.scan().await }));
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);
     }
     let result = handle.join().unwrap();
-    // Print results 
+    // Print results
     println!("Status: {:?}", result.scan_status);
     println!("Results:");
     for host_info in result.results {

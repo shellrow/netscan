@@ -1,10 +1,10 @@
 mod interface;
 mod packet;
 
-pub mod host;
-pub mod setting;
-pub mod result;
 pub mod blocking;
+pub mod host;
+pub mod result;
+pub mod setting;
 
 #[cfg(feature = "async")]
 pub mod async_io;

@@ -1,6 +1,6 @@
+use pnet_datalink::MacAddr;
 use std::net::IpAddr;
 use std::time::Duration;
-use pnet_datalink::MacAddr;
 
 /// Probes for fingerprinting
 #[derive(Clone, Copy, Debug, PartialEq)]

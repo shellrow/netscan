@@ -1,11 +1,11 @@
+use async_io;
+use ipnet::Ipv4Net;
 use netscan::async_io::HostScanner;
 use netscan::host::HostInfo;
-use netscan::setting::{ScanType};
-use std::time::Duration;
+use netscan::setting::ScanType;
 use std::net::{IpAddr, Ipv4Addr};
 use std::thread;
-use ipnet::Ipv4Net;
-use async_io;
+use std::time::Duration;
 
 fn main() {
     let interface = default_net::get_default_interface().unwrap();
@@ -25,20 +25,16 @@ fn main() {
     host_scanner.set_scan_type(ScanType::IcmpPingScan);
     host_scanner.set_timeout(Duration::from_millis(10000));
     host_scanner.set_wait_time(Duration::from_millis(500));
-    
+
     let rx = host_scanner.get_progress_receiver();
-    // Run scan 
-    let handle = thread::spawn(move|| {
-        async_io::block_on(async {
-            host_scanner.scan().await
-        })
-    });
+    // Run scan
+    let handle = thread::spawn(move || async_io::block_on(async { host_scanner.scan().await }));
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);
     }
     let result = handle.join().unwrap();
-    // Print results 
+    // Print results
     println!("Status: {:?}", result.scan_status);
     println!("UP Hosts:");
     for host in result.hosts {

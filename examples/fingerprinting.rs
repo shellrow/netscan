@@ -1,12 +1,11 @@
+use netscan::os::{Fingerprinter, ProbeTarget};
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
-use netscan::os::{Fingerprinter, ProbeTarget};
 
 fn main() {
     let interface = default_net::get_default_interface().unwrap();
     let src_ip: IpAddr = IpAddr::V4(interface.ipv4[0].addr);
-    let dst_ip: IpAddr = 
-    match dns_lookup::lookup_host("scanme.nmap.org") {
+    let dst_ip: IpAddr = match dns_lookup::lookup_host("scanme.nmap.org") {
         Ok(ips) => {
             let mut ip_addr = IpAddr::V4(Ipv4Addr::LOCALHOST);
             for ip in ips {
@@ -18,14 +17,14 @@ fn main() {
                 }
             }
             ip_addr
-        },
+        }
         Err(e) => panic!("Error resolving host: {}", e),
     };
     let mut fingerprinter = Fingerprinter::new(src_ip).unwrap();
     fingerprinter.set_wait_time(Duration::from_millis(500));
     let probe_target: ProbeTarget = ProbeTarget {
         ip_addr: dst_ip,
-        open_tcp_ports: vec![22,80],
+        open_tcp_ports: vec![22, 80],
         closed_tcp_port: 443,
         open_udp_port: 123,
         closed_udp_port: 33455,
