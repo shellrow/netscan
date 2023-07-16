@@ -1,6 +1,6 @@
 [package]
 name = "netscan"
-version = "0.15.2"
+version = "0.15.3"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2021"
 description = "Cross-platform network scan library"
