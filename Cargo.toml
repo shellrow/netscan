@@ -11,22 +11,22 @@ categories = ["network-programming"]
 license = "MIT"
 
 [dependencies]
-rayon = "1.7.0"
-rand = "0.8.5"
-default-net = "0.16"
-dns-lookup = "2.0.2"
-pnet_packet = "0.33.0"
-pnet_datalink = "0.33.0"
-socket2 = { version = "0.5.3", features = ["all"] }
-async-io = { version = "1.13.0", optional = true }
-futures = {version = "0.3.28", features = ["executor", "thread-pool"],  optional = true}
-futures-lite = {version = "1.13.0", optional = true}
+rayon = "1.7"
+rand = "0.8"
+default-net = "0.17"
+dns-lookup = "2.0"
+pnet_packet = "0.34"
+pnet_datalink = "0.34"
+socket2 = { version = "0.5", features = ["all"] }
+async-io = { version = "1.13", optional = true }
+futures = {version = "0.3", features = ["executor", "thread-pool"],  optional = true}
+futures-lite = {version = "1.13", optional = true}
 netscan-os = { path = "netscan-os", version = "0.15.4", optional = true }
 netscan-service = { path = "netscan-service", version = "0.15.4", optional = true }
 
 [dev-dependencies]
-ipnet = "2.7.2"
-dns-lookup = "2.0.2"
+ipnet = "2.7"
+dns-lookup = "2.0"
 
 [features]
 async = ["async-io", "futures", "futures-lite"]
