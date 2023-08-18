@@ -1,5 +1,4 @@
 use crate::async_io::{scan_hosts, scan_ports};
-use crate::host::HostInfo;
 use crate::result::{HostScanResult, PortScanResult, ScanStatus};
 use crate::setting::{
     ScanSetting, ScanType, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY, DEFAULT_SRC_PORT,
@@ -13,30 +12,8 @@ use std::time::{Duration, Instant};
 /// Async Host Scanner
 #[derive(Clone, Debug)]
 pub struct HostScanner {
-    /// Index of network interface
-    pub if_index: u32,
-    /// Name of network interface
-    pub if_name: String,
-    /// MAC address of network interface
-    pub src_mac: [u8; 6],
-    /// MAC address of default gateway(or scan target host)
-    pub dst_mac: [u8; 6],
-    /// Source IP address
-    pub src_ip: IpAddr,
-    /// Source port
-    pub src_port: u16,
-    /// Targets
-    pub targets: Vec<HostInfo>,
-    /// Scan Type
-    pub scan_type: ScanType,
-    /// Number of host scans to run concurrently
-    pub hosts_concurrency: usize,
-    /// Timeout setting for entire scan task
-    pub timeout: Duration,
-    /// Waiting time after packet sending task is completed
-    pub wait_time: Duration,
-    /// Packet sending interval(0 for unlimited)
-    pub send_rate: Duration,
+    /// ScanSetting
+    pub scan_setting: ScanSetting,
     /// Host Scan Result
     pub scan_result: HostScanResult,
     /// Sender for progress messaging
@@ -69,80 +46,29 @@ impl HostScanner {
             ));
         }
         let (tx, rx) = channel();
-        let host_scanner = HostScanner {
+        let scan_setting: ScanSetting = ScanSetting {
             if_index: if_index,
             if_name: if_name,
             src_mac: src_mac.octets(),
             dst_mac: pnet_datalink::MacAddr::zero().octets(),
-            src_ip: src_ip,
+            src_ip: src_ip.clone(),
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
-            scan_type: ScanType::IcmpPingScan,
-            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ip_map: HashMap::new(),
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
+            scan_type: ScanType::IcmpPingScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+        };
+        let host_scanner = HostScanner {
+            scan_setting: scan_setting,
             scan_result: HostScanResult::new(),
             tx: Arc::new(Mutex::new(tx)),
             rx: Arc::new(Mutex::new(rx)),
         };
         Ok(host_scanner)
-    }
-    /// Set source IP address
-    pub fn set_src_ip(&mut self, src_ip: IpAddr) {
-        self.src_ip = src_ip;
-    }
-    /// Get source IP address
-    pub fn get_src_ip(&self) -> IpAddr {
-        self.src_ip.clone()
-    }
-    /// Add Target
-    pub fn add_target(&mut self, dst: HostInfo) {
-        self.targets.push(dst);
-    }
-    /// Set Targets
-    pub fn set_targets(&mut self, dst: Vec<HostInfo>) {
-        self.targets = dst;
-    }
-    /// Get Targets
-    pub fn get_targets(&self) -> Vec<HostInfo> {
-        self.targets.clone()
-    }
-    /// Set ScanType
-    pub fn set_scan_type(&mut self, scan_type: ScanType) {
-        self.scan_type = scan_type;
-    }
-    /// Get ScanType
-    pub fn get_scan_type(&self) -> ScanType {
-        self.scan_type.clone()
-    }
-    /// Set timeout
-    pub fn set_timeout(&mut self, timeout: Duration) {
-        self.timeout = timeout;
-    }
-    /// Get timeout
-    pub fn get_timeout(&self) -> Duration {
-        self.timeout.clone()
-    }
-    /// Set wait time
-    pub fn set_wait_time(&mut self, wait_time: Duration) {
-        self.wait_time = wait_time;
-    }
-    /// Get wait time
-    pub fn get_wait_time(&self) -> Duration {
-        self.wait_time.clone()
-    }
-    /// Set send rate
-    pub fn set_send_rate(&mut self, send_rate: Duration) {
-        self.send_rate = send_rate;
-    }
-    /// Get send rate
-    pub fn get_send_rate(&self) -> Duration {
-        self.send_rate.clone()
-    }
-    /// Set hosts concurrency
-    pub fn set_hosts_concurrency(&mut self, concurrency: usize) {
-        self.hosts_concurrency = concurrency;
     }
     /// Get scan result
     pub fn get_scan_result(&self) -> HostScanResult {
@@ -155,28 +81,14 @@ impl HostScanner {
     /// Run Host Scan
     pub async fn run_scan(&mut self) {
         let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
-        for dst in self.targets.clone() {
+        for dst in self.scan_setting.targets.clone() {
             ip_map.insert(dst.ip_addr, dst.host_name);
         }
-        let scan_setting: ScanSetting = ScanSetting {
-            if_index: self.if_index.clone(),
-            src_mac: pnet_datalink::MacAddr::from(self.src_mac),
-            dst_mac: pnet_datalink::MacAddr::from(self.dst_mac),
-            src_ip: self.src_ip.clone(),
-            src_port: self.src_port.clone(),
-            targets: self.targets.clone(),
-            ip_map: ip_map,
-            timeout: self.timeout.clone(),
-            wait_time: self.wait_time.clone(),
-            send_rate: self.timeout.clone(),
-            scan_type: self.scan_type.clone(),
-            hosts_concurrency: self.hosts_concurrency,
-            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
-        };
+        self.scan_setting.ip_map = ip_map.clone();
         let start_time = Instant::now();
-        let mut result: HostScanResult = scan_hosts(scan_setting, &self.tx).await;
+        let mut result: HostScanResult = scan_hosts(self.scan_setting.clone(), &self.tx).await;
         result.scan_time = Instant::now().duration_since(start_time);
-        if result.scan_time > self.timeout {
+        if result.scan_time > self.scan_setting.timeout {
             result.scan_status = ScanStatus::Timeout;
         } else {
             result.scan_status = ScanStatus::Done;
@@ -193,32 +105,8 @@ impl HostScanner {
 /// Async Port Scanner
 #[derive(Clone, Debug)]
 pub struct PortScanner {
-    /// Index of network interface
-    pub if_index: u32,
-    /// Name of network interface
-    pub if_name: String,
-    /// MAC address of network interface
-    pub src_mac: [u8; 6],
-    /// MAC address of default gateway(or scan target host)
-    pub dst_mac: [u8; 6],
-    /// Source IP address
-    pub src_ip: IpAddr,
-    /// Source port
-    pub src_port: u16,
-    /// Targets
-    pub targets: Vec<HostInfo>,
-    /// Scan Type
-    pub scan_type: ScanType,
-    /// Number of host scans to run concurrently
-    pub hosts_concurrency: usize,
-    /// Number of port scans to run concurrently
-    pub ports_concurrency: usize,
-    /// Timeout setting for entire scan task
-    pub timeout: Duration,
-    /// Waiting time after packet sending task is completed
-    pub wait_time: Duration,
-    /// Packet sending interval(0 for unlimited)
-    pub send_rate: Duration,
+    /// Scan Setting
+    pub scan_setting: ScanSetting,
     /// Port Scan Result
     pub scan_result: PortScanResult,
     /// Sender for progress messaging
@@ -251,85 +139,29 @@ impl PortScanner {
             ));
         }
         let (tx, rx) = channel();
-        let port_scanner = PortScanner {
+        let scan_setting = ScanSetting {
             if_index: if_index,
             if_name: if_name,
             src_mac: src_mac.octets(),
             dst_mac: pnet_datalink::MacAddr::zero().octets(),
-            src_ip: src_ip,
+            src_ip: src_ip.clone(),
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
-            scan_type: ScanType::TcpSynScan,
-            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
-            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+            ip_map: HashMap::new(),
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
+            scan_type: ScanType::TcpSynScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+        };
+        let port_scanner = PortScanner {
+            scan_setting: scan_setting,
             scan_result: PortScanResult::new(),
             tx: Arc::new(Mutex::new(tx)),
             rx: Arc::new(Mutex::new(rx)),
         };
         Ok(port_scanner)
-    }
-    /// Set source IP address
-    pub fn set_src_ip(&mut self, src_ip: IpAddr) {
-        self.src_ip = src_ip;
-    }
-    /// Get source IP address
-    pub fn get_src_ip(&self) -> IpAddr {
-        self.src_ip.clone()
-    }
-    /// Add Target
-    pub fn add_target(&mut self, dst: HostInfo) {
-        self.targets.push(dst);
-    }
-    /// Set Targets
-    pub fn set_targets(&mut self, dst: Vec<HostInfo>) {
-        self.targets = dst;
-    }
-    /// Get targets
-    pub fn get_targets(&self) -> Vec<HostInfo> {
-        self.targets.clone()
-    }
-    /// Set ScanType
-    pub fn set_scan_type(&mut self, scan_type: ScanType) {
-        self.scan_type = scan_type;
-    }
-    /// Get ScanType
-    pub fn get_scan_type(&self) -> ScanType {
-        self.scan_type.clone()
-    }
-    /// Set timeout
-    pub fn set_timeout(&mut self, timeout: Duration) {
-        self.timeout = timeout;
-    }
-    /// Get timeout
-    pub fn get_timeout(&self) -> Duration {
-        self.timeout.clone()
-    }
-    /// Set wait time
-    pub fn set_wait_time(&mut self, wait_time: Duration) {
-        self.wait_time = wait_time;
-    }
-    /// Get wait time
-    pub fn get_wait_time(&self) -> Duration {
-        self.wait_time.clone()
-    }
-    /// Set send rate
-    pub fn set_send_rate(&mut self, send_rate: Duration) {
-        self.send_rate = send_rate;
-    }
-    /// Get send rate
-    pub fn get_send_rate(&self) -> Duration {
-        self.send_rate.clone()
-    }
-    /// Set hosts concurrency
-    pub fn set_hosts_concurrency(&mut self, concurrency: usize) {
-        self.hosts_concurrency = concurrency;
-    }
-    /// Set ports concurrency
-    pub fn set_ports_concurrency(&mut self, concurrency: usize) {
-        self.ports_concurrency = concurrency;
     }
     /// Get scan result
     pub fn get_scan_result(&self) -> PortScanResult {
@@ -342,29 +174,15 @@ impl PortScanner {
     /// Run Port Scan
     pub async fn run_scan(&mut self) {
         let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
-        for dst in self.targets.clone() {
+        for dst in self.scan_setting.targets.clone() {
             ip_map.insert(dst.ip_addr, dst.host_name);
         }
-        let scan_setting: ScanSetting = ScanSetting {
-            if_index: self.if_index.clone(),
-            src_mac: pnet_datalink::MacAddr::from(self.src_mac),
-            dst_mac: pnet_datalink::MacAddr::from(self.dst_mac),
-            src_ip: self.src_ip.clone(),
-            src_port: self.src_port.clone(),
-            targets: self.targets.clone(),
-            ip_map: ip_map,
-            timeout: self.timeout.clone(),
-            wait_time: self.wait_time.clone(),
-            send_rate: self.timeout.clone(),
-            scan_type: self.scan_type.clone(),
-            hosts_concurrency: self.hosts_concurrency,
-            ports_concurrency: self.ports_concurrency,
-        };
+        self.scan_setting.ip_map = ip_map.clone();
         let start_time = Instant::now();
-        let mut result: PortScanResult = scan_ports(scan_setting, &self.tx).await;
+        let mut result: PortScanResult = scan_ports(self.scan_setting.clone(), &self.tx).await;
         result.scan_time = Instant::now().duration_since(start_time);
         if result.scan_status != ScanStatus::Error {
-            if result.scan_time > self.timeout {
+            if result.scan_time > self.scan_setting.timeout {
                 result.scan_status = ScanStatus::Timeout;
             } else {
                 result.scan_status = ScanStatus::Done;

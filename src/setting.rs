@@ -1,4 +1,3 @@
-use pnet_datalink::MacAddr;
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::time::Duration;
@@ -32,22 +31,96 @@ pub enum ScanType {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct ScanSetting {
+pub struct ScanSetting {
     pub if_index: u32,
-    #[allow(dead_code)]
-    pub src_mac: MacAddr,
-    #[allow(dead_code)]
-    pub dst_mac: MacAddr,
+    pub if_name: String,
+    pub src_mac: [u8; 6],
+    pub dst_mac: [u8; 6],
     pub src_ip: IpAddr,
     pub src_port: u16,
     pub targets: Vec<HostInfo>,
     pub ip_map: HashMap<IpAddr, String>,
+    pub scan_type: ScanType,
+    pub hosts_concurrency: usize,
+    pub ports_concurrency: usize,
     pub timeout: Duration,
     pub wait_time: Duration,
     pub send_rate: Duration,
-    pub scan_type: ScanType,
-    #[allow(dead_code)]
-    pub hosts_concurrency: usize,
-    #[allow(dead_code)]
-    pub ports_concurrency: usize,
+}
+
+impl ScanSetting {
+    pub fn new() -> ScanSetting {
+        ScanSetting {
+            if_index: 0,
+            if_name: String::new(),
+            src_mac: [0; 6],
+            dst_mac: [0; 6],
+            src_ip: "".parse().unwrap(),
+            src_port: DEFAULT_SRC_PORT,
+            targets: vec![],
+            ip_map: HashMap::new(),
+            scan_type: ScanType::TcpSynScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+            timeout: Duration::from_secs(1),
+            wait_time: Duration::from_millis(100),
+            send_rate: Duration::from_millis(100),
+        }
+    }
+    /// Set source IP address
+    pub fn set_src_ip(&mut self, src_ip: IpAddr) {
+        self.src_ip = src_ip;
+    }
+    /// Get source IP address
+    pub fn get_src_ip(&self) -> IpAddr {
+        self.src_ip.clone()
+    }
+    /// Add Target
+    pub fn add_target(&mut self, dst: HostInfo) {
+        self.targets.push(dst);
+    }
+    /// Set Targets
+    pub fn set_targets(&mut self, dst: Vec<HostInfo>) {
+        self.targets = dst;
+    }
+    /// Get Targets
+    pub fn get_targets(&self) -> Vec<HostInfo> {
+        self.targets.clone()
+    }
+    /// Set ScanType
+    pub fn set_scan_type(&mut self, scan_type: ScanType) {
+        self.scan_type = scan_type;
+    }
+    /// Get ScanType
+    pub fn get_scan_type(&self) -> ScanType {
+        self.scan_type.clone()
+    }
+    /// Set timeout
+    pub fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = timeout;
+    }
+    /// Get timeout
+    pub fn get_timeout(&self) -> Duration {
+        self.timeout.clone()
+    }
+    /// Set wait time
+    pub fn set_wait_time(&mut self, wait_time: Duration) {
+        self.wait_time = wait_time;
+    }
+    /// Get wait time
+    pub fn get_wait_time(&self) -> Duration {
+        self.wait_time.clone()
+    }
+    /// Set send rate
+    pub fn set_send_rate(&mut self, send_rate: Duration) {
+        self.send_rate = send_rate;
+    }
+    /// Get send rate
+    pub fn get_send_rate(&self) -> Duration {
+        self.send_rate.clone()
+    }
+    /// Set hosts concurrency
+    pub fn set_hosts_concurrency(&mut self, concurrency: usize) {
+        self.hosts_concurrency = concurrency;
+    }
 }

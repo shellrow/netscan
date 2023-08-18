@@ -13,18 +13,18 @@ fn main() {
         Ok(scanner) => scanner,
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 0), 24).unwrap();
+    let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 11, 0), 24).unwrap();
     let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
     let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
     // Add scan target
     for host in hosts {
         let dst: HostInfo = HostInfo::new_with_ip_addr(IpAddr::V4(host));
-        host_scanner.add_target(dst);
+        host_scanner.scan_setting.add_target(dst);
     }
     // Set options
-    host_scanner.set_scan_type(ScanType::IcmpPingScan);
-    host_scanner.set_timeout(Duration::from_millis(10000));
-    host_scanner.set_wait_time(Duration::from_millis(500));
+    host_scanner.scan_setting.set_scan_type(ScanType::IcmpPingScan);
+    host_scanner.scan_setting.set_timeout(Duration::from_millis(10000));
+    host_scanner.scan_setting.set_wait_time(Duration::from_millis(500));
 
     let rx = host_scanner.get_progress_receiver();
     // Run scan

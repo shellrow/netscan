@@ -154,8 +154,9 @@ impl HostScanner {
         }
         let scan_setting: ScanSetting = ScanSetting {
             if_index: self.if_index.clone(),
-            src_mac: pnet_datalink::MacAddr::from(self.src_mac),
-            dst_mac: pnet_datalink::MacAddr::from(self.dst_mac),
+            if_name: self.if_name.clone(),
+            src_mac: self.src_mac,
+            dst_mac: self.dst_mac,
             src_ip: self.src_ip.clone(),
             src_port: self.src_port.clone(),
             targets: self.targets.clone(),
@@ -327,8 +328,9 @@ impl PortScanner {
         }
         let scan_setting: ScanSetting = ScanSetting {
             if_index: self.if_index.clone(),
-            src_mac: pnet_datalink::MacAddr::from(self.src_mac),
-            dst_mac: pnet_datalink::MacAddr::from(self.dst_mac),
+            if_name: self.if_name.clone(),
+            src_mac: self.src_mac,
+            dst_mac: self.dst_mac,
             src_ip: self.src_ip.clone(),
             src_port: self.src_port.clone(),
             targets: self.targets.clone(),
