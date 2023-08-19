@@ -1,6 +1,6 @@
 use async_io;
-use netscan::async_io::PortScanner;
 use netscan::host::{HostInfo, PortStatus};
+use netscan::scanner::PortScanner;
 use netscan::setting::ScanType;
 use std::net::IpAddr;
 use std::thread;

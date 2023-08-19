@@ -1,7 +1,7 @@
 use default_net;
 use dns_lookup;
-use netscan::blocking::PortScanner;
 use netscan::host::{HostInfo, PortStatus};
+use netscan::scanner::PortScanner;
 use netscan::service::{PortDatabase, ServiceDetector};
 use netscan::setting::ScanType;
 use std::net::IpAddr;
@@ -45,7 +45,7 @@ fn main() {
         .scan_setting
         .set_send_rate(Duration::from_millis(1));
 
-    let result = port_scanner.scan();
+    let result = port_scanner.sync_scan();
     for host_info in &result.results {
         println!("{} {}", host_info.ip_addr, host_info.host_name);
         for port_info in &host_info.ports {

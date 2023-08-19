@@ -1,5 +1,5 @@
-use netscan::blocking::PortScanner;
 use netscan::host::{HostInfo, PortStatus};
+use netscan::scanner::PortScanner;
 use netscan::setting::ScanType;
 use std::net::IpAddr;
 use std::thread;
@@ -42,7 +42,7 @@ fn main() {
 
     let rx = port_scanner.get_progress_receiver();
     // Run scan
-    let handle = thread::spawn(move || port_scanner.scan());
+    let handle = thread::spawn(move || port_scanner.sync_scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);

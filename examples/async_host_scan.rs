@@ -1,7 +1,7 @@
 use async_io;
 use ipnet::Ipv4Net;
-use netscan::async_io::HostScanner;
 use netscan::host::HostInfo;
+use netscan::scanner::HostScanner;
 use netscan::setting::ScanType;
 use std::net::{IpAddr, Ipv4Addr};
 use std::thread;

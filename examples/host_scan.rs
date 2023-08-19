@@ -1,6 +1,6 @@
 use ipnet::Ipv4Net;
-use netscan::blocking::HostScanner;
 use netscan::host::HostInfo;
+use netscan::scanner::HostScanner;
 use netscan::setting::ScanType;
 use std::net::{IpAddr, Ipv4Addr};
 use std::thread;
@@ -34,7 +34,7 @@ fn main() {
 
     let rx = host_scanner.get_progress_receiver();
     // Run scan
-    let handle = thread::spawn(move || host_scanner.scan());
+    let handle = thread::spawn(move || host_scanner.sync_scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);

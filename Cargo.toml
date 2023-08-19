@@ -18,9 +18,9 @@ dns-lookup = "2.0"
 pnet_packet = "0.34"
 pnet_datalink = "0.34"
 socket2 = { version = "0.5", features = ["all"] }
-async-io = { version = "1.13", optional = true }
-futures = {version = "0.3", features = ["executor", "thread-pool"],  optional = true}
-futures-lite = {version = "1.13", optional = true}
+async-io = "1.13"
+futures = {version = "0.3", features = ["executor", "thread-pool"]}
+futures-lite = "1.13"
 netscan-os = { path = "netscan-os", version = "0.15.4", optional = true }
 netscan-service = { path = "netscan-service", version = "0.15.4", optional = true }
 
@@ -29,11 +29,9 @@ ipnet = "2.7"
 dns-lookup = "2.0"
 
 [features]
-async = ["async-io", "futures", "futures-lite"]
 service = ["netscan-service"]
 os = ["netscan-os"]
-full = ["async", "service", "os"]
-default = ["async"]
+full = ["service", "os"]
 
 [lib]
 name = "netscan"
@@ -49,12 +47,10 @@ path = "examples/host_scan.rs"
 [[example]]
 name = "async_port_scan"
 path = "examples/async_port_scan.rs"
-required-features = ["async"]
 
 [[example]]
 name = "async_host_scan"
 path = "examples/async_host_scan.rs"
-required-features = ["async"]
 
 [[example]]
 name = "service_detection"
