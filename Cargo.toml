@@ -21,7 +21,7 @@ socket2 = { version = "0.5", features = ["all"] }
 async-io = "1.13"
 futures = {version = "0.3", features = ["executor", "thread-pool"]}
 futures-lite = "1.13"
-np-listener = "0.4"
+np-listener = "0.5"
 netscan-os = { path = "netscan-os", version = "0.15.4", optional = true }
 netscan-service = { path = "netscan-service", version = "0.15.4", optional = true }
 

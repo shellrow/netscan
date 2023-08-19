@@ -10,6 +10,7 @@ use futures::stream::{self, StreamExt};
 use futures::task::SpawnExt;
 use futures_lite::{future::FutureExt, io};
 use np_listener::packet::TcpIpFingerprint;
+use np_listener::packet::tcp::TcpFlagKind;
 use pnet_packet::Packet;
 use socket2::{Protocol, SockAddr, Type};
 use std::collections::HashSet;
@@ -369,14 +370,23 @@ pub(crate) async fn scan_hosts(
                     continue;
                 }
                 if let Some(tcp_fingerprint) = &f.tcp_fingerprint {
-                    /* if tcp_fingerprint.flags.contains(&TcpFlagKind::Syn) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
-                        
-                    } */
-                    let port_info: PortInfo = PortInfo {
-                        port: tcp_fingerprint.destination_port,
-                        status: PortStatus::Open,
-                    };
-                    ports.push(port_info);
+                    if tcp_fingerprint.flags.contains(&TcpFlagKind::Syn) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                        let port_info: PortInfo = PortInfo {
+                            port: tcp_fingerprint.source_port,
+                            status: PortStatus::Open,
+                        };
+                        ports.push(port_info);
+                    }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) || tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                        let port_info: PortInfo = PortInfo {
+                            port: tcp_fingerprint.source_port,
+                            status: PortStatus::Closed,
+                        };
+                        ports.push(port_info);
+                    }else {
+                        continue;
+                    }
+                }else{
+                    continue;
                 }
             }
             ScanType::UdpPingScan => {
