@@ -29,9 +29,15 @@ fn main() {
     let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
     port_scanner.scan_setting.add_target(dst);
     // Set options
-    port_scanner.scan_setting.set_scan_type(ScanType::TcpSynScan);
-    port_scanner.scan_setting.set_timeout(Duration::from_millis(10000));
-    port_scanner.scan_setting.set_wait_time(Duration::from_millis(500));
+    port_scanner
+        .scan_setting
+        .set_scan_type(ScanType::TcpSynScan);
+    port_scanner
+        .scan_setting
+        .set_timeout(Duration::from_millis(10000));
+    port_scanner
+        .scan_setting
+        .set_wait_time(Duration::from_millis(500));
     //port_scanner.set_send_rate(Duration::from_millis(1));
 
     let rx = port_scanner.get_progress_receiver();

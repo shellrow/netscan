@@ -22,9 +22,15 @@ fn main() {
         host_scanner.scan_setting.add_target(dst);
     }
     // Set options
-    host_scanner.scan_setting.set_scan_type(ScanType::IcmpPingScan);
-    host_scanner.scan_setting.set_timeout(Duration::from_millis(10000));
-    host_scanner.scan_setting.set_wait_time(Duration::from_millis(500));
+    host_scanner
+        .scan_setting
+        .set_scan_type(ScanType::IcmpPingScan);
+    host_scanner
+        .scan_setting
+        .set_timeout(Duration::from_millis(10000));
+    host_scanner
+        .scan_setting
+        .set_wait_time(Duration::from_millis(500));
 
     let rx = host_scanner.get_progress_receiver();
     // Run scan

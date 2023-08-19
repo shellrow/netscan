@@ -1,9 +1,9 @@
 use crate::async_io::{scan_hosts, scan_ports};
+use crate::interface;
 use crate::result::{HostScanResult, PortScanResult, ScanStatus};
 use crate::setting::{
     ScanSetting, ScanType, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY, DEFAULT_SRC_PORT,
 };
-use crate::interface;
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::mpsc::{channel, Receiver, Sender};
