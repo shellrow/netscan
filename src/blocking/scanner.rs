@@ -52,7 +52,7 @@ impl HostScanner {
             if_name: if_name,
             src_mac: src_mac.octets(),
             dst_mac: interface::get_default_gateway_macaddr(),
-            src_ip: src_ip.clone(),
+            src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
             ip_map: HashMap::new(),
@@ -85,7 +85,7 @@ impl HostScanner {
         for dst in self.scan_setting.targets.clone() {
             ip_map.insert(dst.ip_addr, dst.host_name);
         }
-        self.scan_setting.ip_map = ip_map.clone();
+        self.scan_setting.ip_map = ip_map;
         let start_time = Instant::now();
         let mut result: HostScanResult = scan_hosts(self.scan_setting.clone(), &self.tx);
         result.scan_time = Instant::now().duration_since(start_time);
@@ -144,8 +144,8 @@ impl PortScanner {
             if_index: if_index,
             if_name: if_name,
             src_mac: src_mac.octets(),
-            dst_mac: pnet_datalink::MacAddr::zero().octets(),
-            src_ip: src_ip.clone(),
+            dst_mac: interface::get_default_gateway_macaddr(),
+            src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
             ip_map: HashMap::new(),
@@ -178,7 +178,7 @@ impl PortScanner {
         for dst in self.scan_setting.targets.clone() {
             ip_map.insert(dst.ip_addr, dst.host_name);
         }
-        self.scan_setting.ip_map = ip_map.clone();
+        self.scan_setting.ip_map = ip_map;
         let start_time = Instant::now();
         let mut result: PortScanResult = scan_ports(self.scan_setting.clone(), &self.tx);
         result.scan_time = Instant::now().duration_since(start_time);

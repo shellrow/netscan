@@ -27,8 +27,8 @@ fn build_tcp_syn_packet(
     .unwrap();
     packet::ethernet::build_ethernet_packet(
         &mut eth_header,
-        scan_setting.src_mac,
-        scan_setting.dst_mac,
+        pnet_datalink::MacAddr::from(scan_setting.src_mac),
+        pnet_datalink::MacAddr::from(scan_setting.dst_mac),
         EtherTypes::Ipv4,
     );
     // Setup IP header
@@ -78,8 +78,8 @@ fn build_udp_packet(
     .unwrap();
     packet::ethernet::build_ethernet_packet(
         &mut eth_header,
-        scan_setting.src_mac,
-        scan_setting.dst_mac,
+        pnet_datalink::MacAddr::from(scan_setting.src_mac),
+        pnet_datalink::MacAddr::from(scan_setting.dst_mac),
         EtherTypes::Ipv4,
     );
     // Setup IP header
@@ -124,8 +124,8 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
     .unwrap();
     packet::ethernet::build_ethernet_packet(
         &mut eth_header,
-        scan_setting.src_mac,
-        scan_setting.dst_mac,
+        pnet_datalink::MacAddr::from(scan_setting.src_mac),
+        pnet_datalink::MacAddr::from(scan_setting.dst_mac),
         EtherTypes::Ipv4,
     );
     // Setup IP header
