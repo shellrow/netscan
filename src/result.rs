@@ -1,5 +1,7 @@
 use std::net::IpAddr;
 use std::time::Duration;
+use np_listener::packet::TcpIpFingerprint;
+
 use crate::host::{HostInfo, PortStatus};
 
 /// Status of scan task
@@ -20,6 +22,8 @@ pub struct ScanResult {
     pub scan_time: Duration,
     /// Status of the scan task
     pub scan_status: ScanStatus,
+    /// Fingerprints of the scanned hosts
+    pub fingerprints: Vec<TcpIpFingerprint>,
 }
 
 impl ScanResult {
@@ -28,6 +32,7 @@ impl ScanResult {
             hosts: vec![],
             scan_time: Duration::from_millis(0),
             scan_status: ScanStatus::Ready,
+            fingerprints: vec![],
         }
     }
     /// Returns IP addresses from the scan result

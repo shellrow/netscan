@@ -8,6 +8,8 @@ pub mod result;
 pub mod scanner;
 pub mod setting;
 
+pub use np_listener;
+
 #[cfg(feature = "service")]
 extern crate netscan_service;
 

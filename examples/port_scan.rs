@@ -59,5 +59,9 @@ fn main() {
             }
         }
     }
+    println!("Fingerprints:");
+    for fingerprint in result.fingerprints {
+        println!("{:?}", fingerprint);
+    }
     println!("Scan Time: {:?} (including wait-time)", result.scan_time);
 }

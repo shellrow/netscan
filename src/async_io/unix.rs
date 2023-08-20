@@ -10,7 +10,7 @@ use futures::task::SpawnExt;
 use futures_lite::{future::FutureExt, io};
 use np_listener::packet::TcpIpFingerprint;
 use np_listener::packet::tcp::TcpFlagKind;
-use pnet_packet::Packet;
+use pnet::packet::Packet;
 use socket2::{Protocol, SockAddr, Type};
 use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr, TcpStream};
@@ -26,7 +26,7 @@ use np_listener::packet::ip::IpNextLevelProtocol;
 async fn build_icmpv4_echo_packet() -> Vec<u8> {
     let mut buf = vec![0; 16];
     let mut icmp_packet =
-        pnet_packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
+        pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
     packet::icmp::build_icmp_packet(&mut icmp_packet);
     icmp_packet.packet().to_vec()
 }
@@ -38,7 +38,7 @@ async fn build_tcp_syn_packet(
     dst_port: u16,
 ) -> Vec<u8> {
     let mut vec: Vec<u8> = vec![0; 66];
-    let mut tcp_packet = pnet_packet::tcp::MutableTcpPacket::new(
+    let mut tcp_packet = pnet::packet::tcp::MutableTcpPacket::new(
         &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
     )
     .unwrap();
@@ -48,7 +48,7 @@ async fn build_tcp_syn_packet(
 
 async fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16) -> Vec<u8> {
     let mut vec: Vec<u8> = vec![0; 66];
-    let mut udp_packet = pnet_packet::udp::MutableUdpPacket::new(
+    let mut udp_packet = pnet::packet::udp::MutableUdpPacket::new(
         &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
     )
     .unwrap();
@@ -239,6 +239,7 @@ async fn run_connect_scan(
         hosts: results,
         scan_time: Duration::from_millis(0),
         scan_status: ScanStatus::Ready,
+        fingerprints: vec![],
     }
 }
 
@@ -403,6 +404,7 @@ pub(crate) async fn scan_hosts(
         };
         if !result.hosts.contains(&host_info) {
             result.hosts.push(host_info);
+            result.fingerprints.push(f.clone());
         }
     }
     return result;
@@ -535,6 +537,7 @@ pub(crate) async fn scan_ports(
             };
             result.hosts.push(host_info);
         }
+        result.fingerprints.push(f.clone());
         socket_set.insert(f.source);
     }
     return result;
