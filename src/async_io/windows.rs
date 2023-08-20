@@ -226,21 +226,15 @@ async fn try_connect_ports(
     }
 }
 
-async fn run_connect_scan(
-    scan_setting: ScanSetting,
+async fn send_connect_requests(
+    scan_setting: &ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
-) -> ScanResult {
-    let results: Vec<HostInfo> = stream::iter(scan_setting.targets.clone().into_iter())
+) {
+    let _results: Vec<HostInfo> = stream::iter(scan_setting.targets.clone().into_iter())
         .map(|dst| try_connect_ports(scan_setting.ports_concurrency, dst, ptx))
         .buffer_unordered(scan_setting.hosts_concurrency)
         .collect()
         .await;
-    ScanResult {
-        hosts: results,
-        scan_time: Duration::from_millis(0),
-        scan_status: ScanStatus::Ready,
-        fingerprints: vec![],
-    }
 }
 
 async fn send_ping_packet(
@@ -414,11 +408,11 @@ pub(crate) async fn scan_ports(
     scan_setting: ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
 ) -> ScanResult {
+    // TODO
+    // Winsock2 does not allow TCP data to be sent over Raw Socket
+    // ...so another Async capable implementation is needed
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
-            // TODO
-            // Winsock2 does not allow TCP data to be sent over Raw Socket
-            // ...so another Async capable implementation is needed
             return ScanResult {
                 hosts: vec![],
                 scan_time: Duration::from_millis(0),
@@ -426,18 +420,7 @@ pub(crate) async fn scan_ports(
                 fingerprints: vec![],
             };
         }
-        ScanType::TcpConnectScan => {
-            let scan_result = run_connect_scan(scan_setting, ptx).await;
-            return scan_result;
-        }
-        _ => {
-            return ScanResult {
-                hosts: vec![],
-                scan_time: Duration::from_millis(0),
-                scan_status: ScanStatus::Error,
-                fingerprints: vec![],
-            };
-        }
+        _ => {}
     }
     /* let socket = match scan_setting.scan_type {
         ScanType::TcpSynScan => {
@@ -447,7 +430,7 @@ pub(crate) async fn scan_ports(
             AsyncSocket::new(scan_setting.src_ip, Type::STREAM, Protocol::TCP).unwrap()
         }
         _ => return ScanResult::new(),
-    };
+    }; */
     let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
         interface_index: scan_setting.if_index,
         interface_name: scan_setting.if_name.clone(),
@@ -492,7 +475,8 @@ pub(crate) async fn scan_ports(
     // Wait for listener to start (need fix for better way)
     thread::sleep(Duration::from_millis(1));
 
-    send_tcp_packets(&socket, &scan_setting, ptx).await;
+    send_connect_requests(&scan_setting, ptx).await;
+
     thread::sleep(scan_setting.wait_time);
     *stop_handle.lock().unwrap() = true;
 
@@ -555,7 +539,8 @@ pub(crate) async fn scan_ports(
             };
             result.hosts.push(host_info);
         }
+        result.fingerprints.push(f.clone());
         socket_set.insert(f.source);
     }
-    return result; */
+    return result;
 }

@@ -225,10 +225,10 @@ fn send_packets(
     }
 }
 
-fn run_connect_scan(
-    scan_setting: ScanSetting
-) -> ScanResult {
-    let port_scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
+fn send_connect_requests(
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>
+) {
     let start_time = Instant::now();
     let conn_timeout = Duration::from_millis(200);
     for dst in scan_setting.targets.clone() {
@@ -238,41 +238,14 @@ fn run_connect_scan(
             let socket_addr: SocketAddr = SocketAddr::new(ip_addr, port);
             let sock_addr = SockAddr::from(socket_addr);
             match socket.connect_timeout(&sock_addr, conn_timeout) {
-                Ok(_) => {
-                    let port_info = PortInfo {
-                        port: socket_addr.port(),
-                        status: PortStatus::Open,
-                    };
-                    // Avoid deadlock.
-                    let mut exists: bool = false;
-                    for host in port_scan_result
-                        .lock()
-                        .unwrap()
-                        .hosts
-                        .iter_mut()
-                    {
-                        if host.ip_addr == socket_addr.ip() {
-                            host.ports.push(port_info);
-                            exists = true;
-                        }
-                    }
-                    if !exists {
-                        let mut host_info = HostInfo::new();
-                        host_info.ip_addr = socket_addr.ip();
-                        host_info.host_name = scan_setting
-                            .ip_map
-                            .get(&socket_addr.ip())
-                            .unwrap_or(&String::new())
-                            .to_string();
-                        host_info.ttl = socket.ttl().unwrap_or(0) as u8;
-                        host_info.ports.push(port_info);
-                        port_scan_result
-                            .lock()
-                            .unwrap()
-                            .hosts
-                            .push(host_info);
-                    }
-                }
+                Ok(_) => {},
+                Err(_) => {}
+            }
+            match ptx.lock() {
+                Ok(lr) => match lr.send(socket_addr) {
+                    Ok(_) => {}
+                    Err(_) => {}
+                },
                 Err(_) => {}
             }
             // Cancel scan if timeout
@@ -281,9 +254,6 @@ fn run_connect_scan(
             }
         });
     }
-    let mut result: ScanResult = port_scan_result.lock().unwrap().clone();
-    result.scan_time = Instant::now().duration_since(start_time);
-    return result;
 }
 
 pub(crate) fn scan_hosts(
@@ -432,12 +402,6 @@ pub(crate) fn scan_ports(
     scan_setting: ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
 ) -> ScanResult {
-    match scan_setting.scan_type {
-        ScanType::TcpConnectScan => {
-            return run_connect_scan(scan_setting);
-        }
-        _ => {}
-    }
     let interfaces = pnet::datalink::interfaces();
     let interface = match interfaces
         .into_iter()
@@ -506,7 +470,14 @@ pub(crate) fn scan_ports(
     // Wait for listener to start (need fix for better way)
     thread::sleep(Duration::from_millis(1));
 
-    send_packets(&mut tx, &scan_setting, ptx);
+    match scan_setting.scan_type {
+        ScanType::TcpConnectScan => {
+            send_connect_requests(&scan_setting, ptx);
+        }
+        _ => {
+            send_packets(&mut tx, &scan_setting, ptx);
+        }
+    }
     thread::sleep(scan_setting.wait_time);
     *stop_handle.lock().unwrap() = true;
 
