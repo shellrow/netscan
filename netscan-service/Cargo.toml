@@ -1,6 +1,6 @@
 [package]
 name = "netscan-service"
-version = "0.15.4"
+version = "0.16.0"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2021"
 description = "Service detection library for netscan"

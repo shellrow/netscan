@@ -19,7 +19,7 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.15"
+netscan = "0.16"
 ```
 
 ## Example
@@ -27,8 +27,6 @@ See [Examples][examples-url]
 
 ## Feature flags
 The following feature flags can be used to enable/disable specific features.
-#### `--feature async`
-Enable async scanning.(Default feature)  
 #### `--feature service`
 Enable service detection. (Experimental)      
 #### `--feature os`
