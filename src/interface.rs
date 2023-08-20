@@ -1,9 +1,9 @@
-use pnet_datalink::MacAddr;
+use pnet::datalink::MacAddr;
 use std::net::IpAddr;
 
 #[allow(dead_code)]
 pub fn get_interface_index_by_ip(ip_addr: IpAddr) -> Option<u32> {
-    for iface in pnet_datalink::interfaces() {
+    for iface in pnet::datalink::interfaces() {
         for ip in iface.ips {
             if ip.ip() == ip_addr {
                 return Some(iface.index);

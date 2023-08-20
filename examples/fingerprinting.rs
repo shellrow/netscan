@@ -39,11 +39,12 @@ fn main() {
         println!("{:?}", result.icmp_address_mask_result);
         println!("{:?}", result.icmp_information_result);
         println!("{:?}", result.icmp_unreachable_ip_result);
-        println!("{:?}", result.icmp_unreachable_data_result);
         println!("{:?}", result.tcp_syn_ack_result);
         println!("{:?}", result.tcp_rst_ack_result);
         println!("{:?}", result.tcp_ecn_result);
-        println!("{:?}", result.tcp_header_result);
+        for f in result.fingerprints {
+            println!("{:?}", f);
+        }
         println!();
     }
 }

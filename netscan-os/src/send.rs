@@ -1,12 +1,10 @@
 use super::packet::{ethernet, icmp, ipv4, tcp, udp};
 use super::packet::{ICMP_PACKET_SIZE, TCP_PACKET_SIZE, UDP_PACKET_SIZE};
 use super::setting::{ProbeSetting, ProbeType};
-use pnet_packet::ethernet::EtherTypes;
-use pnet_packet::icmp::{IcmpType, IcmpTypes};
-use pnet_packet::ip::IpNextHeaderProtocols;
+use pnet::packet::ethernet::EtherTypes;
+use pnet::packet::icmp::{IcmpType, IcmpTypes};
+use pnet::packet::ip::IpNextHeaderProtocols;
 use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
-use std::thread;
 
 fn build_tcp_probe_packet(
     probe_setting: &ProbeSetting,
@@ -15,7 +13,7 @@ fn build_tcp_probe_packet(
     option: Option<tcp::TcpProbeOption>,
 ) {
     // Setup Ethernet header
-    let mut eth_header = pnet_packet::ethernet::MutableEthernetPacket::new(
+    let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(
         &mut tmp_packet[..ethernet::ETHERNET_HEADER_LEN],
     )
     .unwrap();
@@ -26,7 +24,7 @@ fn build_tcp_probe_packet(
         EtherTypes::Ipv4,
     );
     // Setup IP header
-    let mut ip_header = pnet_packet::ipv4::MutableIpv4Packet::new(
+    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
         &mut tmp_packet[ethernet::ETHERNET_HEADER_LEN
             ..(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)],
     )
@@ -41,7 +39,7 @@ fn build_tcp_probe_packet(
         IpAddr::V6(_ip) => {}
     }
     // Setup TCP header
-    let mut tcp_header = pnet_packet::tcp::MutableTcpPacket::new(
+    let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(
         &mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..],
     )
     .unwrap();
@@ -133,7 +131,7 @@ fn build_icmp_probe_packet(
     icmp_type: IcmpType,
 ) {
     // Setup Ethernet header
-    let mut eth_header = pnet_packet::ethernet::MutableEthernetPacket::new(
+    let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(
         &mut tmp_packet[..ethernet::ETHERNET_HEADER_LEN],
     )
     .unwrap();
@@ -144,7 +142,7 @@ fn build_icmp_probe_packet(
         EtherTypes::Ipv4,
     );
     // Setup IP header
-    let mut ip_header = pnet_packet::ipv4::MutableIpv4Packet::new(
+    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
         &mut tmp_packet[ethernet::ETHERNET_HEADER_LEN
             ..(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)],
     )
@@ -166,14 +164,14 @@ fn build_icmp_probe_packet(
     // Setup ICMP header
     match icmp_type {
         IcmpTypes::EchoRequest => {
-            let mut icmp_packet = pnet_packet::icmp::echo_request::MutableEchoRequestPacket::new(
+            let mut icmp_packet = pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(
                 &mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..],
             )
             .unwrap();
             icmp::build_icmp_echo_packet(&mut icmp_packet, IcmpTypes::EchoRequest);
         }
         _ => {
-            let mut icmp_packet = pnet_packet::icmp::MutableIcmpPacket::new(
+            let mut icmp_packet = pnet::packet::icmp::MutableIcmpPacket::new(
                 &mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..],
             )
             .unwrap();
@@ -184,7 +182,7 @@ fn build_icmp_probe_packet(
 
 fn build_udp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8]) {
     // Setup Ethernet header
-    let mut eth_header = pnet_packet::ethernet::MutableEthernetPacket::new(
+    let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(
         &mut tmp_packet[..ethernet::ETHERNET_HEADER_LEN],
     )
     .unwrap();
@@ -195,7 +193,7 @@ fn build_udp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8]) {
         EtherTypes::Ipv4,
     );
     // Setup IP header
-    let mut ip_header = pnet_packet::ipv4::MutableIpv4Packet::new(
+    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
         &mut tmp_packet[ethernet::ETHERNET_HEADER_LEN
             ..(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)],
     )
@@ -210,7 +208,7 @@ fn build_udp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8]) {
         IpAddr::V6(_ip) => {}
     }
     // Setup UDP header
-    let mut udp_header = pnet_packet::udp::MutableUdpPacket::new(
+    let mut udp_header = pnet::packet::udp::MutableUdpPacket::new(
         &mut tmp_packet[(ethernet::ETHERNET_HEADER_LEN + ipv4::IPV4_HEADER_LEN)..],
     )
     .unwrap();
@@ -224,9 +222,8 @@ fn build_udp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8]) {
 }
 
 pub(crate) fn send_packets(
-    tx: &mut Box<dyn pnet_datalink::DataLinkSender>,
-    probe_setting: &ProbeSetting,
-    stop: &Arc<Mutex<bool>>,
+    tx: &mut Box<dyn pnet::datalink::DataLinkSender>,
+    probe_setting: &ProbeSetting
 ) {
     for probe_type in probe_setting.probe_types.clone() {
         match probe_type {
@@ -279,6 +276,4 @@ pub(crate) fn send_packets(
             }
         }
     }
-    thread::sleep(probe_setting.wait_time);
-    *stop.lock().unwrap() = true;
 }

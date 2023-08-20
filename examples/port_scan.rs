@@ -1,5 +1,5 @@
-use netscan::blocking::PortScanner;
 use netscan::host::{HostInfo, PortStatus};
+use netscan::scanner::PortScanner;
 use netscan::setting::ScanType;
 use std::net::IpAddr;
 use std::thread;
@@ -27,16 +27,22 @@ fn main() {
     };
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![22, 80, 443, 5000, 8080]);
     let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
-    port_scanner.add_target(dst);
+    port_scanner.scan_setting.add_target(dst);
     // Set options
-    port_scanner.set_scan_type(ScanType::TcpSynScan);
-    port_scanner.set_timeout(Duration::from_millis(10000));
-    port_scanner.set_wait_time(Duration::from_millis(500));
+    port_scanner
+        .scan_setting
+        .set_scan_type(ScanType::TcpSynScan);
+    port_scanner
+        .scan_setting
+        .set_timeout(Duration::from_millis(10000));
+    port_scanner
+        .scan_setting
+        .set_wait_time(Duration::from_millis(500));
     //port_scanner.set_send_rate(Duration::from_millis(1));
 
     let rx = port_scanner.get_progress_receiver();
     // Run scan
-    let handle = thread::spawn(move || port_scanner.scan());
+    let handle = thread::spawn(move || port_scanner.sync_scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);
@@ -45,13 +51,17 @@ fn main() {
     // Print results
     println!("Status: {:?}", result.scan_status);
     println!("Results:");
-    for host_info in result.results {
+    for host_info in result.hosts {
         println!("{} {}", host_info.ip_addr, host_info.host_name);
         for port_info in host_info.ports {
             if port_info.status == PortStatus::Open {
                 println!("{}: {:?}", port_info.port, port_info.status);
             }
         }
+    }
+    println!("Fingerprints:");
+    for fingerprint in result.fingerprints {
+        println!("{:?}", fingerprint);
     }
     println!("Scan Time: {:?} (including wait-time)", result.scan_time);
 }

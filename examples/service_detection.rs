@@ -1,7 +1,7 @@
 use default_net;
 use dns_lookup;
-use netscan::blocking::PortScanner;
 use netscan::host::{HostInfo, PortStatus};
+use netscan::scanner::PortScanner;
 use netscan::service::{PortDatabase, ServiceDetector};
 use netscan::setting::ScanType;
 use std::net::IpAddr;
@@ -31,14 +31,22 @@ fn main() {
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_host_name("scanme.nmap.org".to_string()).with_ports(vec![22, 80, 443, 5000, 8080]);
     //let dst: HostInfo = HostInfo::new_with_host_name("scanme.nmap.org".to_string()).with_ports(vec![22, 80, 443, 5000, 8080]);
-    port_scanner.add_target(dst);
-    port_scanner.set_scan_type(ScanType::TcpSynScan);
-    port_scanner.set_timeout(Duration::from_millis(10000));
-    port_scanner.set_wait_time(Duration::from_millis(500));
-    port_scanner.set_send_rate(Duration::from_millis(1));
+    port_scanner.scan_setting.add_target(dst);
+    port_scanner
+        .scan_setting
+        .set_scan_type(ScanType::TcpSynScan);
+    port_scanner
+        .scan_setting
+        .set_timeout(Duration::from_millis(10000));
+    port_scanner
+        .scan_setting
+        .set_wait_time(Duration::from_millis(500));
+    port_scanner
+        .scan_setting
+        .set_send_rate(Duration::from_millis(1));
 
-    let result = port_scanner.scan();
-    for host_info in &result.results {
+    let result = port_scanner.sync_scan();
+    for host_info in &result.hosts {
         println!("{} {}", host_info.ip_addr, host_info.host_name);
         for port_info in &host_info.ports {
             if port_info.status == PortStatus::Open {

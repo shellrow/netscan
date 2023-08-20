@@ -10,7 +10,7 @@ pub enum PortStatus {
 }
 
 /// Port Information
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PortInfo {
     /// Port number
     pub port: u16,
@@ -19,7 +19,7 @@ pub struct PortInfo {
 }
 
 /// Host Information
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HostInfo {
     /// IP address of the host
     pub ip_addr: IpAddr,

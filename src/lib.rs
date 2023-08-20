@@ -1,13 +1,14 @@
 mod interface;
 mod packet;
 
+pub mod async_io;
 pub mod blocking;
 pub mod host;
 pub mod result;
+pub mod scanner;
 pub mod setting;
 
-#[cfg(feature = "async")]
-pub mod async_io;
+pub use np_listener;
 
 #[cfg(feature = "service")]
 extern crate netscan_service;

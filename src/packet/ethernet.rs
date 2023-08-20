@@ -1,5 +1,5 @@
-use pnet_datalink::MacAddr;
-use pnet_packet::ethernet::{EtherType, EtherTypes, MutableEthernetPacket};
+use pnet::datalink::MacAddr;
+use pnet::packet::ethernet::{EtherType, EtherTypes, MutableEthernetPacket};
 
 pub const ETHERNET_HEADER_LEN: usize = 14;
 

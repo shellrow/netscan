@@ -1,6 +1,6 @@
 use ipnet::Ipv4Net;
-use netscan::blocking::HostScanner;
 use netscan::host::HostInfo;
+use netscan::scanner::HostScanner;
 use netscan::setting::ScanType;
 use std::net::{IpAddr, Ipv4Addr};
 use std::thread;
@@ -18,17 +18,23 @@ fn main() {
     // Add scan target
     for host in hosts {
         let dst: HostInfo = HostInfo::new_with_ip_addr(IpAddr::V4(host));
-        host_scanner.add_target(dst);
+        host_scanner.scan_setting.add_target(dst);
     }
     // Set options
-    host_scanner.set_scan_type(ScanType::IcmpPingScan);
-    host_scanner.set_timeout(Duration::from_millis(10000));
-    host_scanner.set_wait_time(Duration::from_millis(500));
+    host_scanner
+        .scan_setting
+        .set_scan_type(ScanType::IcmpPingScan);
+    host_scanner
+        .scan_setting
+        .set_timeout(Duration::from_millis(10000));
+    host_scanner
+        .scan_setting
+        .set_wait_time(Duration::from_millis(500));
     //host_scanner.set_send_rate(Duration::from_millis(1));
 
     let rx = host_scanner.get_progress_receiver();
     // Run scan
-    let handle = thread::spawn(move || host_scanner.scan());
+    let handle = thread::spawn(move || host_scanner.sync_scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);
@@ -39,6 +45,10 @@ fn main() {
     println!("UP Hosts:");
     for host in result.hosts {
         println!("{:?}", host);
+    }
+    println!("Fingerprints:");
+    for fingerprint in result.fingerprints {
+        println!("{:?}", fingerprint);
     }
     println!("Scan Time: {:?} (including wait-time)", result.scan_time);
 }

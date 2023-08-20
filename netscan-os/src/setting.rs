@@ -1,4 +1,4 @@
-use pnet_datalink::MacAddr;
+use pnet::datalink::MacAddr;
 use std::net::IpAddr;
 use std::time::Duration;
 
