@@ -1,7 +1,7 @@
 use np_listener::packet::icmp::{IcmpType, Icmpv6Type};
 use np_listener::packet::tcp::TcpFlagKind;
-use pnet_datalink::{self, MacAddr};
-use pnet_packet::{MutablePacket, Packet};
+use pnet::datalink::MacAddr;
+use pnet::packet::{MutablePacket, Packet};
 use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, Mutex};
@@ -52,7 +52,7 @@ impl Fingerprinter {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
         let mut src_mac: MacAddr = MacAddr::zero();
-        for iface in pnet_datalink::interfaces() {
+        for iface in pnet::datalink::interfaces() {
             for ip in iface.ips {
                 if ip.ip() == src_ip {
                     if_index = iface.index;
@@ -101,7 +101,7 @@ impl Fingerprinter {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
         let mut src_mac: MacAddr = MacAddr::zero();
-        for iface in pnet_datalink::interfaces() {
+        for iface in pnet::datalink::interfaces() {
             for ip in iface.ips {
                 if ip.ip() == src_ip {
                     if_index = iface.index;
@@ -116,16 +116,16 @@ impl Fingerprinter {
                 "Failed to create Fingerprinter. Network Interface not found.",
             ));
         }
-        let interfaces = pnet_datalink::interfaces();
+        let interfaces = pnet::datalink::interfaces();
         let interface = interfaces
             .into_iter()
-            .filter(|interface: &pnet_datalink::NetworkInterface| interface.index == if_index)
+            .filter(|interface: &pnet::datalink::NetworkInterface| interface.index == if_index)
             .next()
             .expect("Failed to get Interface");
         let dst_mac: MacAddr = match gateway_ip {
             IpAddr::V4(ip) => {
                 let dst_mac: MacAddr = get_mac_through_arp(&interface, ip);
-                if dst_mac == pnet_datalink::MacAddr::zero() {
+                if dst_mac == pnet::datalink::MacAddr::zero() {
                     return Err(String::from(
                         "Failed to create Fingerprinter. Invalid Gateway IP address.",
                     ));
@@ -205,16 +205,16 @@ impl Fingerprinter {
     }
     /// Run probe with the current settings
     pub fn run_probe(&mut self) {
-        let interfaces = pnet_datalink::interfaces();
+        let interfaces = pnet::datalink::interfaces();
         let interface = interfaces
             .into_iter()
-            .filter(|interface: &pnet_datalink::NetworkInterface| interface.index == self.if_index)
+            .filter(|interface: &pnet::datalink::NetworkInterface| interface.index == self.if_index)
             .next()
             .expect("Failed to get Interface");
         for dst in self.probe_targets.clone() {
             let mut probe_setting: ProbeSetting = ProbeSetting {
-                src_mac: self.src_mac.parse::<pnet_datalink::MacAddr>().unwrap(),
-                dst_mac: self.dst_mac.parse::<pnet_datalink::MacAddr>().unwrap(),
+                src_mac: self.src_mac.parse::<pnet::datalink::MacAddr>().unwrap(),
+                dst_mac: self.dst_mac.parse::<pnet::datalink::MacAddr>().unwrap(),
                 src_ip: self.src_ip,
                 src_port: self.src_port,
                 probe_target: dst.clone(),
@@ -234,19 +234,19 @@ impl Fingerprinter {
     }
 }
 
-fn probe(interface: &pnet_datalink::NetworkInterface, probe_setting: &ProbeSetting) -> ProbeResult {
-    let config = pnet_datalink::Config {
+fn probe(interface: &pnet::datalink::NetworkInterface, probe_setting: &ProbeSetting) -> ProbeResult {
+    let config = pnet::datalink::Config {
         write_buffer_size: 4096,
         read_buffer_size: 4096,
         read_timeout: None,
         write_timeout: None,
-        channel_type: pnet_datalink::ChannelType::Layer2,
+        channel_type: pnet::datalink::ChannelType::Layer2,
         bpf_fd_attempts: 1000,
         linux_fanout: None,
         promiscuous: false,
     };
-    let (mut tx, mut _rx) = match pnet_datalink::channel(&interface, config) {
-        Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+    let (mut tx, mut _rx) = match pnet::datalink::channel(&interface, config) {
+        Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
     };
@@ -375,7 +375,7 @@ fn probe(interface: &pnet_datalink::NetworkInterface, probe_setting: &ProbeSetti
 }
 
 fn get_mac_through_arp(
-    interface: &pnet_datalink::NetworkInterface,
+    interface: &pnet::datalink::NetworkInterface,
     target_ip: Ipv4Addr,
 ) -> MacAddr {
     let source_ip = interface
@@ -388,31 +388,31 @@ fn get_mac_through_arp(
         })
         .unwrap();
 
-    let (mut sender, mut receiver) = match pnet_datalink::channel(&interface, Default::default()) {
-        Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+    let (mut sender, mut receiver) = match pnet::datalink::channel(&interface, Default::default()) {
+        Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
     };
 
     let mut ethernet_buffer = [0u8; 42];
     let mut ethernet_packet =
-        pnet_packet::ethernet::MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
+        pnet::packet::ethernet::MutableEthernetPacket::new(&mut ethernet_buffer).unwrap();
 
-    ethernet_packet.set_destination(pnet_datalink::MacAddr::broadcast());
+    ethernet_packet.set_destination(pnet::datalink::MacAddr::broadcast());
     ethernet_packet.set_source(interface.mac.unwrap());
-    ethernet_packet.set_ethertype(pnet_packet::ethernet::EtherTypes::Arp);
+    ethernet_packet.set_ethertype(pnet::packet::ethernet::EtherTypes::Arp);
 
     let mut arp_buffer = [0u8; 28];
-    let mut arp_packet = pnet_packet::arp::MutableArpPacket::new(&mut arp_buffer).unwrap();
+    let mut arp_packet = pnet::packet::arp::MutableArpPacket::new(&mut arp_buffer).unwrap();
 
-    arp_packet.set_hardware_type(pnet_packet::arp::ArpHardwareTypes::Ethernet);
-    arp_packet.set_protocol_type(pnet_packet::ethernet::EtherTypes::Ipv4);
+    arp_packet.set_hardware_type(pnet::packet::arp::ArpHardwareTypes::Ethernet);
+    arp_packet.set_protocol_type(pnet::packet::ethernet::EtherTypes::Ipv4);
     arp_packet.set_hw_addr_len(6);
     arp_packet.set_proto_addr_len(4);
-    arp_packet.set_operation(pnet_packet::arp::ArpOperations::Request);
+    arp_packet.set_operation(pnet::packet::arp::ArpOperations::Request);
     arp_packet.set_sender_hw_addr(interface.mac.unwrap());
     arp_packet.set_sender_proto_addr(source_ip);
-    arp_packet.set_target_hw_addr(pnet_datalink::MacAddr::zero());
+    arp_packet.set_target_hw_addr(pnet::datalink::MacAddr::zero());
     arp_packet.set_target_proto_addr(target_ip);
 
     ethernet_packet.set_payload(arp_packet.packet_mut());
@@ -422,12 +422,12 @@ fn get_mac_through_arp(
         .unwrap()
         .unwrap();
 
-    let mut target_mac_addr: pnet_datalink::MacAddr = pnet_datalink::MacAddr::zero();
+    let mut target_mac_addr: pnet::datalink::MacAddr = pnet::datalink::MacAddr::zero();
 
     for _ in 0..2 {
         let buf = receiver.next().unwrap();
-        let arp = pnet_packet::arp::ArpPacket::new(
-            &buf[pnet_packet::ethernet::MutableEthernetPacket::minimum_packet_size()..],
+        let arp = pnet::packet::arp::ArpPacket::new(
+            &buf[pnet::packet::ethernet::MutableEthernetPacket::minimum_packet_size()..],
         )
         .unwrap();
         if arp.get_sender_hw_addr() != interface.mac.unwrap() {
