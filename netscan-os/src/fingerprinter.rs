@@ -1,11 +1,18 @@
+use np_listener::packet::icmp::{IcmpType, Icmpv6Type};
+use np_listener::packet::tcp::TcpFlagKind;
 use pnet_datalink::{self, MacAddr};
 use pnet_packet::{MutablePacket, Packet};
+use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Duration;
+use np_listener::listener::Listner;
+use np_listener::option::PacketCaptureOptions;
+use np_listener::packet::TcpIpFingerprint;
+use np_listener::packet::ip::IpNextLevelProtocol;
 
-use super::receive;
-use super::result::{ProbeResult, ProbeStatus};
+use super::result::ProbeResult;
 use super::send;
 use super::setting::{ProbeSetting, ProbeTarget, ProbeType};
 
@@ -228,12 +235,6 @@ impl Fingerprinter {
 }
 
 fn probe(interface: &pnet_datalink::NetworkInterface, probe_setting: &ProbeSetting) -> ProbeResult {
-    let probe_result: Arc<Mutex<ProbeResult>> = Arc::new(Mutex::new(ProbeResult::new_with_types(
-        probe_setting.probe_target.ip_addr,
-        probe_setting.probe_types.clone(),
-    )));
-    let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-    let probe_status: Arc<Mutex<ProbeStatus>> = Arc::new(Mutex::new(ProbeStatus::Ready));
     let config = pnet_datalink::Config {
         write_buffer_size: 4096,
         read_buffer_size: 4096,
@@ -244,16 +245,132 @@ fn probe(interface: &pnet_datalink::NetworkInterface, probe_setting: &ProbeSetti
         linux_fanout: None,
         promiscuous: false,
     };
-    let (mut tx, mut rx) = match pnet_datalink::channel(&interface, config) {
+    let (mut tx, mut _rx) = match pnet_datalink::channel(&interface, config) {
         Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
     };
-    rayon::join(
-        || send::send_packets(&mut tx, &probe_setting, &stop),
-        || receive::receive_packets(&mut rx, &probe_setting, &probe_result, &stop, &probe_status),
-    );
-    let result: ProbeResult = probe_result.lock().unwrap().clone();
+    let capture_options: PacketCaptureOptions = PacketCaptureOptions {
+        interface_index: interface.index,
+        interface_name: interface.name.clone(),
+        src_ips: [probe_setting.probe_target.ip_addr].iter().cloned().collect(),
+        dst_ips: HashSet::new(),
+        src_ports: HashSet::new(),
+        dst_ports: HashSet::new(),
+        ether_types: HashSet::new(),
+        ip_protocols: HashSet::new(),
+        duration: probe_setting.timeout,
+        promiscuous: false,
+        store: true,
+        store_limit: u32::MAX,
+    };
+    let listener: Listner = Listner::new(capture_options);
+    let stop_handle = listener.get_stop_handle();
+    let fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::new(Mutex::new(vec![]));
+    let receive_fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::clone(&fingerprints);
+
+    let handler = thread::spawn(move || {
+        listener.start();
+        for f in listener.get_fingerprints() {
+            receive_fingerprints.lock().unwrap().push(f);
+        }
+    });
+
+    // Wait for listener to start (need fix for better way)
+    thread::sleep(Duration::from_millis(1));
+
+    send::send_packets(&mut tx, &probe_setting);
+    thread::sleep(probe_setting.wait_time);
+    *stop_handle.lock().unwrap() = true;
+
+    // Wait for listener to stop
+    handler.join().unwrap();
+    
+    // Parse fingerprints and set result
+    let mut result: ProbeResult = ProbeResult::new_with_types(probe_setting.probe_target.ip_addr, probe_setting.probe_types.clone());
+    for f in fingerprints.lock().unwrap().iter() {
+        match f.ip_fingerprint.next_level_protocol {
+            IpNextLevelProtocol::Tcp => {
+                if let Some(tcp_fingerprint) = &f.tcp_fingerprint {
+                    if tcp_fingerprint.flags.contains(&TcpFlagKind::Syn) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) && !tcp_fingerprint.flags.contains(&TcpFlagKind::Ece) {
+                        if let Some(tcp_syn_ack_result) = &mut result.tcp_syn_ack_result {
+                            tcp_syn_ack_result.syn_ack_response = true;
+                            tcp_syn_ack_result.fingerprints.push(f.clone());
+                        }
+                    }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                        if let Some(tcp_rst_ack_result) = &mut result.tcp_rst_ack_result {
+                            tcp_rst_ack_result.rst_ack_response = true;
+                            tcp_rst_ack_result.fingerprints.push(f.clone());
+                        }
+                    } else if tcp_fingerprint.flags.contains(&TcpFlagKind::Syn) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ece) {
+                        if let Some(tcp_rst_ack_result) = &mut result.tcp_ecn_result {
+                            tcp_rst_ack_result.syn_ack_ece_response = true;
+                            tcp_rst_ack_result.fingerprints.push(f.clone());
+                        }
+                    }
+                }
+            }
+            IpNextLevelProtocol::Udp => {}
+            IpNextLevelProtocol::Icmp => {
+                if let Some(icmp_fingerprint) = &f.icmp_fingerprint {
+                    match icmp_fingerprint.icmp_type {
+                        IcmpType::EchoReply => {
+                            if let Some(icmp_echo_result) = &mut result.icmp_echo_result {
+                                icmp_echo_result.icmp_echo_reply = true;
+                                icmp_echo_result.fingerprints.push(f.clone());
+                            }
+                        }
+                        IcmpType::DestinationUnreachable => {
+                            if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
+                                icmp_unreachable_ip_result.icmp_unreachable_reply = true;
+                                icmp_unreachable_ip_result.fingerprints.push(f.clone());
+                            }
+                        }
+                        IcmpType::TimestampReply => {
+                            if let Some(icmp_timestamp_result) = &mut result.icmp_timestamp_result {
+                                icmp_timestamp_result.icmp_timestamp_reply = true;
+                                icmp_timestamp_result.fingerprints.push(f.clone());
+                            }
+                        }
+                        IcmpType::AddressMaskReply => {
+                            if let Some(icmp_address_mask_result) = &mut result.icmp_address_mask_result {
+                                icmp_address_mask_result.icmp_address_mask_reply = true;
+                                icmp_address_mask_result.fingerprints.push(f.clone());
+                            }
+                        }
+                        IcmpType::InformationReply => {
+                            if let Some(icmp_information_result) = &mut result.icmp_information_result {
+                                icmp_information_result.icmp_information_reply = true;
+                                icmp_information_result.fingerprints.push(f.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            IpNextLevelProtocol::Icmpv6 => {
+                if let Some(icmpv6_fingerprint) = &f.icmpv6_fingerprint {
+                    match icmpv6_fingerprint.icmpv6_type {
+                        Icmpv6Type::EchoReply => {
+                            if let Some(icmp_echo_result) = &mut result.icmp_echo_result {
+                                icmp_echo_result.icmp_echo_reply = true;
+                                icmp_echo_result.fingerprints.push(f.clone());
+                            }
+                        }
+                        Icmpv6Type::DestinationUnreachable => {
+                            if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
+                                icmp_unreachable_ip_result.icmp_unreachable_reply = true;
+                                icmp_unreachable_ip_result.fingerprints.push(f.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+        result.fingerprints.push(f.clone());
+    }
     return result;
 }
 

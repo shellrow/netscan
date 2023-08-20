@@ -5,8 +5,6 @@ use pnet_packet::ethernet::EtherTypes;
 use pnet_packet::icmp::{IcmpType, IcmpTypes};
 use pnet_packet::ip::IpNextHeaderProtocols;
 use std::net::IpAddr;
-use std::sync::{Arc, Mutex};
-use std::thread;
 
 fn build_tcp_probe_packet(
     probe_setting: &ProbeSetting,
@@ -225,8 +223,7 @@ fn build_udp_probe_packet(probe_setting: &ProbeSetting, tmp_packet: &mut [u8]) {
 
 pub(crate) fn send_packets(
     tx: &mut Box<dyn pnet_datalink::DataLinkSender>,
-    probe_setting: &ProbeSetting,
-    stop: &Arc<Mutex<bool>>,
+    probe_setting: &ProbeSetting
 ) {
     for probe_type in probe_setting.probe_types.clone() {
         match probe_type {
@@ -279,6 +276,4 @@ pub(crate) fn send_packets(
             }
         }
     }
-    thread::sleep(probe_setting.wait_time);
-    *stop.lock().unwrap() = true;
 }
