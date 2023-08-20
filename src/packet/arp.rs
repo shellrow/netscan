@@ -1,6 +1,6 @@
-use pnet_datalink::MacAddr;
-use pnet_packet::arp::{ArpHardwareTypes, ArpOperations, MutableArpPacket};
-use pnet_packet::ethernet::EtherTypes;
+use pnet::datalink::MacAddr;
+use pnet::packet::arp::{ArpHardwareTypes, ArpOperations, MutableArpPacket};
+use pnet::packet::ethernet::EtherTypes;
 use std::net::Ipv4Addr;
 
 #[allow(dead_code)]

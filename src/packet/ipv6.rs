@@ -1,5 +1,5 @@
-use pnet_packet::ip::{IpNextHeaderProtocol, IpNextHeaderProtocols};
-use pnet_packet::ipv6::MutableIpv6Packet;
+use pnet::packet::ip::{IpNextHeaderProtocol, IpNextHeaderProtocols};
+use pnet::packet::ipv6::MutableIpv6Packet;
 use std::net::Ipv6Addr;
 
 #[allow(dead_code)]

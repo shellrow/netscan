@@ -1,13 +1,18 @@
-use crate::blocking::receiver;
 use crate::host::{HostInfo, PortInfo, PortStatus};
 use crate::packet;
-use crate::result::{HostScanResult, PortScanResult, ScanResult};
+use crate::result::ScanResult;
 use crate::setting::ScanSetting;
 use crate::setting::ScanType;
-use pnet_packet::ethernet::EtherTypes;
-use pnet_packet::ip::IpNextHeaderProtocols;
+use np_listener::listener::Listner;
+use np_listener::option::PacketCaptureOptions;
+use np_listener::packet::TcpIpFingerprint;
+use np_listener::packet::ip::IpNextLevelProtocol;
+use np_listener::packet::tcp::TcpFlagKind;
+use pnet::packet::ethernet::EtherTypes;
+use pnet::packet::ip::IpNextHeaderProtocols;
 use rayon::prelude::*;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -21,18 +26,18 @@ fn build_tcp_syn_packet(
     dst_port: u16,
 ) {
     // Setup Ethernet header
-    let mut eth_header = pnet_packet::ethernet::MutableEthernetPacket::new(
+    let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(
         &mut tmp_packet[..packet::ethernet::ETHERNET_HEADER_LEN],
     )
     .unwrap();
     packet::ethernet::build_ethernet_packet(
         &mut eth_header,
-        pnet_datalink::MacAddr::from(scan_setting.src_mac),
-        pnet_datalink::MacAddr::from(scan_setting.dst_mac),
+        pnet::datalink::MacAddr::from(scan_setting.src_mac),
+        pnet::datalink::MacAddr::from(scan_setting.dst_mac),
         EtherTypes::Ipv4,
     );
     // Setup IP header
-    let mut ip_header = pnet_packet::ipv4::MutableIpv4Packet::new(
+    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
         &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
             ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
     )
@@ -52,7 +57,7 @@ fn build_tcp_syn_packet(
         IpAddr::V6(_ip) => {}
     }
     // Setup TCP header
-    let mut tcp_header = pnet_packet::tcp::MutableTcpPacket::new(
+    let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(
         &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
     )
     .unwrap();
@@ -72,18 +77,18 @@ fn build_udp_packet(
     dst_port: u16,
 ) {
     // Setup Ethernet header
-    let mut eth_header = pnet_packet::ethernet::MutableEthernetPacket::new(
+    let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(
         &mut tmp_packet[..packet::ethernet::ETHERNET_HEADER_LEN],
     )
     .unwrap();
     packet::ethernet::build_ethernet_packet(
         &mut eth_header,
-        pnet_datalink::MacAddr::from(scan_setting.src_mac),
-        pnet_datalink::MacAddr::from(scan_setting.dst_mac),
+        pnet::datalink::MacAddr::from(scan_setting.src_mac),
+        pnet::datalink::MacAddr::from(scan_setting.dst_mac),
         EtherTypes::Ipv4,
     );
     // Setup IP header
-    let mut ip_header = pnet_packet::ipv4::MutableIpv4Packet::new(
+    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
         &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
             ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
     )
@@ -103,7 +108,7 @@ fn build_udp_packet(
         IpAddr::V6(_ip) => {}
     }
     // Setup UDP header
-    let mut udp_header = pnet_packet::udp::MutableUdpPacket::new(
+    let mut udp_header = pnet::packet::udp::MutableUdpPacket::new(
         &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
     )
     .unwrap();
@@ -118,18 +123,18 @@ fn build_udp_packet(
 
 fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst_ip: IpAddr) {
     // Setup Ethernet header
-    let mut eth_header = pnet_packet::ethernet::MutableEthernetPacket::new(
+    let mut eth_header = pnet::packet::ethernet::MutableEthernetPacket::new(
         &mut tmp_packet[..packet::ethernet::ETHERNET_HEADER_LEN],
     )
     .unwrap();
     packet::ethernet::build_ethernet_packet(
         &mut eth_header,
-        pnet_datalink::MacAddr::from(scan_setting.src_mac),
-        pnet_datalink::MacAddr::from(scan_setting.dst_mac),
+        pnet::datalink::MacAddr::from(scan_setting.src_mac),
+        pnet::datalink::MacAddr::from(scan_setting.dst_mac),
         EtherTypes::Ipv4,
     );
     // Setup IP header
-    let mut ip_header = pnet_packet::ipv4::MutableIpv4Packet::new(
+    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
         &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
             ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
     )
@@ -149,7 +154,7 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
         IpAddr::V6(_ip) => {}
     }
     // Setup ICMP header
-    let mut icmp_packet = pnet_packet::icmp::echo_request::MutableEchoRequestPacket::new(
+    let mut icmp_packet = pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(
         &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
     )
     .unwrap();
@@ -157,9 +162,8 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
 }
 
 fn send_packets(
-    tx: &mut Box<dyn pnet_datalink::DataLinkSender>,
+    tx: &mut Box<dyn pnet::datalink::DataLinkSender>,
     scan_setting: &ScanSetting,
-    stop: &Arc<Mutex<bool>>,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
 ) {
     match scan_setting.scan_type {
@@ -219,15 +223,12 @@ fn send_packets(
         }
         _ => {}
     }
-    thread::sleep(scan_setting.wait_time);
-    *stop.lock().unwrap() = true;
 }
 
 fn run_connect_scan(
-    scan_setting: ScanSetting,
-    scan_result: &Arc<Mutex<ScanResult>>,
-    stop: &Arc<Mutex<bool>>,
-) {
+    scan_setting: ScanSetting
+) -> ScanResult {
+    let port_scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
     let start_time = Instant::now();
     let conn_timeout = Duration::from_millis(200);
     for dst in scan_setting.targets.clone() {
@@ -244,11 +245,10 @@ fn run_connect_scan(
                     };
                     // Avoid deadlock.
                     let mut exists: bool = false;
-                    for host in scan_result
+                    for host in port_scan_result
                         .lock()
                         .unwrap()
-                        .port_scan_result
-                        .results
+                        .hosts
                         .iter_mut()
                     {
                         if host.ip_addr == socket_addr.ip() {
@@ -266,110 +266,309 @@ fn run_connect_scan(
                             .to_string();
                         host_info.ttl = socket.ttl().unwrap_or(0) as u8;
                         host_info.ports.push(port_info);
-                        scan_result
+                        port_scan_result
                             .lock()
                             .unwrap()
-                            .port_scan_result
-                            .results
+                            .hosts
                             .push(host_info);
                     }
                 }
                 Err(_) => {}
             }
+            // Cancel scan if timeout
             if Instant::now().duration_since(start_time) > scan_setting.timeout {
-                *stop.lock().unwrap() = true;
                 return;
             }
         });
     }
+    let mut result: ScanResult = port_scan_result.lock().unwrap().clone();
+    result.scan_time = Instant::now().duration_since(start_time);
+    return result;
 }
 
 pub(crate) fn scan_hosts(
     scan_setting: ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
-) -> HostScanResult {
-    let interfaces = pnet_datalink::interfaces();
+) -> ScanResult {
+    let interfaces = pnet::datalink::interfaces();
     let interface = match interfaces
         .into_iter()
-        .filter(|interface: &pnet_datalink::NetworkInterface| {
+        .filter(|interface: &pnet::datalink::NetworkInterface| {
             interface.index == scan_setting.if_index
         })
         .next()
     {
         Some(interface) => interface,
-        None => return HostScanResult::new(),
+        None => return ScanResult::new(),
     };
-    let config = pnet_datalink::Config {
+    let config = pnet::datalink::Config {
         write_buffer_size: 4096,
         read_buffer_size: 4096,
         read_timeout: None,
         write_timeout: None,
-        channel_type: pnet_datalink::ChannelType::Layer2,
+        channel_type: pnet::datalink::ChannelType::Layer2,
         bpf_fd_attempts: 1000,
         linux_fanout: None,
         promiscuous: false,
     };
-    let (mut tx, mut rx) = match pnet_datalink::channel(&interface, config) {
-        Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+    let (mut tx, mut _rx) = match pnet::datalink::channel(&interface, config) {
+        Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
     };
-    let scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
-    let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-    let receive_setting: ScanSetting = scan_setting.clone();
-    rayon::join(
-        || send_packets(&mut tx, &scan_setting, &stop, ptx),
-        || receiver::receive_packets(&mut rx, receive_setting, &scan_result, &stop),
-    );
-    let result: HostScanResult = scan_result.lock().unwrap().host_scan_result.clone();
+    let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
+        interface_index: scan_setting.if_index,
+        interface_name: scan_setting.if_name.clone(),
+        src_ips: HashSet::new(),
+        dst_ips: HashSet::new(),
+        src_ports: HashSet::new(),
+        dst_ports: HashSet::new(),
+        ether_types: HashSet::new(),
+        ip_protocols: HashSet::new(),
+        duration: scan_setting.timeout,
+        promiscuous: false,
+        store: true,
+        store_limit: u32::MAX,
+    };
+    for target in scan_setting.targets.clone() {
+        capture_options.src_ips.insert(target.ip_addr);
+    }
+    match scan_setting.scan_type {
+        ScanType::IcmpPingScan => {
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+        }
+        ScanType::TcpPingScan => {
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
+            for target in scan_setting.targets.clone() {
+                for port in target.get_ports() {
+                    capture_options.src_ports.insert(port);
+                }
+            }
+        }
+        ScanType::UdpPingScan => {
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Udp);
+        }
+        _ => {}
+    }
+    let listener: Listner = Listner::new(capture_options);
+    let stop_handle = listener.get_stop_handle();
+    let fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::new(Mutex::new(vec![]));
+    let receive_fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::clone(&fingerprints);
+
+    let handler = thread::spawn(move || {
+        listener.start();
+        for f in listener.get_fingerprints() {
+            receive_fingerprints.lock().unwrap().push(f);
+        }
+    });
+
+    // Wait for listener to start (need fix for better way)
+    thread::sleep(Duration::from_millis(1));
+
+    // Send probe packets
+    send_packets(&mut tx, &scan_setting, ptx);
+    thread::sleep(scan_setting.wait_time);
+    *stop_handle.lock().unwrap() = true;
+
+    // Wait for listener to stop
+    handler.join().unwrap();
+
+    // Parse fingerprints and store results
+    let mut result: ScanResult = ScanResult::new();
+    for f in fingerprints.lock().unwrap().iter() {
+        let mut ports: Vec<PortInfo> = vec![];
+        match scan_setting.scan_type {
+            ScanType::IcmpPingScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp {
+                    continue;
+                }
+            }
+            ScanType::TcpPingScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Tcp {
+                    continue;
+                }
+                if let Some(tcp_fingerprint) = &f.tcp_fingerprint {
+                    if tcp_fingerprint.flags.contains(&TcpFlagKind::Syn) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                        let port_info: PortInfo = PortInfo {
+                            port: tcp_fingerprint.source_port,
+                            status: PortStatus::Open,
+                        };
+                        ports.push(port_info);
+                    }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) || tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                        let port_info: PortInfo = PortInfo {
+                            port: tcp_fingerprint.source_port,
+                            status: PortStatus::Closed,
+                        };
+                        ports.push(port_info);
+                    }else {
+                        continue;
+                    }
+                }else{
+                    continue;
+                }
+            }
+            ScanType::UdpPingScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Udp {
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        let host_info: HostInfo = HostInfo {
+            ip_addr: f.ip_fingerprint.source_ip,
+            host_name: scan_setting.ip_map.get(&f.ip_fingerprint.source_ip).unwrap_or(&String::new()).clone(),
+            ttl: f.ip_fingerprint.ttl,
+            ports: ports,
+        };
+        if !result.hosts.contains(&host_info) {
+            result.hosts.push(host_info);
+        }
+    }
     return result;
 }
 
 pub(crate) fn scan_ports(
     scan_setting: ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
-) -> PortScanResult {
-    let interfaces = pnet_datalink::interfaces();
+) -> ScanResult {
+    match scan_setting.scan_type {
+        ScanType::TcpConnectScan => {
+            return run_connect_scan(scan_setting);
+        }
+        _ => {}
+    }
+    let interfaces = pnet::datalink::interfaces();
     let interface = match interfaces
         .into_iter()
-        .filter(|interface: &pnet_datalink::NetworkInterface| {
+        .filter(|interface: &pnet::datalink::NetworkInterface| {
             interface.index == scan_setting.if_index
         })
         .next()
     {
         Some(interface) => interface,
-        None => return PortScanResult::new(),
+        None => return ScanResult::new(),
     };
-    let config = pnet_datalink::Config {
+    let config = pnet::datalink::Config {
         write_buffer_size: 4096,
         read_buffer_size: 4096,
         read_timeout: None,
         write_timeout: None,
-        channel_type: pnet_datalink::ChannelType::Layer2,
+        channel_type: pnet::datalink::ChannelType::Layer2,
         bpf_fd_attempts: 1000,
         linux_fanout: None,
         promiscuous: false,
     };
-    let (mut tx, mut rx) = match pnet_datalink::channel(&interface, config) {
-        Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+    let (mut tx, mut _rx) = match pnet::datalink::channel(&interface, config) {
+        Ok(pnet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
         Ok(_) => panic!("Unknown channel type"),
         Err(e) => panic!("Error happened {}", e),
     };
-    let scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
-    let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-    let receive_setting: ScanSetting = scan_setting.clone();
+    let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
+        interface_index: scan_setting.if_index,
+        interface_name: scan_setting.if_name.clone(),
+        src_ips: HashSet::new(),
+        dst_ips: HashSet::new(),
+        src_ports: HashSet::new(),
+        dst_ports: HashSet::new(),
+        ether_types: HashSet::new(),
+        ip_protocols: HashSet::new(),
+        duration: scan_setting.timeout,
+        promiscuous: false,
+        store: true,
+        store_limit: u32::MAX,
+    };
+    for target in scan_setting.targets.clone() {
+        capture_options.src_ips.insert(target.ip_addr);
+        capture_options.src_ports.extend(target.get_ports());
+    }
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
-            rayon::join(
-                || send_packets(&mut tx, &scan_setting, &stop, ptx),
-                || receiver::receive_packets(&mut rx, receive_setting, &scan_result, &stop),
-            );
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
         }
         ScanType::TcpConnectScan => {
-            run_connect_scan(scan_setting, &scan_result, &stop);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
         }
         _ => {}
     }
-    let result: PortScanResult = scan_result.lock().unwrap().port_scan_result.clone();
+    let listener: Listner = Listner::new(capture_options);
+    let stop_handle = listener.get_stop_handle();
+    let fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::new(Mutex::new(vec![]));
+    let receive_fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::clone(&fingerprints);
+
+    let handler = thread::spawn(move || {
+        listener.start();
+        for f in listener.get_fingerprints() {
+            receive_fingerprints.lock().unwrap().push(f);
+        }
+    });
+
+    // Wait for listener to start (need fix for better way)
+    thread::sleep(Duration::from_millis(1));
+
+    send_packets(&mut tx, &scan_setting, ptx);
+    thread::sleep(scan_setting.wait_time);
+    *stop_handle.lock().unwrap() = true;
+
+    // Wait for listener to stop
+    handler.join().unwrap();
+
+    // Parse fingerprints and store results
+    let mut result: ScanResult = ScanResult::new();
+    let mut socket_set: HashSet<SocketAddr> = HashSet::new();
+    for f in fingerprints.lock().unwrap().iter() {
+        match scan_setting.scan_type {
+            ScanType::TcpSynScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Tcp {
+                    continue;
+                }
+            }
+            ScanType::TcpConnectScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Tcp {
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        if socket_set.contains(&f.source) {
+            continue;
+        }
+        let port_info: PortInfo = if let Some(tcp_fingerprint) = &f.tcp_fingerprint {
+            if tcp_fingerprint.flags.contains(&TcpFlagKind::Syn) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                let port_info: PortInfo = PortInfo {
+                    port: tcp_fingerprint.source_port,
+                    status: PortStatus::Open,
+                };
+                port_info
+            }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) || tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                let port_info: PortInfo = PortInfo {
+                    port: tcp_fingerprint.source_port,
+                    status: PortStatus::Closed,
+                };
+                port_info
+            }else {
+                continue;
+            }
+        }else{
+            continue;
+        };
+        let mut exists: bool = false;
+        for host in result.hosts.iter_mut()
+        {
+            if host.ip_addr == f.ip_fingerprint.source_ip {
+                host.ports.push(port_info);
+                exists = true;     
+            }
+        }
+        if !exists {
+            let host_info: HostInfo = HostInfo {
+                ip_addr: f.ip_fingerprint.source_ip,
+                host_name: scan_setting.ip_map.get(&f.ip_fingerprint.source_ip).unwrap_or(&String::new()).clone(),
+                ttl: f.ip_fingerprint.ttl,
+                ports: vec![port_info],
+            };
+            result.hosts.push(host_info);
+        }
+        socket_set.insert(f.source);
+    }
     return result;
 }

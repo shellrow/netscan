@@ -31,18 +31,18 @@ impl HostScanner {
     pub fn new(src_ip: IpAddr) -> Result<HostScanner, String> {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
-        let mut src_mac: pnet_datalink::MacAddr = pnet_datalink::MacAddr::zero();
-        for iface in pnet_datalink::interfaces() {
+        let mut src_mac: pnet::datalink::MacAddr = pnet::datalink::MacAddr::zero();
+        for iface in pnet::datalink::interfaces() {
             for ip in iface.ips {
                 if ip.ip() == src_ip {
                     if_index = iface.index;
                     if_name = iface.name;
-                    src_mac = iface.mac.unwrap_or(pnet_datalink::MacAddr::zero());
+                    src_mac = iface.mac.unwrap_or(pnet::datalink::MacAddr::zero());
                     break;
                 }
             }
         }
-        if if_index == 0 || if_name.is_empty() || src_mac == pnet_datalink::MacAddr::zero() {
+        if if_index == 0 || if_name.is_empty() || src_mac == pnet::datalink::MacAddr::zero() {
             return Err(String::from(
                 "Failed to create Scanner. Network Interface not found.",
             ));
@@ -145,18 +145,18 @@ impl PortScanner {
     pub fn new(src_ip: IpAddr) -> Result<PortScanner, String> {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
-        let mut src_mac: pnet_datalink::MacAddr = pnet_datalink::MacAddr::zero();
-        for iface in pnet_datalink::interfaces() {
+        let mut src_mac: pnet::datalink::MacAddr = pnet::datalink::MacAddr::zero();
+        for iface in pnet::datalink::interfaces() {
             for ip in iface.ips {
                 if ip.ip() == src_ip {
                     if_index = iface.index;
                     if_name = iface.name;
-                    src_mac = iface.mac.unwrap_or(pnet_datalink::MacAddr::zero());
+                    src_mac = iface.mac.unwrap_or(pnet::datalink::MacAddr::zero());
                     break;
                 }
             }
         }
-        if if_index == 0 || if_name.is_empty() || src_mac == pnet_datalink::MacAddr::zero() {
+        if if_index == 0 || if_name.is_empty() || src_mac == pnet::datalink::MacAddr::zero() {
             return Err(String::from(
                 "Failed to create Scanner. Network Interface not found.",
             ));
