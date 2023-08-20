@@ -31,7 +31,7 @@ async fn build_icmpv4_echo_packet() -> Vec<u8> {
     icmp_packet.packet().to_vec()
 }
 
-async fn build_tcp_syn_packet(
+/* async fn build_tcp_syn_packet(
     src_ip: IpAddr,
     src_port: u16,
     dst_ip: IpAddr,
@@ -44,7 +44,7 @@ async fn build_tcp_syn_packet(
     .unwrap();
     packet::tcp::build_tcp_packet(&mut tcp_packet, src_ip, src_port, dst_ip, dst_port);
     tcp_packet.packet().to_vec()
-}
+} */
 
 async fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16) -> Vec<u8> {
     let mut vec: Vec<u8> = vec![0; 66];
@@ -85,7 +85,7 @@ async fn send_icmp_echo_packets(
     fut_host.await;
 }
 
-async fn send_tcp_syn_packets(
+/* async fn send_tcp_syn_packets(
     socket: &AsyncSocket,
     scan_setting: &ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
@@ -125,7 +125,7 @@ async fn send_tcp_syn_packets(
         },
     );
     fut_host.await;
-}
+} */
 
 async fn send_udp_packets(
     socket: &AsyncSocket,
@@ -247,7 +247,10 @@ async fn send_ping_packet(
             send_icmp_echo_packets(socket, scan_setting, ptx).await;
         }
         ScanType::TcpPingScan => {
-            send_tcp_syn_packets(socket, scan_setting, ptx).await;
+            // Winsock2 does not allow TCP data to be sent over Raw Socket
+            // https://docs.microsoft.com/en-US/windows/win32/winsock/tcp-ip-raw-sockets-2#limitations-on-raw-sockets
+            //send_tcp_syn_packets(socket, scan_setting, ptx).await;
+            send_connect_requests(scan_setting, ptx).await;
         }
         ScanType::UdpPingScan => {
             send_udp_packets(socket, scan_setting, ptx).await;
