@@ -1,7 +1,7 @@
 use super::socket::AsyncSocket;
 use crate::host::{HostInfo, PortInfo, PortStatus};
 use crate::packet;
-use crate::result::{ScanResult, ScanStatus};
+use crate::result::ScanResult;
 use crate::setting::{ScanSetting, ScanType};
 use async_io::{Async, Timer};
 use futures::executor::ThreadPool;
@@ -226,21 +226,15 @@ async fn try_connect_ports(
     }
 }
 
-async fn run_connect_scan(
-    scan_setting: ScanSetting,
+async fn send_connect_requests(
+    scan_setting: &ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
-) -> ScanResult {
-    let results: Vec<HostInfo> = stream::iter(scan_setting.targets.clone().into_iter())
+) {
+    let _results: Vec<HostInfo> = stream::iter(scan_setting.targets.clone().into_iter())
         .map(|dst| try_connect_ports(scan_setting.ports_concurrency, dst, ptx))
         .buffer_unordered(scan_setting.hosts_concurrency)
         .collect()
         .await;
-    ScanResult {
-        hosts: results,
-        scan_time: Duration::from_millis(0),
-        scan_status: ScanStatus::Ready,
-        fingerprints: vec![],
-    }
 }
 
 async fn send_ping_packet(
@@ -414,13 +408,6 @@ pub(crate) async fn scan_ports(
     scan_setting: ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
 ) -> ScanResult {
-    match scan_setting.scan_type {
-        ScanType::TcpConnectScan => {
-            let scan_result = run_connect_scan(scan_setting, ptx).await;
-            return scan_result;
-        }
-        _ => {}
-    }
     let socket = match scan_setting.scan_type {
         ScanType::TcpSynScan => {
             AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::TCP).unwrap()
@@ -474,7 +461,15 @@ pub(crate) async fn scan_ports(
     // Wait for listener to start (need fix for better way)
     thread::sleep(Duration::from_millis(1));
 
-    send_tcp_packets(&socket, &scan_setting, ptx).await;
+    match scan_setting.scan_type {
+        ScanType::TcpConnectScan => {
+            send_connect_requests(&scan_setting, ptx).await;
+        }
+        _ => {
+            send_tcp_packets(&socket, &scan_setting, ptx).await;
+        }
+    }
+    
     thread::sleep(scan_setting.wait_time);
     *stop_handle.lock().unwrap() = true;
 
