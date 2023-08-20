@@ -422,6 +422,7 @@ pub(crate) fn scan_hosts(
         };
         if !result.hosts.contains(&host_info) {
             result.hosts.push(host_info);
+            result.fingerprints.push(f.clone());
         }
     }
     return result;
@@ -568,6 +569,7 @@ pub(crate) fn scan_ports(
             };
             result.hosts.push(host_info);
         }
+        result.fingerprints.push(f.clone());
         socket_set.insert(f.source);
     }
     return result;

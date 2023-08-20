@@ -239,6 +239,7 @@ async fn run_connect_scan(
         hosts: results,
         scan_time: Duration::from_millis(0),
         scan_status: ScanStatus::Ready,
+        fingerprints: vec![],
     }
 }
 
@@ -401,6 +402,7 @@ pub(crate) async fn scan_hosts(
         };
         if !result.hosts.contains(&host_info) {
             result.hosts.push(host_info);
+            result.fingerprints.push(f.clone());
         }
     }
     return result;
@@ -421,6 +423,7 @@ pub(crate) async fn scan_ports(
                 hosts: vec![],
                 scan_time: Duration::from_millis(0),
                 scan_status: ScanStatus::Error,
+                fingerprints: vec![],
             };
         }
         ScanType::TcpConnectScan => {
@@ -432,6 +435,7 @@ pub(crate) async fn scan_ports(
                 hosts: vec![],
                 scan_time: Duration::from_millis(0),
                 scan_status: ScanStatus::Error,
+                fingerprints: vec![],
             };
         }
     }
