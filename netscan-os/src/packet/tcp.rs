@@ -240,7 +240,7 @@ pub fn build_tcp_packet(
         IpAddr::V4(src_ip) => match dst_ip {
             IpAddr::V4(dst_ip) => {
                 let checksum =
-                    pnet_packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip, &dst_ip);
+                    pnet::packet::tcp::ipv4_checksum(&tcp_packet.to_immutable(), &src_ip, &dst_ip);
                 tcp_packet.set_checksum(checksum);
             }
             IpAddr::V6(_) => {}
@@ -249,7 +249,7 @@ pub fn build_tcp_packet(
             IpAddr::V4(_) => {}
             IpAddr::V6(dst_ip) => {
                 let checksum =
-                    pnet_packet::tcp::ipv6_checksum(&tcp_packet.to_immutable(), &src_ip, &dst_ip);
+                    pnet::packet::tcp::ipv6_checksum(&tcp_packet.to_immutable(), &src_ip, &dst_ip);
                 tcp_packet.set_checksum(checksum);
             }
         },
