@@ -376,7 +376,7 @@ pub(crate) async fn scan_hosts(
                             status: PortStatus::Open,
                         };
                         ports.push(port_info);
-                    }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) || tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                    }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
                         let port_info: PortInfo = PortInfo {
                             port: tcp_fingerprint.source_port,
                             status: PortStatus::Closed,
@@ -508,7 +508,7 @@ pub(crate) async fn scan_ports(
                     status: PortStatus::Open,
                 };
                 port_info
-            }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) || tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+            }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
                 let port_info: PortInfo = PortInfo {
                     port: tcp_fingerprint.source_port,
                     status: PortStatus::Closed,
