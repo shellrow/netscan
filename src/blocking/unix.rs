@@ -1,12 +1,17 @@
-use crate::blocking::receiver;
 use crate::host::{HostInfo, PortInfo, PortStatus};
 use crate::packet;
-use crate::result::{HostScanResult, PortScanResult, ScanResult};
+use crate::result::ScanResult;
 use crate::setting::ScanSetting;
 use crate::setting::ScanType;
+use np_listener::listener::Listner;
+use np_listener::option::PacketCaptureOptions;
+use np_listener::packet::TcpIpFingerprint;
+use np_listener::packet::ip::IpNextLevelProtocol;
+use np_listener::packet::tcp::TcpFlagKind;
 use pnet_packet::Packet;
 use rayon::prelude::*;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -128,10 +133,9 @@ fn send_udp_packets(
 }
 
 fn run_connect_scan(
-    scan_setting: ScanSetting,
-    scan_result: &Arc<Mutex<ScanResult>>,
-    stop: &Arc<Mutex<bool>>,
-) {
+    scan_setting: ScanSetting
+) -> ScanResult {
+    let port_scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
     let start_time = Instant::now();
     let conn_timeout = Duration::from_millis(200);
     for dst in scan_setting.targets.clone() {
@@ -148,11 +152,10 @@ fn run_connect_scan(
                     };
                     // Avoid deadlock.
                     let mut exists: bool = false;
-                    for host in scan_result
+                    for host in port_scan_result
                         .lock()
                         .unwrap()
-                        .port_scan_result
-                        .results
+                        .hosts
                         .iter_mut()
                     {
                         if host.ip_addr == socket_addr.ip() {
@@ -170,22 +173,24 @@ fn run_connect_scan(
                             .to_string();
                         host_info.ttl = socket.ttl().unwrap_or(0) as u8;
                         host_info.ports.push(port_info);
-                        scan_result
+                        port_scan_result
                             .lock()
                             .unwrap()
-                            .port_scan_result
-                            .results
+                            .hosts
                             .push(host_info);
                     }
                 }
                 Err(_) => {}
             }
+            // Cancel scan if timeout
             if Instant::now().duration_since(start_time) > scan_setting.timeout {
-                *stop.lock().unwrap() = true;
                 return;
             }
         });
     }
+    let mut result: ScanResult = port_scan_result.lock().unwrap().clone();
+    result.scan_time = Instant::now().duration_since(start_time);
+    return result;
 }
 
 fn send_ping_packet(
@@ -227,7 +232,7 @@ fn send_tcp_packets(
 pub(crate) fn scan_hosts(
     scan_setting: ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
-) -> HostScanResult {
+) -> ScanResult {
     let socket = match scan_setting.src_ip {
         IpAddr::V4(_) => match scan_setting.scan_type {
             ScanType::IcmpPingScan => {
@@ -239,7 +244,7 @@ pub(crate) fn scan_hosts(
             ScanType::UdpPingScan => {
                 Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::UDP)).unwrap()
             }
-            _ => return HostScanResult::new(),
+            _ => return ScanResult::new(),
         },
         IpAddr::V6(_) => match scan_setting.scan_type {
             ScanType::IcmpPingScan => {
@@ -251,54 +256,130 @@ pub(crate) fn scan_hosts(
             ScanType::UdpPingScan => {
                 Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::UDP)).unwrap()
             }
-            _ => return HostScanResult::new(),
+            _ => return ScanResult::new(),
         },
     };
-    let interfaces = pnet_datalink::interfaces();
-    let interface = match interfaces
-        .into_iter()
-        .filter(|interface: &pnet_datalink::NetworkInterface| {
-            interface.index == scan_setting.if_index
-        })
-        .next()
-    {
-        Some(interface) => interface,
-        None => return HostScanResult::new(),
-    };
-    let config = pnet_datalink::Config {
-        write_buffer_size: 4096,
-        read_buffer_size: 4096,
-        read_timeout: None,
-        write_timeout: None,
-        channel_type: pnet_datalink::ChannelType::Layer2,
-        bpf_fd_attempts: 1000,
-        linux_fanout: None,
+    let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
+        interface_index: scan_setting.if_index,
+        interface_name: scan_setting.if_name.clone(),
+        src_ips: HashSet::new(),
+        dst_ips: HashSet::new(),
+        src_ports: HashSet::new(),
+        dst_ports: HashSet::new(),
+        ether_types: HashSet::new(),
+        ip_protocols: HashSet::new(),
+        duration: scan_setting.timeout,
         promiscuous: false,
+        store: true,
+        store_limit: u32::MAX,
     };
-    let (mut _tx, mut rx) = match pnet_datalink::channel(&interface, config) {
-        Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => panic!("Unknown channel type"),
-        Err(e) => panic!("Error happened {}", e),
-    };
-    let scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
-    let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-    let receive_result: Arc<Mutex<ScanResult>> = Arc::clone(&scan_result);
-    let receive_stop: Arc<Mutex<bool>> = Arc::clone(&stop);
-    let receive_setting: ScanSetting = scan_setting.clone();
-    thread::spawn(move || {
-        receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop);
+    for target in scan_setting.targets.clone() {
+        capture_options.src_ips.insert(target.ip_addr);
+    }
+    match scan_setting.scan_type {
+        ScanType::IcmpPingScan => {
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+        }
+        ScanType::TcpPingScan => {
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
+            for target in scan_setting.targets.clone() {
+                for port in target.get_ports() {
+                    capture_options.src_ports.insert(port);
+                }
+            }
+        }
+        ScanType::UdpPingScan => {
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Udp);
+        }
+        _ => {}
+    }
+    let listener: Listner = Listner::new(capture_options);
+    let stop_handle = listener.get_stop_handle();
+    let fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::new(Mutex::new(vec![]));
+    let receive_fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::clone(&fingerprints);
+
+    let handler = thread::spawn(move || {
+        listener.start();
+        for f in listener.get_fingerprints() {
+            receive_fingerprints.lock().unwrap().push(f);
+        }
     });
+    
+    // Wait for listener to start (need fix for better way)
+    thread::sleep(Duration::from_millis(1));
+
+    // Send probe packets
     send_ping_packet(&socket, &scan_setting, ptx);
     thread::sleep(scan_setting.wait_time);
-    *stop.lock().unwrap() = true;
-    let result: HostScanResult = scan_result.lock().unwrap().host_scan_result.clone();
+    *stop_handle.lock().unwrap() = true;
+
+    // Wait for listener to stop
+    handler.join().unwrap();
+
+    // Parse fingerprints and store results
+    let mut result: ScanResult = ScanResult::new();
+    for f in fingerprints.lock().unwrap().iter() {
+        let mut ports: Vec<PortInfo> = vec![];
+        match scan_setting.scan_type {
+            ScanType::IcmpPingScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp {
+                    continue;
+                }
+            }
+            ScanType::TcpPingScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Tcp {
+                    continue;
+                }
+                if let Some(tcp_fingerprint) = &f.tcp_fingerprint {
+                    if tcp_fingerprint.flags.contains(&TcpFlagKind::Syn) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                        let port_info: PortInfo = PortInfo {
+                            port: tcp_fingerprint.source_port,
+                            status: PortStatus::Open,
+                        };
+                        ports.push(port_info);
+                    }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) || tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                        let port_info: PortInfo = PortInfo {
+                            port: tcp_fingerprint.source_port,
+                            status: PortStatus::Closed,
+                        };
+                        ports.push(port_info);
+                    }else {
+                        continue;
+                    }
+                }else{
+                    continue;
+                }
+            }
+            ScanType::UdpPingScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Udp {
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        let host_info: HostInfo = HostInfo {
+            ip_addr: f.ip_fingerprint.source_ip,
+            host_name: scan_setting.ip_map.get(&f.ip_fingerprint.source_ip).unwrap_or(&String::new()).clone(),
+            ttl: f.ip_fingerprint.ttl,
+            ports: ports,
+        };
+        if !result.hosts.contains(&host_info) {
+            result.hosts.push(host_info);
+        }
+    }
     return result;
 }
 
 pub(crate) fn scan_ports(
     scan_setting: ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
-) -> PortScanResult {
+) -> ScanResult {
+    match scan_setting.scan_type {
+        ScanType::TcpConnectScan => {
+            return run_connect_scan(scan_setting);
+        }
+        _ => {}
+    }
     let socket = match scan_setting.src_ip {
         IpAddr::V4(_) => match scan_setting.scan_type {
             ScanType::TcpSynScan => {
@@ -307,7 +388,7 @@ pub(crate) fn scan_ports(
             ScanType::TcpConnectScan => {
                 Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP)).unwrap()
             }
-            _ => return PortScanResult::new(),
+            _ => return ScanResult::new(),
         },
         IpAddr::V6(_) => match scan_setting.scan_type {
             ScanType::TcpSynScan => {
@@ -316,54 +397,115 @@ pub(crate) fn scan_ports(
             ScanType::TcpConnectScan => {
                 Socket::new(Domain::IPV6, Type::STREAM, Some(Protocol::TCP)).unwrap()
             }
-            _ => return PortScanResult::new(),
+            _ => return ScanResult::new(),
         },
     };
-    let interfaces = pnet_datalink::interfaces();
-    let interface = match interfaces
-        .into_iter()
-        .filter(|interface: &pnet_datalink::NetworkInterface| {
-            interface.index == scan_setting.if_index
-        })
-        .next()
-    {
-        Some(interface) => interface,
-        None => return PortScanResult::new(),
-    };
-    let config = pnet_datalink::Config {
-        write_buffer_size: 4096,
-        read_buffer_size: 4096,
-        read_timeout: None,
-        write_timeout: None,
-        channel_type: pnet_datalink::ChannelType::Layer2,
-        bpf_fd_attempts: 1000,
-        linux_fanout: None,
+    let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
+        interface_index: scan_setting.if_index,
+        interface_name: scan_setting.if_name.clone(),
+        src_ips: HashSet::new(),
+        dst_ips: HashSet::new(),
+        src_ports: HashSet::new(),
+        dst_ports: HashSet::new(),
+        ether_types: HashSet::new(),
+        ip_protocols: HashSet::new(),
+        duration: scan_setting.timeout,
         promiscuous: false,
+        store: true,
+        store_limit: u32::MAX,
     };
-    let (mut _tx, mut rx) = match pnet_datalink::channel(&interface, config) {
-        Ok(pnet_datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => panic!("Unknown channel type"),
-        Err(e) => panic!("Error happened {}", e),
-    };
-    let scan_result: Arc<Mutex<ScanResult>> = Arc::new(Mutex::new(ScanResult::new()));
-    let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-    let receive_result: Arc<Mutex<ScanResult>> = Arc::clone(&scan_result);
-    let receive_stop: Arc<Mutex<bool>> = Arc::clone(&stop);
-    let receive_setting: ScanSetting = scan_setting.clone();
+    for target in scan_setting.targets.clone() {
+        capture_options.src_ips.insert(target.ip_addr);
+        capture_options.src_ports.extend(target.get_ports());
+    }
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
-            thread::spawn(move || {
-                receiver::receive_packets(&mut rx, receive_setting, &receive_result, &receive_stop);
-            });
-            send_tcp_packets(&socket, &scan_setting, ptx);
-            thread::sleep(scan_setting.wait_time);
-            *stop.lock().unwrap() = true;
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
         }
         ScanType::TcpConnectScan => {
-            run_connect_scan(scan_setting, &receive_result, &receive_stop);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
         }
         _ => {}
     }
-    let result: PortScanResult = scan_result.lock().unwrap().port_scan_result.clone();
+    let listener: Listner = Listner::new(capture_options);
+    let stop_handle = listener.get_stop_handle();
+    let fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::new(Mutex::new(vec![]));
+    let receive_fingerprints: Arc<Mutex<Vec<TcpIpFingerprint>>> = Arc::clone(&fingerprints);
+
+    let handler = thread::spawn(move || {
+        listener.start();
+        for f in listener.get_fingerprints() {
+            receive_fingerprints.lock().unwrap().push(f);
+        }
+    });
+
+    // Wait for listener to start (need fix for better way)
+    thread::sleep(Duration::from_millis(1));
+
+    send_tcp_packets(&socket, &scan_setting, ptx);
+    thread::sleep(scan_setting.wait_time);
+    *stop_handle.lock().unwrap() = true;
+
+    // Wait for listener to stop
+    handler.join().unwrap();
+
+    // Parse fingerprints and store results
+    let mut result: ScanResult = ScanResult::new();
+    let mut socket_set: HashSet<SocketAddr> = HashSet::new();
+    for f in fingerprints.lock().unwrap().iter() {
+        match scan_setting.scan_type {
+            ScanType::TcpSynScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Tcp {
+                    continue;
+                }
+            }
+            ScanType::TcpConnectScan => {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Tcp {
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        if socket_set.contains(&f.source) {
+            continue;
+        }
+        let port_info: PortInfo = if let Some(tcp_fingerprint) = &f.tcp_fingerprint {
+            if tcp_fingerprint.flags.contains(&TcpFlagKind::Syn) && tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                let port_info: PortInfo = PortInfo {
+                    port: tcp_fingerprint.source_port,
+                    status: PortStatus::Open,
+                };
+                port_info
+            }else if tcp_fingerprint.flags.contains(&TcpFlagKind::Rst) || tcp_fingerprint.flags.contains(&TcpFlagKind::Ack) {
+                let port_info: PortInfo = PortInfo {
+                    port: tcp_fingerprint.source_port,
+                    status: PortStatus::Closed,
+                };
+                port_info
+            }else {
+                continue;
+            }
+        }else{
+            continue;
+        };
+        let mut exists: bool = false;
+        for host in result.hosts.iter_mut()
+        {
+            if host.ip_addr == f.ip_fingerprint.source_ip {
+                host.ports.push(port_info);
+                exists = true;     
+            }
+        }
+        if !exists {
+            let host_info: HostInfo = HostInfo {
+                ip_addr: f.ip_fingerprint.source_ip,
+                host_name: scan_setting.ip_map.get(&f.ip_fingerprint.source_ip).unwrap_or(&String::new()).clone(),
+                ttl: f.ip_fingerprint.ttl,
+                ports: vec![port_info],
+            };
+            result.hosts.push(host_info);
+        }
+        socket_set.insert(f.source);
+    }
     return result;
 }

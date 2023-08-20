@@ -1,7 +1,7 @@
 use crate::async_io;
 use crate::blocking;
 use crate::interface;
-use crate::result::{HostScanResult, PortScanResult, ScanStatus};
+use crate::result::{ScanResult, ScanStatus};
 use crate::setting::{
     ScanSetting, ScanType, DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY, DEFAULT_SRC_PORT,
 };
@@ -17,7 +17,7 @@ pub struct HostScanner {
     /// Scan Setting
     pub scan_setting: ScanSetting,
     /// Host Scan Result
-    pub scan_result: HostScanResult,
+    pub scan_result: ScanResult,
     /// Sender for progress messaging
     pub tx: Arc<Mutex<Sender<SocketAddr>>>,
     /// Receiver for progress messaging
@@ -66,14 +66,14 @@ impl HostScanner {
         };
         let host_scanner = HostScanner {
             scan_setting: scan_setting,
-            scan_result: HostScanResult::new(),
+            scan_result: ScanResult::new(),
             tx: Arc::new(Mutex::new(tx)),
             rx: Arc::new(Mutex::new(rx)),
         };
         Ok(host_scanner)
     }
     /// Get scan result
-    pub fn get_scan_result(&self) -> HostScanResult {
+    pub fn get_scan_result(&self) -> ScanResult {
         self.scan_result.clone()
     }
     /// Get progress receiver
@@ -88,7 +88,7 @@ impl HostScanner {
         }
         self.scan_setting.ip_map = ip_map;
         let start_time = Instant::now();
-        let mut result: HostScanResult =
+        let mut result: ScanResult =
             async_io::scan_hosts(self.scan_setting.clone(), &self.tx).await;
         result.scan_time = Instant::now().duration_since(start_time);
         if result.scan_time > self.scan_setting.timeout {
@@ -105,7 +105,7 @@ impl HostScanner {
         }
         self.scan_setting.ip_map = ip_map;
         let start_time = Instant::now();
-        let mut result: HostScanResult = blocking::scan_hosts(self.scan_setting.clone(), &self.tx);
+        let mut result: ScanResult = blocking::scan_hosts(self.scan_setting.clone(), &self.tx);
         result.scan_time = Instant::now().duration_since(start_time);
         if result.scan_time > self.scan_setting.timeout {
             result.scan_status = ScanStatus::Timeout;
@@ -115,11 +115,11 @@ impl HostScanner {
         self.scan_result = result;
     }
     /// Run scan and return result
-    pub async fn scan(&mut self) -> HostScanResult {
+    pub async fn scan(&mut self) -> ScanResult {
         self.run_scan().await;
         self.scan_result.clone()
     }
-    pub fn sync_scan(&mut self) -> HostScanResult {
+    pub fn sync_scan(&mut self) -> ScanResult {
         self.run_async_scan();
         self.scan_result.clone()
     }
@@ -131,7 +131,7 @@ pub struct PortScanner {
     /// Scan Setting
     pub scan_setting: ScanSetting,
     /// Port Scan Result
-    pub scan_result: PortScanResult,
+    pub scan_result: ScanResult,
     /// Sender for progress messaging
     pub tx: Arc<Mutex<Sender<SocketAddr>>>,
     /// Receiver for progress messaging
@@ -180,14 +180,14 @@ impl PortScanner {
         };
         let port_scanner = PortScanner {
             scan_setting: scan_setting,
-            scan_result: PortScanResult::new(),
+            scan_result: ScanResult::new(),
             tx: Arc::new(Mutex::new(tx)),
             rx: Arc::new(Mutex::new(rx)),
         };
         Ok(port_scanner)
     }
     /// Get scan result
-    pub fn get_scan_result(&self) -> PortScanResult {
+    pub fn get_scan_result(&self) -> ScanResult {
         self.scan_result.clone()
     }
     /// Get progress receiver
@@ -202,7 +202,7 @@ impl PortScanner {
         }
         self.scan_setting.ip_map = ip_map;
         let start_time = Instant::now();
-        let mut result: PortScanResult =
+        let mut result: ScanResult =
             async_io::scan_ports(self.scan_setting.clone(), &self.tx).await;
         result.scan_time = Instant::now().duration_since(start_time);
         if result.scan_status != ScanStatus::Error {
@@ -221,7 +221,7 @@ impl PortScanner {
         }
         self.scan_setting.ip_map = ip_map;
         let start_time = Instant::now();
-        let mut result: PortScanResult = blocking::scan_ports(self.scan_setting.clone(), &self.tx);
+        let mut result: ScanResult = blocking::scan_ports(self.scan_setting.clone(), &self.tx);
         result.scan_time = Instant::now().duration_since(start_time);
         if result.scan_status != ScanStatus::Error {
             if result.scan_time > self.scan_setting.timeout {
@@ -233,11 +233,11 @@ impl PortScanner {
         self.scan_result = result;
     }
     /// Run scan and return result
-    pub async fn scan(&mut self) -> PortScanResult {
+    pub async fn scan(&mut self) -> ScanResult {
         self.run_scan().await;
         self.scan_result.clone()
     }
-    pub fn sync_scan(&mut self) -> PortScanResult {
+    pub fn sync_scan(&mut self) -> ScanResult {
         self.run_sync_scan();
         self.scan_result.clone()
     }

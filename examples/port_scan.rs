@@ -51,7 +51,7 @@ fn main() {
     // Print results
     println!("Status: {:?}", result.scan_status);
     println!("Results:");
-    for host_info in result.results {
+    for host_info in result.hosts {
         println!("{} {}", host_info.ip_addr, host_info.host_name);
         for port_info in host_info.ports {
             if port_info.status == PortStatus::Open {

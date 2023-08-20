@@ -62,9 +62,9 @@ impl ScanSetting {
             scan_type: ScanType::TcpSynScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
-            timeout: Duration::from_secs(1),
-            wait_time: Duration::from_millis(100),
-            send_rate: Duration::from_millis(100),
+            timeout: Duration::from_secs(30),
+            wait_time: Duration::from_millis(200),
+            send_rate: Duration::from_millis(0),
         }
     }
     /// Set source IP address

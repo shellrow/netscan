@@ -46,7 +46,7 @@ fn main() {
         .set_send_rate(Duration::from_millis(1));
 
     let result = port_scanner.sync_scan();
-    for host_info in &result.results {
+    for host_info in &result.hosts {
         println!("{} {}", host_info.ip_addr, host_info.host_name);
         for port_info in &host_info.ports {
             if port_info.status == PortStatus::Open {
