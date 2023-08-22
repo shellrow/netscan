@@ -45,12 +45,20 @@ name = "host_scan"
 path = "examples/host_scan.rs"
 
 [[example]]
+name = "ipv6_hostscan"
+path = "examples/ipv6_hostscan.rs"
+
+[[example]]
 name = "async_port_scan"
 path = "examples/async_port_scan.rs"
 
 [[example]]
 name = "async_host_scan"
 path = "examples/async_host_scan.rs"
+
+[[example]]
+name = "async_ipv6_hostscan"
+path = "examples/async_ipv6_hostscan.rs"
 
 [[example]]
 name = "service_detection"

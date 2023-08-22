@@ -24,10 +24,18 @@ use np_listener::listener::Listner;
 use np_listener::packet::ip::IpNextLevelProtocol;
 
 async fn build_icmpv4_echo_packet() -> Vec<u8> {
-    let mut buf = vec![0; 16];
+    let mut buf = vec![0; packet::icmp::ICMPV4_HEADER_SIZE];
     let mut icmp_packet =
         pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
     packet::icmp::build_icmp_packet(&mut icmp_packet);
+    icmp_packet.packet().to_vec()
+}
+
+async fn build_icmpv6_echo_packet() -> Vec<u8> {
+    let mut buf = vec![0; packet::icmpv6::ICMPV6_HEADER_SIZE];
+    let mut icmp_packet =
+        pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
+    packet::icmpv6::build_icmpv6_packet(&mut icmp_packet);
     icmp_packet.packet().to_vec()
 }
 
@@ -67,7 +75,12 @@ async fn send_icmp_echo_packets(
             let socket_addr = SocketAddr::new(dst.ip_addr, 0);
             let sock_addr = SockAddr::from(socket_addr);
             async move {
-                let mut icmp_packet: Vec<u8> = build_icmpv4_echo_packet().await;
+                let mut icmp_packet: Vec<u8> = if scan_setting.src_ip.is_ipv4() {
+                    build_icmpv4_echo_packet().await
+                }
+                else {
+                    build_icmpv6_echo_packet().await
+                };
                 match socket.send_to(&mut icmp_packet, &sock_addr).await {
                     Ok(_) => {}
                     Err(_) => {}
@@ -317,6 +330,7 @@ pub(crate) async fn scan_hosts(
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
         }
         ScanType::TcpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
@@ -362,7 +376,7 @@ pub(crate) async fn scan_hosts(
         let mut ports: Vec<PortInfo> = vec![];
         match scan_setting.scan_type {
             ScanType::IcmpPingScan => {
-                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp && f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmpv6 {
                     continue;
                 }
             }
