@@ -279,7 +279,14 @@ pub(crate) async fn scan_hosts(
 ) -> ScanResult {
     let socket = match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
-            AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::ICMPV4).unwrap()
+            match scan_setting.src_ip {
+                IpAddr::V4(_) => {
+                    AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::ICMPV4).unwrap()
+                }
+                IpAddr::V6(_) => {
+                    AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::ICMPV6).unwrap()
+                }
+            }
         }
         ScanType::TcpPingScan => {
             AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::TCP).unwrap()
