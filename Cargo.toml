@@ -41,6 +41,10 @@ name = "port_scan"
 path = "examples/port_scan.rs"
 
 [[example]]
+name = "ipv6_portscan"
+path = "examples/ipv6_portscan.rs"
+
+[[example]]
 name = "host_scan"
 path = "examples/host_scan.rs"
 
@@ -51,6 +55,10 @@ path = "examples/ipv6_hostscan.rs"
 [[example]]
 name = "async_port_scan"
 path = "examples/async_port_scan.rs"
+
+[[example]]
+name = "async_ipv6_portscan"
+path = "examples/async_ipv6_portscan.rs"
 
 [[example]]
 name = "async_host_scan"

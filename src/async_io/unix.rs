@@ -45,11 +45,18 @@ async fn build_tcp_syn_packet(
     dst_ip: IpAddr,
     dst_port: u16,
 ) -> Vec<u8> {
-    let mut vec: Vec<u8> = vec![0; 66];
-    let mut tcp_packet = pnet::packet::tcp::MutableTcpPacket::new(
-        &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
+    let mut vec: Vec<u8> = if src_ip.is_ipv4() { vec![0; 66] } else { vec![0; 86] };
+    let mut tcp_packet = if src_ip.is_ipv4() {
+        pnet::packet::tcp::MutableTcpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+        )
+        .unwrap()
+    }else{
+        pnet::packet::tcp::MutableTcpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+        )
+        .unwrap()
+    };
     packet::tcp::build_tcp_packet(&mut tcp_packet, src_ip, src_port, dst_ip, dst_port);
     tcp_packet.packet().to_vec()
 }
