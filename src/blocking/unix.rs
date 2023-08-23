@@ -52,11 +52,18 @@ fn build_tcp_syn_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port:
 }
 
 fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16) -> Vec<u8> {
-    let mut vec: Vec<u8> = vec![0; 66];
-    let mut udp_packet = pnet::packet::udp::MutableUdpPacket::new(
-        &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
+    let mut vec: Vec<u8> = if src_ip.is_ipv4() { vec![0; 42] } else { vec![0; 62] };
+    let mut udp_packet = if src_ip.is_ipv4() {
+        pnet::packet::udp::MutableUdpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+        )
+        .unwrap()
+    } else {
+        pnet::packet::udp::MutableUdpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+        )
+        .unwrap()
+    };
     packet::udp::build_udp_packet(&mut udp_packet, src_ip, src_port, dst_ip, dst_port);
     udp_packet.packet().to_vec()
 }
@@ -120,6 +127,7 @@ fn send_tcp_syn_packets(
     }
 }
 
+#[allow(dead_code)]
 fn send_udp_packets(
     socket: &Socket,
     scan_setting: &ScanSetting,
@@ -148,6 +156,35 @@ fn send_udp_packets(
             }
             thread::sleep(scan_setting.send_rate);
         }
+    }
+}
+
+fn send_udp_ping_packets(
+    socket: &Socket,
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>,
+) {
+    for dst in scan_setting.targets.clone() {
+        let socket_addr = SocketAddr::new(dst.ip_addr, packet::udp::UDP_BASE_DST_PORT);
+        let sock_addr = SockAddr::from(socket_addr);
+        let mut udp_packet: Vec<u8> = build_udp_packet(
+            scan_setting.src_ip,
+            scan_setting.src_port,
+            dst.ip_addr,
+            packet::udp::UDP_BASE_DST_PORT,
+        );
+        match socket.send_to(&mut udp_packet, &sock_addr) {
+            Ok(_) => {}
+            Err(_) => {}
+        }
+        match ptx.lock() {
+            Ok(lr) => match lr.send(socket_addr) {
+                Ok(_) => {}
+                Err(_) => {}
+            },
+            Err(_) => {}
+        }
+        thread::sleep(scan_setting.send_rate);
     }
 }
 
@@ -195,7 +232,7 @@ fn send_ping_packet(
             send_tcp_syn_packets(socket, scan_setting, ptx);
         }
         ScanType::UdpPingScan => {
-            send_udp_packets(socket, scan_setting, ptx);
+            send_udp_ping_packets(socket, scan_setting, ptx);
         }
         _ => {
             return;
@@ -280,6 +317,8 @@ pub(crate) fn scan_hosts(
         }
         ScanType::UdpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Udp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
         }
         _ => {}
     }
@@ -341,7 +380,7 @@ pub(crate) fn scan_hosts(
                 }
             }
             ScanType::UdpPingScan => {
-                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Udp {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp && f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmpv6 {
                     continue;
                 }
             }

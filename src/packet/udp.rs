@@ -1,6 +1,8 @@
 use pnet::packet::udp::MutableUdpPacket;
 use std::net::IpAddr;
 
+pub const UDP_BASE_DST_PORT: u16 = 33435;
+
 pub fn build_udp_packet(
     udp_packet: &mut MutableUdpPacket,
     src_ip: IpAddr,
