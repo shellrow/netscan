@@ -37,32 +37,32 @@ full = ["service", "os"]
 name = "netscan"
 
 [[example]]
-name = "port_scan"
-path = "examples/port_scan.rs"
+name = "portscan"
+path = "examples/portscan.rs"
 
 [[example]]
 name = "ipv6_portscan"
 path = "examples/ipv6_portscan.rs"
 
 [[example]]
-name = "host_scan"
-path = "examples/host_scan.rs"
+name = "hostscan"
+path = "examples/hostscan.rs"
 
 [[example]]
 name = "ipv6_hostscan"
 path = "examples/ipv6_hostscan.rs"
 
 [[example]]
-name = "async_port_scan"
-path = "examples/async_port_scan.rs"
+name = "async_portscan"
+path = "examples/async_portscan.rs"
 
 [[example]]
 name = "async_ipv6_portscan"
 path = "examples/async_ipv6_portscan.rs"
 
 [[example]]
-name = "async_host_scan"
-path = "examples/async_host_scan.rs"
+name = "async_hostscan"
+path = "examples/async_hostscan.rs"
 
 [[example]]
 name = "async_ipv6_hostscan"
