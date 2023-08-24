@@ -2,7 +2,7 @@ use pnet::packet::icmp::echo_request::MutableEchoRequestPacket;
 use pnet::packet::icmp::IcmpTypes;
 use pnet::packet::Packet;
 
-pub const ICMPV4_HEADER_SIZE: usize =
+pub const ICMPV4_HEADER_LEN: usize =
     pnet::packet::icmp::echo_request::MutableEchoRequestPacket::minimum_packet_size();
 
 pub fn build_icmp_packet(icmp_packet: &mut MutableEchoRequestPacket) {

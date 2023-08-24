@@ -2,7 +2,7 @@ use pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket;
 use pnet::packet::icmpv6::Icmpv6Types;
 use pnet::packet::Packet;
 
-pub const ICMPV6_HEADER_SIZE: usize =
+pub const ICMPV6_HEADER_LEN: usize =
     pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::minimum_packet_size();
 
 pub fn build_icmpv6_packet(icmp_packet: &mut MutableEchoRequestPacket) {
