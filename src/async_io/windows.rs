@@ -24,34 +24,57 @@ use std::thread;
 use std::time::Duration;
 
 async fn build_icmpv4_echo_packet() -> Vec<u8> {
-    let mut buf = vec![0; 16];
+    let mut buf = vec![0; packet::icmp::ICMPV4_HEADER_LEN];
     let mut icmp_packet =
         pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
     packet::icmp::build_icmp_packet(&mut icmp_packet);
     icmp_packet.packet().to_vec()
 }
 
-/* async fn build_tcp_syn_packet(
+async fn build_icmpv6_echo_packet() -> Vec<u8> {
+    let mut buf = vec![0; packet::icmpv6::ICMPV6_HEADER_LEN];
+    let mut icmp_packet =
+        pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
+    packet::icmpv6::build_icmpv6_packet(&mut icmp_packet);
+    icmp_packet.packet().to_vec()
+}
+
+#[allow(dead_code)]
+async fn build_tcp_syn_packet(
     src_ip: IpAddr,
     src_port: u16,
     dst_ip: IpAddr,
     dst_port: u16,
 ) -> Vec<u8> {
-    let mut vec: Vec<u8> = vec![0; 66];
-    let mut tcp_packet = pnet::packet::tcp::MutableTcpPacket::new(
-        &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
+    let mut vec: Vec<u8> = if src_ip.is_ipv4() { vec![0; 66] } else { vec![0; 86] };
+    let mut tcp_packet = if src_ip.is_ipv4() {
+        pnet::packet::tcp::MutableTcpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+        )
+        .unwrap()
+    }else{
+        pnet::packet::tcp::MutableTcpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+        )
+        .unwrap()
+    };
     packet::tcp::build_tcp_packet(&mut tcp_packet, src_ip, src_port, dst_ip, dst_port);
     tcp_packet.packet().to_vec()
-} */
+}
 
 async fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16) -> Vec<u8> {
-    let mut vec: Vec<u8> = vec![0; 66];
-    let mut udp_packet = pnet::packet::udp::MutableUdpPacket::new(
-        &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
+    let mut vec: Vec<u8> = if src_ip.is_ipv4() { vec![0; 42] } else { vec![0; 62] };
+    let mut udp_packet = if src_ip.is_ipv4() {
+        pnet::packet::udp::MutableUdpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+        )
+        .unwrap()
+    } else {
+        pnet::packet::udp::MutableUdpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+        )
+        .unwrap()
+    };
     packet::udp::build_udp_packet(&mut udp_packet, src_ip, src_port, dst_ip, dst_port);
     udp_packet.packet().to_vec()
 }
@@ -67,7 +90,12 @@ async fn send_icmp_echo_packets(
             let socket_addr = SocketAddr::new(dst.ip_addr, 0);
             let sock_addr = SockAddr::from(socket_addr);
             async move {
-                let mut icmp_packet: Vec<u8> = build_icmpv4_echo_packet().await;
+                let mut icmp_packet: Vec<u8> = if scan_setting.src_ip.is_ipv4() {
+                    build_icmpv4_echo_packet().await
+                }
+                else {
+                    build_icmpv6_echo_packet().await
+                };
                 match socket.send_to(&mut icmp_packet, &sock_addr).await {
                     Ok(_) => {}
                     Err(_) => {}
@@ -85,7 +113,10 @@ async fn send_icmp_echo_packets(
     fut_host.await;
 }
 
-/* async fn send_tcp_syn_packets(
+// Winsock2 does not allow TCP data to be sent over Raw Socket
+// https://docs.microsoft.com/en-US/windows/win32/winsock/tcp-ip-raw-sockets-2#limitations-on-raw-sockets
+#[allow(dead_code)]
+async fn send_tcp_syn_packets(
     socket: &AsyncSocket,
     scan_setting: &ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
@@ -125,8 +156,9 @@ async fn send_icmp_echo_packets(
         },
     );
     fut_host.await;
-} */
+}
 
+#[allow(dead_code)]
 async fn send_udp_packets(
     socket: &AsyncSocket,
     scan_setting: &ScanSetting,
@@ -164,6 +196,39 @@ async fn send_udp_packets(
                 },
             );
             fut_port.await;
+        },
+    );
+    fut_host.await;
+}
+
+async fn send_udp_ping_packets(
+    socket: &AsyncSocket,
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>,
+) {
+    let fut_host = stream::iter(scan_setting.targets.clone()).for_each_concurrent(
+        scan_setting.hosts_concurrency,
+        |dst| async move {
+            let socket_addr = SocketAddr::new(dst.ip_addr, packet::udp::UDP_BASE_DST_PORT);
+            let sock_addr = SockAddr::from(socket_addr);
+            let mut udp_packet: Vec<u8> = build_udp_packet(
+                scan_setting.src_ip,
+                scan_setting.src_port,
+                dst.ip_addr,
+                packet::udp::UDP_BASE_DST_PORT,
+            )
+            .await;
+            match socket.send_to(&mut udp_packet, &sock_addr).await {
+                Ok(_) => {}
+                Err(_) => {}
+            }
+            match ptx.lock() {
+                Ok(lr) => match lr.send(socket_addr) {
+                    Ok(_) => {}
+                    Err(_) => {}
+                },
+                Err(_) => {}
+            }
         },
     );
     fut_host.await;
@@ -253,7 +318,7 @@ async fn send_ping_packet(
             send_connect_requests(scan_setting, ptx).await;
         }
         ScanType::UdpPingScan => {
-            send_udp_packets(socket, scan_setting, ptx).await;
+            send_udp_ping_packets(socket, scan_setting, ptx).await;
         }
         _ => {
             return;
@@ -263,14 +328,18 @@ async fn send_ping_packet(
 
 // Winsock2 does not allow TCP data to be sent over Raw Socket
 // https://docs.microsoft.com/en-US/windows/win32/winsock/tcp-ip-raw-sockets-2#limitations-on-raw-sockets
-/* async fn send_tcp_packets(socket: &AsyncSocket, scan_setting: &ScanSetting) {
+/* async fn send_tcp_packets(
+    socket: &AsyncSocket,
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>,
+) {
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
-            send_tcp_syn_packets(socket, scan_setting).await;
-        },
+            send_tcp_syn_packets(socket, scan_setting, ptx).await;
+        }
         _ => {
             return;
-        },
+        }
     }
 } */
 
@@ -280,7 +349,14 @@ pub(crate) async fn scan_hosts(
 ) -> ScanResult {
     let socket = match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
-            AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::ICMPV4).unwrap()
+            match scan_setting.src_ip {
+                IpAddr::V4(_) => {
+                    AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::ICMPV4).unwrap()
+                }
+                IpAddr::V6(_) => {
+                    AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::ICMPV6).unwrap()
+                }
+            }
         }
         ScanType::TcpPingScan => {
             AsyncSocket::new(scan_setting.src_ip, Type::RAW, Protocol::TCP).unwrap()
@@ -311,6 +387,7 @@ pub(crate) async fn scan_hosts(
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
         }
         ScanType::TcpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
@@ -322,6 +399,8 @@ pub(crate) async fn scan_hosts(
         }
         ScanType::UdpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Udp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
         }
         _ => {}
     }
@@ -356,7 +435,7 @@ pub(crate) async fn scan_hosts(
         let mut ports: Vec<PortInfo> = vec![];
         match scan_setting.scan_type {
             ScanType::IcmpPingScan => {
-                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp && f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmpv6 {
                     continue;
                 }
             }
@@ -385,7 +464,7 @@ pub(crate) async fn scan_hosts(
                 }
             }
             ScanType::UdpPingScan => {
-                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Udp {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp && f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmpv6 {
                     continue;
                 }
             }
