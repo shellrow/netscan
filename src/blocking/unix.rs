@@ -12,25 +12,25 @@ use pnet::packet::Packet;
 use rayon::prelude::*;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use std::collections::HashSet;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
 fn build_icmpv4_echo_packet() -> Vec<u8> {
-    let mut buf = vec![0; packet::icmp::ICMPV4_HEADER_SIZE];
+    let mut buf = vec![0; packet::icmp::ICMPV4_HEADER_LEN];
     let mut icmp_packet =
         pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
     packet::icmp::build_icmp_packet(&mut icmp_packet);
     icmp_packet.packet().to_vec()
 }
 
-fn build_icmpv6_echo_packet() -> Vec<u8> {
-    let mut buf = vec![0; packet::icmpv6::ICMPV6_HEADER_SIZE];
+fn build_icmpv6_echo_packet(src_ipv6: Ipv6Addr, dst_ipv6: Ipv6Addr) -> Vec<u8> {
+    let mut buf = vec![0; packet::icmpv6::ICMPV6_HEADER_LEN];
     let mut icmp_packet =
         pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
-    packet::icmpv6::build_icmpv6_packet(&mut icmp_packet);
+    packet::icmpv6::build_icmpv6_packet(&mut icmp_packet, src_ipv6, dst_ipv6);
     icmp_packet.packet().to_vec()
 }
 
@@ -76,10 +76,18 @@ fn send_icmp_echo_packets(
     for dst in scan_setting.targets.clone() {
         let socket_addr = SocketAddr::new(dst.ip_addr, 0);
         let sock_addr = SockAddr::from(socket_addr);
-        let mut icmp_packet: Vec<u8> = if scan_setting.src_ip.is_ipv4() {
-            build_icmpv4_echo_packet()
-        } else {
-            build_icmpv6_echo_packet()
+        let mut icmp_packet: Vec<u8> = match scan_setting.src_ip {
+            IpAddr::V4(_) => {
+                build_icmpv4_echo_packet()
+            }
+            IpAddr::V6(src_ipv6) => match dst.ip_addr {
+                IpAddr::V4(_) => {
+                    build_icmpv4_echo_packet()
+                }
+                IpAddr::V6(dst_ipv6) => {
+                    build_icmpv6_echo_packet(src_ipv6, dst_ipv6)
+                }
+            }
         };
         match socket.send_to(&mut icmp_packet, &sock_addr) {
             Ok(_) => {}
