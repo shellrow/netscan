@@ -34,7 +34,11 @@ fn build_tcp_syn_packet(
         &mut eth_header,
         pnet::datalink::MacAddr::from(scan_setting.src_mac),
         pnet::datalink::MacAddr::from(scan_setting.dst_mac),
-        EtherTypes::Ipv4,
+        if scan_setting.src_ip.is_ipv4() {
+            EtherTypes::Ipv4
+        } else {
+            EtherTypes::Ipv6
+        }
     );
     // Setup IP header
     match scan_setting.src_ip {
@@ -118,7 +122,11 @@ fn build_udp_packet(
         &mut eth_header,
         pnet::datalink::MacAddr::from(scan_setting.src_mac),
         pnet::datalink::MacAddr::from(scan_setting.dst_mac),
-        EtherTypes::Ipv4,
+        if scan_setting.src_ip.is_ipv4() {
+            EtherTypes::Ipv4
+        } else {
+            EtherTypes::Ipv6
+        },
     );
     // Setup IP header
     
@@ -197,7 +205,11 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
         &mut eth_header,
         pnet::datalink::MacAddr::from(scan_setting.src_mac),
         pnet::datalink::MacAddr::from(scan_setting.dst_mac),
-        EtherTypes::Ipv4,
+        if scan_setting.src_ip.is_ipv4() {
+            EtherTypes::Ipv4
+        } else {
+            EtherTypes::Ipv6
+        },
     );
     // Setup IP header
     match scan_setting.src_ip {
@@ -243,12 +255,15 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
             .unwrap();
             packet::icmp::build_icmp_packet(&mut icmp_packet);
         }
-        IpAddr::V6(_ip) => {
-            let mut icmp_packet = pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(
-                &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
-            )
-            .unwrap();
-            packet::icmpv6::build_icmpv6_packet(&mut icmp_packet);
+        IpAddr::V6(src_ipv6) => match dst_ip {
+            IpAddr::V4(_ip) => {},
+            IpAddr::V6(dst_ipv6) => {
+                let mut icmp_packet = pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(
+                    &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+                )
+                .unwrap();
+                packet::icmpv6::build_icmpv6_packet(&mut icmp_packet, src_ipv6, dst_ipv6);
+            }
         }
     }
     
