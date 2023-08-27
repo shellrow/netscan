@@ -5,7 +5,7 @@ use std::time::Duration;
 fn main() {
     let interface = default_net::get_default_interface().unwrap();
     let src_ip: IpAddr = IpAddr::V6(interface.ipv6[0].addr);
-    let dst_ip: IpAddr = match dns_lookup::lookup_host("cloudflare.com") {
+    let dst_ip: IpAddr = match dns_lookup::lookup_host("example.com") {
         Ok(ips) => {
             let mut ip_addr = IpAddr::V6(Ipv6Addr::LOCALHOST);
             for ip in ips {
@@ -17,7 +17,7 @@ fn main() {
                 }
             }
             if ip_addr == IpAddr::V6(Ipv6Addr::LOCALHOST) {
-                panic!("No IPv6 address found for cloudflare.com");
+                panic!("No IPv6 address found for example.com");
             }
             ip_addr
         }
@@ -27,8 +27,8 @@ fn main() {
     fingerprinter.set_wait_time(Duration::from_millis(500));
     let probe_target: ProbeTarget = ProbeTarget {
         ip_addr: dst_ip,
-        open_tcp_ports: vec![22, 80],
-        closed_tcp_port: 443,
+        open_tcp_ports: vec![80, 443],
+        closed_tcp_port: 22,
         open_udp_port: 123,
         closed_udp_port: 33455,
     };
