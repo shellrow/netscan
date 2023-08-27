@@ -4,7 +4,7 @@ use std::net::Ipv6Addr;
 
 pub const IPV6_HEADER_LEN: usize = pnet::packet::ipv6::MutableIpv6Packet::minimum_packet_size();
 pub const IPV6_DEFAULT_HOP_LIMIT: u8 = 64;
-pub const IPV6_TOTAL_LEN_TCP: u16 = 32;
+pub const IPV6_TOTAL_LEN_TCP: u16 = 44;
 pub const IPV6_TOTAL_LEN_UDP: u16 = 8;
 pub const IPV6_TOTAL_LEN_ICMPV6: u16 = 8;
 
