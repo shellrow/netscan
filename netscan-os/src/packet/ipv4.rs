@@ -4,7 +4,12 @@ use std::net::Ipv4Addr;
 
 pub const IPV4_HEADER_LEN: usize = pnet::packet::ipv4::MutableIpv4Packet::minimum_packet_size();
 pub const IPV4_HEADER_BYTES: usize = 4;
+
+#[cfg(not(target_family = "windows"))]
 pub const IPV4_TOTAL_LEN_TCP: u16 = 64;
+#[cfg(target_family = "windows")]
+pub const IPV4_TOTAL_LEN_TCP: u16 = 52;
+
 pub const IPV4_TOTAL_LEN_UDP: u16 = 28;
 pub const IPV4_TOTAL_LEN_ICMP: u16 = 28;
 pub const IPV4_DEFAULT_ID: u16 = 4162;
