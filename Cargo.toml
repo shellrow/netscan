@@ -29,6 +29,7 @@ ipnet = "2.7"
 dns-lookup = "2.0"
 
 [features]
+default = ["service", "os"]
 service = ["netscan-service"]
 os = ["netscan-os"]
 full = ["service", "os"]

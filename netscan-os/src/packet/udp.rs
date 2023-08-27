@@ -1,7 +1,6 @@
 use pnet::packet::udp::MutableUdpPacket;
 use std::net::IpAddr;
 
-#[allow(dead_code)]
 pub const UDP_HEADER_LEN: usize = 8;
 
 pub fn build_udp_packet(
@@ -13,7 +12,7 @@ pub fn build_udp_packet(
 ) {
     udp_packet.set_source(src_port);
     udp_packet.set_destination(dst_port);
-    udp_packet.set_length(32);
+    udp_packet.set_length(UDP_HEADER_LEN as u16);
     match src_ip {
         IpAddr::V4(src_ip) => match dst_ip {
             IpAddr::V4(dst_ip) => {

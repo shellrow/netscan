@@ -51,20 +51,36 @@ impl Fingerprinter {
     pub fn new(src_ip: IpAddr) -> Result<Fingerprinter, String> {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
-        let mut src_mac: MacAddr = MacAddr::zero();
-        for iface in pnet::datalink::interfaces() {
-            for ip in iface.ips {
-                if ip.ip() == src_ip {
-                    if_index = iface.index;
-                    if_name = iface.name;
-                    src_mac = iface.mac.unwrap_or(MacAddr::zero());
-                    break;
+        let mut src_mac: default_net::interface::MacAddr = default_net::interface::MacAddr::zero();
+        match src_ip {
+            IpAddr::V4(_) => {
+                for iface in default_net::get_interfaces() {
+                    for ip in iface.ipv4 {
+                        if ip.addr == src_ip {
+                            if_index = iface.index;
+                            if_name = iface.name;
+                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
+                            break;
+                        }
+                    }
+                }
+            }
+            IpAddr::V6(_) => {
+                for iface in default_net::get_interfaces() {
+                    for ip in iface.ipv6 {
+                        if ip.addr == src_ip {
+                            if_index = iface.index;
+                            if_name = iface.name;
+                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
+                            break;
+                        }
+                    }
                 }
             }
         }
-        if if_index == 0 || if_name.is_empty() || src_mac == MacAddr::zero() {
+        if if_index == 0 || if_name.is_empty() || src_mac.octets() == default_net::interface::MacAddr::zero().octets() {
             return Err(String::from(
-                "Failed to create Fingerprinter. Network Interface not found.",
+                "Failed to create Scanner. Network Interface not found.",
             ));
         }
         let dst_mac: MacAddr = match default_net::get_default_gateway() {
@@ -100,20 +116,36 @@ impl Fingerprinter {
     ) -> Result<Fingerprinter, String> {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
-        let mut src_mac: MacAddr = MacAddr::zero();
-        for iface in pnet::datalink::interfaces() {
-            for ip in iface.ips {
-                if ip.ip() == src_ip {
-                    if_index = iface.index;
-                    if_name = iface.name;
-                    src_mac = iface.mac.unwrap_or(MacAddr::zero());
-                    break;
+        let mut src_mac: default_net::interface::MacAddr = default_net::interface::MacAddr::zero();
+        match src_ip {
+            IpAddr::V4(_) => {
+                for iface in default_net::get_interfaces() {
+                    for ip in iface.ipv4 {
+                        if ip.addr == src_ip {
+                            if_index = iface.index;
+                            if_name = iface.name;
+                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
+                            break;
+                        }
+                    }
+                }
+            }
+            IpAddr::V6(_) => {
+                for iface in default_net::get_interfaces() {
+                    for ip in iface.ipv6 {
+                        if ip.addr == src_ip {
+                            if_index = iface.index;
+                            if_name = iface.name;
+                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
+                            break;
+                        }
+                    }
                 }
             }
         }
-        if if_index == 0 || if_name.is_empty() || src_mac == MacAddr::zero() {
+        if if_index == 0 || if_name.is_empty() || src_mac.octets() == default_net::interface::MacAddr::zero().octets() {
             return Err(String::from(
-                "Failed to create Fingerprinter. Network Interface not found.",
+                "Failed to create Scanner. Network Interface not found.",
             ));
         }
         let interfaces = pnet::datalink::interfaces();
@@ -178,9 +210,11 @@ impl Fingerprinter {
     pub fn set_full_probe(&mut self) {
         self.probe_types.clear();
         self.probe_types.push(ProbeType::IcmpEchoProbe);
-        self.probe_types.push(ProbeType::IcmpTimestampProbe);
-        self.probe_types.push(ProbeType::IcmpAddressMaskProbe);
-        self.probe_types.push(ProbeType::IcmpInformationProbe);
+        if self.src_ip.is_ipv4() {
+            self.probe_types.push(ProbeType::IcmpTimestampProbe);
+            self.probe_types.push(ProbeType::IcmpAddressMaskProbe);
+            self.probe_types.push(ProbeType::IcmpInformationProbe);
+        }
         self.probe_types.push(ProbeType::IcmpUnreachableProbe);
         self.probe_types.push(ProbeType::TcpSynAckProbe);
         self.probe_types.push(ProbeType::TcpRstAckProbe);

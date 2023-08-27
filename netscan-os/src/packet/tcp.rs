@@ -2,6 +2,9 @@ use crate::setting::ProbeType;
 use pnet::packet::tcp::{MutableTcpPacket, TcpFlags, TcpOption};
 use std::net::IpAddr;
 
+pub const TCP_HEADER_LEN: usize = pnet::packet::tcp::MutableTcpPacket::minimum_packet_size();
+pub const TCP_DEFAULT_OPTION_LEN: usize = 12;
+
 #[derive(Copy, Clone, Debug)]
 pub enum TcpProbeOption {
     Syn1,
