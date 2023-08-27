@@ -12,36 +12,58 @@ use pnet::packet::Packet;
 use rayon::prelude::*;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use std::collections::HashSet;
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
 fn build_icmpv4_echo_packet() -> Vec<u8> {
-    let mut buf = vec![0; 16];
+    let mut buf = vec![0; packet::icmp::ICMPV4_HEADER_LEN];
     let mut icmp_packet =
         pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
     packet::icmp::build_icmp_packet(&mut icmp_packet);
     icmp_packet.packet().to_vec()
 }
 
+fn build_icmpv6_echo_packet(src_ipv6: Ipv6Addr, dst_ipv6: Ipv6Addr) -> Vec<u8> {
+    let mut buf = vec![0; packet::icmpv6::ICMPV6_HEADER_LEN];
+    let mut icmp_packet =
+        pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..]).unwrap();
+    packet::icmpv6::build_icmpv6_packet(&mut icmp_packet, src_ipv6, dst_ipv6);
+    icmp_packet.packet().to_vec()
+}
+
 fn build_tcp_syn_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16) -> Vec<u8> {
-    let mut vec: Vec<u8> = vec![0; 66];
-    let mut tcp_packet = pnet::packet::tcp::MutableTcpPacket::new(
-        &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
+    let mut vec: Vec<u8> = if src_ip.is_ipv4() { vec![0; 66] } else { vec![0; 86] };
+    let mut tcp_packet = if src_ip.is_ipv4() {
+        pnet::packet::tcp::MutableTcpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+        )
+        .unwrap()
+    }else{
+        pnet::packet::tcp::MutableTcpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+        )
+        .unwrap()
+    };
     packet::tcp::build_tcp_packet(&mut tcp_packet, src_ip, src_port, dst_ip, dst_port);
     tcp_packet.packet().to_vec()
 }
 
 fn build_udp_packet(src_ip: IpAddr, src_port: u16, dst_ip: IpAddr, dst_port: u16) -> Vec<u8> {
-    let mut vec: Vec<u8> = vec![0; 66];
-    let mut udp_packet = pnet::packet::udp::MutableUdpPacket::new(
-        &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
+    let mut vec: Vec<u8> = if src_ip.is_ipv4() { vec![0; 42] } else { vec![0; 62] };
+    let mut udp_packet = if src_ip.is_ipv4() {
+        pnet::packet::udp::MutableUdpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+        )
+        .unwrap()
+    } else {
+        pnet::packet::udp::MutableUdpPacket::new(
+            &mut vec[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+        )
+        .unwrap()
+    };
     packet::udp::build_udp_packet(&mut udp_packet, src_ip, src_port, dst_ip, dst_port);
     udp_packet.packet().to_vec()
 }
@@ -54,7 +76,19 @@ fn send_icmp_echo_packets(
     for dst in scan_setting.targets.clone() {
         let socket_addr = SocketAddr::new(dst.ip_addr, 0);
         let sock_addr = SockAddr::from(socket_addr);
-        let mut icmp_packet: Vec<u8> = build_icmpv4_echo_packet();
+        let mut icmp_packet: Vec<u8> = match scan_setting.src_ip {
+            IpAddr::V4(_) => {
+                build_icmpv4_echo_packet()
+            }
+            IpAddr::V6(src_ipv6) => match dst.ip_addr {
+                IpAddr::V4(_) => {
+                    build_icmpv4_echo_packet()
+                }
+                IpAddr::V6(dst_ipv6) => {
+                    build_icmpv6_echo_packet(src_ipv6, dst_ipv6)
+                }
+            }
+        };
         match socket.send_to(&mut icmp_packet, &sock_addr) {
             Ok(_) => {}
             Err(_) => {}
@@ -101,6 +135,7 @@ fn send_tcp_syn_packets(
     }
 }
 
+#[allow(dead_code)]
 fn send_udp_packets(
     socket: &Socket,
     scan_setting: &ScanSetting,
@@ -129,6 +164,35 @@ fn send_udp_packets(
             }
             thread::sleep(scan_setting.send_rate);
         }
+    }
+}
+
+fn send_udp_ping_packets(
+    socket: &Socket,
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>,
+) {
+    for dst in scan_setting.targets.clone() {
+        let socket_addr = SocketAddr::new(dst.ip_addr, packet::udp::UDP_BASE_DST_PORT);
+        let sock_addr = SockAddr::from(socket_addr);
+        let mut udp_packet: Vec<u8> = build_udp_packet(
+            scan_setting.src_ip,
+            scan_setting.src_port,
+            dst.ip_addr,
+            packet::udp::UDP_BASE_DST_PORT,
+        );
+        match socket.send_to(&mut udp_packet, &sock_addr) {
+            Ok(_) => {}
+            Err(_) => {}
+        }
+        match ptx.lock() {
+            Ok(lr) => match lr.send(socket_addr) {
+                Ok(_) => {}
+                Err(_) => {}
+            },
+            Err(_) => {}
+        }
+        thread::sleep(scan_setting.send_rate);
     }
 }
 
@@ -176,7 +240,7 @@ fn send_ping_packet(
             send_tcp_syn_packets(socket, scan_setting, ptx);
         }
         ScanType::UdpPingScan => {
-            send_udp_packets(socket, scan_setting, ptx);
+            send_udp_ping_packets(socket, scan_setting, ptx);
         }
         _ => {
             return;
@@ -249,6 +313,7 @@ pub(crate) fn scan_hosts(
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
         }
         ScanType::TcpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
@@ -260,6 +325,8 @@ pub(crate) fn scan_hosts(
         }
         ScanType::UdpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Udp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
         }
         _ => {}
     }
@@ -292,7 +359,7 @@ pub(crate) fn scan_hosts(
         let mut ports: Vec<PortInfo> = vec![];
         match scan_setting.scan_type {
             ScanType::IcmpPingScan => {
-                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp && f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmpv6 {
                     continue;
                 }
             }
@@ -321,7 +388,7 @@ pub(crate) fn scan_hosts(
                 }
             }
             ScanType::UdpPingScan => {
-                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Udp {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp && f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmpv6 {
                     continue;
                 }
             }

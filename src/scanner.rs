@@ -31,18 +31,34 @@ impl HostScanner {
     pub fn new(src_ip: IpAddr) -> Result<HostScanner, String> {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
-        let mut src_mac: pnet::datalink::MacAddr = pnet::datalink::MacAddr::zero();
-        for iface in pnet::datalink::interfaces() {
-            for ip in iface.ips {
-                if ip.ip() == src_ip {
-                    if_index = iface.index;
-                    if_name = iface.name;
-                    src_mac = iface.mac.unwrap_or(pnet::datalink::MacAddr::zero());
-                    break;
+        let mut src_mac: default_net::interface::MacAddr = default_net::interface::MacAddr::zero();
+        match src_ip {
+            IpAddr::V4(_) => {
+                for iface in default_net::get_interfaces() {
+                    for ip in iface.ipv4 {
+                        if ip.addr == src_ip {
+                            if_index = iface.index;
+                            if_name = iface.name;
+                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
+                            break;
+                        }
+                    }
+                }
+            }
+            IpAddr::V6(_) => {
+                for iface in default_net::get_interfaces() {
+                    for ip in iface.ipv6 {
+                        if ip.addr == src_ip {
+                            if_index = iface.index;
+                            if_name = iface.name;
+                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
+                            break;
+                        }
+                    }
                 }
             }
         }
-        if if_index == 0 || if_name.is_empty() || src_mac == pnet::datalink::MacAddr::zero() {
+        if if_index == 0 || if_name.is_empty() || src_mac.octets() == default_net::interface::MacAddr::zero().octets() {
             return Err(String::from(
                 "Failed to create Scanner. Network Interface not found.",
             ));
@@ -145,18 +161,34 @@ impl PortScanner {
     pub fn new(src_ip: IpAddr) -> Result<PortScanner, String> {
         let mut if_index: u32 = 0;
         let mut if_name: String = String::new();
-        let mut src_mac: pnet::datalink::MacAddr = pnet::datalink::MacAddr::zero();
-        for iface in pnet::datalink::interfaces() {
-            for ip in iface.ips {
-                if ip.ip() == src_ip {
-                    if_index = iface.index;
-                    if_name = iface.name;
-                    src_mac = iface.mac.unwrap_or(pnet::datalink::MacAddr::zero());
-                    break;
+        let mut src_mac: default_net::interface::MacAddr = default_net::interface::MacAddr::zero();
+        match src_ip {
+            IpAddr::V4(_) => {
+                for iface in default_net::get_interfaces() {
+                    for ip in iface.ipv4 {
+                        if ip.addr == src_ip {
+                            if_index = iface.index;
+                            if_name = iface.name;
+                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
+                            break;
+                        }
+                    }
+                }
+            }
+            IpAddr::V6(_) => {
+                for iface in default_net::get_interfaces() {
+                    for ip in iface.ipv6 {
+                        if ip.addr == src_ip {
+                            if_index = iface.index;
+                            if_name = iface.name;
+                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
+                            break;
+                        }
+                    }
                 }
             }
         }
-        if if_index == 0 || if_name.is_empty() || src_mac == pnet::datalink::MacAddr::zero() {
+        if if_index == 0 || if_name.is_empty() || src_mac.octets() == default_net::interface::MacAddr::zero().octets() {
             return Err(String::from(
                 "Failed to create Scanner. Network Interface not found.",
             ));

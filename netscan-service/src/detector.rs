@@ -105,6 +105,11 @@ fn detect_service(setting: &ServiceDetector, port_db: PortDatabase) -> HashMap<u
                     );
                     parse_header(header)
                 } else {
+                    if port_db.payload_map.contains_key(&port) {
+                        let payload: &Vec<u8> = port_db.payload_map.get(&port).unwrap();
+                        writer.write_all(payload).unwrap();
+                        writer.flush().unwrap();
+                    }
                     read_response(&mut reader).replace("\r\n", "")
                 };
                 service_map.lock().unwrap().insert(port, msg);

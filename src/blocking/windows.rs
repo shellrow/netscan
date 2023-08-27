@@ -34,17 +34,21 @@ fn build_tcp_syn_packet(
         &mut eth_header,
         pnet::datalink::MacAddr::from(scan_setting.src_mac),
         pnet::datalink::MacAddr::from(scan_setting.dst_mac),
-        EtherTypes::Ipv4,
+        if scan_setting.src_ip.is_ipv4() {
+            EtherTypes::Ipv4
+        } else {
+            EtherTypes::Ipv6
+        }
     );
     // Setup IP header
-    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
-        &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
-            ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
-    )
-    .unwrap();
     match scan_setting.src_ip {
         IpAddr::V4(src_ip) => match dst_ip {
             IpAddr::V4(dst_ip) => {
+                let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
+                    &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
+                        ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
+                )
+                .unwrap();
                 packet::ipv4::build_ipv4_packet(
                     &mut ip_header,
                     src_ip,
@@ -54,20 +58,53 @@ fn build_tcp_syn_packet(
             }
             IpAddr::V6(_ip) => {}
         },
-        IpAddr::V6(_ip) => {}
+        IpAddr::V6(src_ip) => match dst_ip {
+            IpAddr::V4(_ip) => {}
+            IpAddr::V6(dst_ip) => {
+                let mut ip_header = pnet::packet::ipv6::MutableIpv6Packet::new(
+                    &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
+                        ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)],
+                )
+                .unwrap();
+                packet::ipv6::build_ipv6_packet(
+                    &mut ip_header,
+                    src_ip,
+                    dst_ip,
+                    IpNextHeaderProtocols::Tcp,
+                );
+            }
+        }
     }
-    // Setup TCP header
-    let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(
-        &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
-    packet::tcp::build_tcp_packet(
-        &mut tcp_header,
-        scan_setting.src_ip,
-        scan_setting.src_port,
-        dst_ip,
-        dst_port,
-    );
+    match scan_setting.src_ip {
+        IpAddr::V4(_ip) => {
+            // Setup TCP header
+            let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(
+                &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+            )
+            .unwrap();
+            packet::tcp::build_tcp_packet(
+                &mut tcp_header,
+                scan_setting.src_ip,
+                scan_setting.src_port,
+                dst_ip,
+                dst_port,
+            );
+        },
+        IpAddr::V6(_ip) => {
+            // Setup TCP header
+            let mut tcp_header = pnet::packet::tcp::MutableTcpPacket::new(
+                &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+            )
+            .unwrap();
+            packet::tcp::build_tcp_packet(
+                &mut tcp_header,
+                scan_setting.src_ip,
+                scan_setting.src_port,
+                dst_ip,
+                dst_port,
+            );
+        }
+    }
 }
 
 fn build_udp_packet(
@@ -85,40 +122,77 @@ fn build_udp_packet(
         &mut eth_header,
         pnet::datalink::MacAddr::from(scan_setting.src_mac),
         pnet::datalink::MacAddr::from(scan_setting.dst_mac),
-        EtherTypes::Ipv4,
+        if scan_setting.src_ip.is_ipv4() {
+            EtherTypes::Ipv4
+        } else {
+            EtherTypes::Ipv6
+        },
     );
     // Setup IP header
-    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
-        &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
-            ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
-    )
-    .unwrap();
+    
     match scan_setting.src_ip {
         IpAddr::V4(src_ip) => match dst_ip {
             IpAddr::V4(dst_ip) => {
+                let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
+                    &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
+                        ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
+                )
+                .unwrap();
                 packet::ipv4::build_ipv4_packet(
                     &mut ip_header,
                     src_ip,
                     dst_ip,
-                    IpNextHeaderProtocols::Tcp,
+                    IpNextHeaderProtocols::Udp,
                 );
             }
             IpAddr::V6(_ip) => {}
         },
-        IpAddr::V6(_ip) => {}
+        IpAddr::V6(src_ip) => match dst_ip {
+            IpAddr::V4(_ip) => {}
+            IpAddr::V6(dst_ip) => {
+                let mut ip_header = pnet::packet::ipv6::MutableIpv6Packet::new(
+                    &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
+                        ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)],
+                )
+                .unwrap();
+                packet::ipv6::build_ipv6_packet(
+                    &mut ip_header,
+                    src_ip,
+                    dst_ip,
+                    IpNextHeaderProtocols::Udp,
+                );
+            }
+        }
     }
     // Setup UDP header
-    let mut udp_header = pnet::packet::udp::MutableUdpPacket::new(
-        &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
-    packet::udp::build_udp_packet(
-        &mut udp_header,
-        scan_setting.src_ip,
-        scan_setting.src_port,
-        dst_ip,
-        dst_port,
-    );
+    match scan_setting.src_ip {
+        IpAddr::V4(_ip) => {
+            let mut udp_header = pnet::packet::udp::MutableUdpPacket::new(
+                &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+            )
+            .unwrap();
+            packet::udp::build_udp_packet(
+                &mut udp_header,
+                scan_setting.src_ip,
+                scan_setting.src_port,
+                dst_ip,
+                dst_port,
+            );
+        },
+        IpAddr::V6(_ip) => {
+            let mut udp_header = pnet::packet::udp::MutableUdpPacket::new(
+                &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+            )
+            .unwrap();
+            packet::udp::build_udp_packet(
+                &mut udp_header,
+                scan_setting.src_ip,
+                scan_setting.src_port,
+                dst_ip,
+                dst_port,
+            );
+        }
+    }
 }
 
 fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst_ip: IpAddr) {
@@ -131,17 +205,21 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
         &mut eth_header,
         pnet::datalink::MacAddr::from(scan_setting.src_mac),
         pnet::datalink::MacAddr::from(scan_setting.dst_mac),
-        EtherTypes::Ipv4,
+        if scan_setting.src_ip.is_ipv4() {
+            EtherTypes::Ipv4
+        } else {
+            EtherTypes::Ipv6
+        },
     );
     // Setup IP header
-    let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
-        &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
-            ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
-    )
-    .unwrap();
     match scan_setting.src_ip {
         IpAddr::V4(src_ip) => match dst_ip {
             IpAddr::V4(dst_ip) => {
+                let mut ip_header = pnet::packet::ipv4::MutableIpv4Packet::new(
+                    &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
+                        ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)],
+                )
+                .unwrap();
                 packet::ipv4::build_ipv4_packet(
                     &mut ip_header,
                     src_ip,
@@ -151,14 +229,44 @@ fn build_icmp_echo_packet(scan_setting: &ScanSetting, tmp_packet: &mut [u8], dst
             }
             IpAddr::V6(_ip) => {}
         },
-        IpAddr::V6(_ip) => {}
+        IpAddr::V6(src_ip) => match dst_ip {
+            IpAddr::V4(_ip) => {}
+            IpAddr::V6(dst_ip) => {
+                let mut ip_header = pnet::packet::ipv6::MutableIpv6Packet::new(
+                    &mut tmp_packet[packet::ethernet::ETHERNET_HEADER_LEN
+                        ..(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)],
+                )
+                .unwrap();
+                packet::ipv6::build_ipv6_packet(
+                    &mut ip_header,
+                    src_ip,
+                    dst_ip,
+                    IpNextHeaderProtocols::Icmpv6,
+                );
+            }
+        }
     }
     // Setup ICMP header
-    let mut icmp_packet = pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(
-        &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
-    )
-    .unwrap();
-    packet::icmp::build_icmp_packet(&mut icmp_packet);
+    match scan_setting.src_ip {
+        IpAddr::V4(_ip) => {
+            let mut icmp_packet = pnet::packet::icmp::echo_request::MutableEchoRequestPacket::new(
+                &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv4::IPV4_HEADER_LEN)..],
+            )
+            .unwrap();
+            packet::icmp::build_icmp_packet(&mut icmp_packet);
+        }
+        IpAddr::V6(src_ipv6) => match dst_ip {
+            IpAddr::V4(_ip) => {},
+            IpAddr::V6(dst_ipv6) => {
+                let mut icmp_packet = pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(
+                    &mut tmp_packet[(packet::ethernet::ETHERNET_HEADER_LEN + packet::ipv6::IPV6_HEADER_LEN)..],
+                )
+                .unwrap();
+                packet::icmpv6::build_icmpv6_packet(&mut icmp_packet, src_ipv6, dst_ipv6);
+            }
+        }
+    }
+    
 }
 
 fn send_packets(
@@ -169,9 +277,19 @@ fn send_packets(
     match scan_setting.scan_type {
         ScanType::TcpSynScan | ScanType::TcpPingScan => {
             for dst in scan_setting.targets.clone() {
+                let packet_size: usize = match dst.ip_addr {
+                    IpAddr::V4(_ip) => packet::ethernet::ETHERNET_HEADER_LEN
+                        + packet::ipv4::IPV4_HEADER_LEN
+                        + packet::tcp::TCP_HEADER_LEN
+                        + packet::tcp::TCP_DEFAULT_OPTION_LEN,
+                    IpAddr::V6(_ip) => packet::ethernet::ETHERNET_HEADER_LEN
+                        + packet::ipv6::IPV6_HEADER_LEN
+                        + packet::tcp::TCP_HEADER_LEN
+                        + packet::tcp::TCP_DEFAULT_OPTION_LEN,
+                };
                 let dst_ip: IpAddr = dst.ip_addr;
                 for port in dst.get_ports() {
-                    tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
+                    tx.build_and_send(1, packet_size, &mut |packet: &mut [u8]| {
                         build_tcp_syn_packet(scan_setting, packet, dst_ip, port);
                     });
                     let socket_addr = SocketAddr::new(dst.ip_addr, port);
@@ -188,26 +306,40 @@ fn send_packets(
         }
         ScanType::UdpPingScan => {
             for dst in scan_setting.targets.clone() {
+                let packet_size: usize = match dst.ip_addr {
+                    IpAddr::V4(_ip) => packet::ethernet::ETHERNET_HEADER_LEN
+                        + packet::ipv4::IPV4_HEADER_LEN
+                        + packet::udp::UDP_HEADER_LEN,
+                    IpAddr::V6(_ip) => packet::ethernet::ETHERNET_HEADER_LEN
+                        + packet::ipv6::IPV6_HEADER_LEN
+                        + packet::udp::UDP_HEADER_LEN,
+                };
                 let dst_ip: IpAddr = dst.ip_addr;
-                for port in dst.get_ports() {
-                    tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
-                        build_udp_packet(scan_setting, packet, dst_ip, port);
-                    });
-                    let socket_addr = SocketAddr::new(dst.ip_addr, port);
-                    match ptx.lock() {
-                        Ok(lr) => match lr.send(socket_addr) {
-                            Ok(_) => {}
-                            Err(_) => {}
-                        },
+                tx.build_and_send(1, packet_size, &mut |packet: &mut [u8]| {
+                    build_udp_packet(scan_setting, packet, dst_ip, packet::udp::UDP_BASE_DST_PORT);
+                });
+                let socket_addr = SocketAddr::new(dst.ip_addr, packet::udp::UDP_BASE_DST_PORT);
+                match ptx.lock() {
+                    Ok(lr) => match lr.send(socket_addr) {
+                        Ok(_) => {}
                         Err(_) => {}
-                    }
-                    thread::sleep(scan_setting.send_rate);
+                    },
+                    Err(_) => {}
                 }
+                thread::sleep(scan_setting.send_rate);
             }
         }
         ScanType::IcmpPingScan => {
             for dst in scan_setting.targets.clone() {
-                tx.build_and_send(1, 66, &mut |packet: &mut [u8]| {
+                let packet_size: usize = match dst.ip_addr {
+                    IpAddr::V4(_ip) => packet::ethernet::ETHERNET_HEADER_LEN
+                        + packet::ipv4::IPV4_HEADER_LEN
+                        + packet::icmp::ICMPV4_HEADER_LEN,
+                    IpAddr::V6(_ip) => packet::ethernet::ETHERNET_HEADER_LEN
+                        + packet::ipv6::IPV6_HEADER_LEN
+                        + packet::icmpv6::ICMPV6_HEADER_LEN,
+                };
+                tx.build_and_send(1, packet_size, &mut |packet: &mut [u8]| {
                     build_icmp_echo_packet(scan_setting, packet, dst.ip_addr);
                 });
                 let socket_addr = SocketAddr::new(dst.ip_addr, 0);
@@ -306,6 +438,7 @@ pub(crate) fn scan_hosts(
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
         }
         ScanType::TcpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
@@ -317,6 +450,8 @@ pub(crate) fn scan_hosts(
         }
         ScanType::UdpPingScan => {
             capture_options.ip_protocols.insert(IpNextLevelProtocol::Udp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
         }
         _ => {}
     }
@@ -349,7 +484,7 @@ pub(crate) fn scan_hosts(
         let mut ports: Vec<PortInfo> = vec![];
         match scan_setting.scan_type {
             ScanType::IcmpPingScan => {
-                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp && f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmpv6 {
                     continue;
                 }
             }
@@ -378,7 +513,7 @@ pub(crate) fn scan_hosts(
                 }
             }
             ScanType::UdpPingScan => {
-                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Udp {
+                if f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmp && f.ip_fingerprint.next_level_protocol != IpNextLevelProtocol::Icmpv6 {
                     continue;
                 }
             }

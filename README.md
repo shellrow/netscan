@@ -8,18 +8,19 @@ Cross-platform network scan library
 with the aim of being lightweight and fast. 
 
 ## Features
-- Port Scan
+- Port Scan (IPv4, IPv6)
     - TCP SYN scan
     - TCP CONNECT scan
-- Host Scan
+- Host Scan (IPv4, IPv6)
     - ICMP PING scan
     - TCP PING scan
+    - UDP PING scan
 
 ## Usage
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.16"
+netscan = "0.17"
 ```
 
 ## Example
