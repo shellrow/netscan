@@ -16,6 +16,9 @@ fn main() {
                     continue;
                 }
             }
+            if ip_addr == IpAddr::V4(Ipv4Addr::LOCALHOST) {
+                panic!("No IPv4 address found for scanme.nmap.org");
+            }
             ip_addr
         }
         Err(e) => panic!("Error resolving host: {}", e),
