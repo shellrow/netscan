@@ -1,13 +1,27 @@
-use pnet::datalink::MacAddr;
+use cross_socket::datalink::MacAddr;
+use cross_socket::datalink::interface::Interface;
 use std::net::IpAddr;
 
-#[allow(dead_code)]
 pub fn get_interface_index_by_ip(ip_addr: IpAddr) -> Option<u32> {
-    for iface in pnet::datalink::interfaces() {
-        for ip in iface.ips {
-            if ip.ip() == ip_addr {
+    for iface in default_net::get_interfaces() {
+        for ip in iface.ipv4 {
+            if ip.addr == ip_addr {
                 return Some(iface.index);
             }
+        }
+        for ip in iface.ipv6 {
+            if ip.addr == ip_addr {
+                return Some(iface.index);
+            }
+        }
+    }
+    return None;
+}
+
+pub(crate) fn get_interface_by_index(index: u32) -> Option<Interface> {
+    for iface in default_net::get_interfaces() {
+        if iface.index == index {
+            return Some(iface);
         }
     }
     return None;

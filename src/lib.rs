@@ -1,5 +1,5 @@
 mod interface;
-mod packet;
+//mod packet;
 
 pub mod async_io;
 pub mod blocking;
@@ -8,7 +8,7 @@ pub mod result;
 pub mod scanner;
 pub mod setting;
 
-pub use np_listener;
+pub use cross_socket::packet;
 
 #[cfg(feature = "service")]
 extern crate netscan_service;
