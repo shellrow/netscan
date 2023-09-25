@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 use std::time::Duration;
-use crate::packet::PacketFrame;
+use crate::cross_socket::packet::PacketFrame;
 
 use crate::host::{HostInfo, PortStatus};
 
