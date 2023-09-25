@@ -1,5 +1,4 @@
 mod interface;
-//mod packet;
 
 pub mod async_io;
 pub mod blocking;

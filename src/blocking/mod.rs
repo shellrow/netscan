@@ -1,6 +1,3 @@
-mod shared;
-pub(crate) use shared::*;
-
 #[cfg(not(target_os = "windows"))]
 mod unix;
 #[cfg(not(target_os = "windows"))]

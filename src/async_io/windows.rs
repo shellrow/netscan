@@ -17,7 +17,6 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-
 use cross_socket::{socket::AsyncSocket, packet::{ip::IpNextLevelProtocol, tcp::{TcpPacketBuilder, TcpFlag, TcpOption}, icmp::IcmpPacketBuilder, icmpv6::Icmpv6PacketBuilder}};
 use cross_socket::packet::udp::UDP_BASE_DST_PORT;
 
@@ -209,7 +208,7 @@ async fn try_connect_ports(
     }
 }
 
-async fn send_connect_requests(
+async fn send_tcp_connect_requests(
     scan_setting: &ScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
 ) {
@@ -229,7 +228,7 @@ async fn send_ping_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx
             // Winsock2 does not allow TCP data to be sent over Raw Socket
             // https://docs.microsoft.com/en-US/windows/win32/winsock/tcp-ip-raw-sockets-2#limitations-on-raw-sockets
             //send_tcp_syn_packets(socket, scan_setting, ptx);
-            send_connect_requests(scan_setting, ptx).await;
+            send_tcp_connect_requests(scan_setting, ptx).await;
         }
         ScanType::UdpPingScan => {
             send_udp_ping_packets(socket, scan_setting, ptx).await;
@@ -531,7 +530,7 @@ pub(crate) async fn scan_ports(
     // Wait for listener to start (need fix for better way)
     thread::sleep(Duration::from_millis(1));
 
-    send_connect_requests(&scan_setting, ptx).await;
+    send_tcp_connect_requests(&scan_setting, ptx).await;
 
     thread::sleep(scan_setting.wait_time);
     *stop_handle.lock().unwrap() = true;

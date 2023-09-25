@@ -12,12 +12,11 @@ use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-
 use cross_socket::{socket::DataLinkSocket, packet::{builder::PacketBuilder, ethernet::{EthernetPacketBuilder, EtherType}, ipv4::Ipv4PacketBuilder, ip::IpNextLevelProtocol, tcp::{TcpPacketBuilder, TcpFlag, TcpOption}, ipv6::Ipv6PacketBuilder, icmp::IcmpPacketBuilder, icmpv6::Icmpv6PacketBuilder}};
 use cross_socket::datalink::MacAddr;
 use cross_socket::packet::udp::UDP_BASE_DST_PORT;
 
-pub(crate) fn send_tcp_syn_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_tcp_syn_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
         src_mac: MacAddr::new(scan_setting.src_mac.clone()),
@@ -89,7 +88,7 @@ pub(crate) fn send_tcp_syn_packets_datalink(socket: &mut DataLinkSocket, scan_se
     }
 }
 
-pub(crate) fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
         src_mac: socket.interface.mac_addr.clone().unwrap(),
@@ -160,7 +159,7 @@ pub(crate) fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_
     }
 }
 
-pub(crate) fn send_udp_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_udp_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
         src_mac: socket.interface.mac_addr.clone().unwrap(),
@@ -217,7 +216,7 @@ pub(crate) fn send_udp_ping_packets_datalink(socket: &mut DataLinkSocket, scan_s
     }
 }
 
-pub(crate) fn send_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
             send_icmp_echo_packets_datalink(socket, scan_setting, ptx);
@@ -240,7 +239,11 @@ fn send_tcp_connect_requests(scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<
     for dst in scan_setting.targets.clone() {
         let ip_addr: IpAddr = dst.ip_addr;
         dst.get_ports().into_par_iter().for_each(|port| {
-            let socket = socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::STREAM, Some(socket2::Protocol::TCP)).unwrap();
+            let socket = if ip_addr.is_ipv4() {
+                socket2::Socket::new(socket2::Domain::IPV4, socket2::Type::STREAM, Some(socket2::Protocol::TCP)).unwrap()
+            }else {
+                socket2::Socket::new(socket2::Domain::IPV6, socket2::Type::STREAM, Some(socket2::Protocol::TCP)).unwrap()
+            };
             let socket_addr: SocketAddr = SocketAddr::new(ip_addr, port);
             let sock_addr = socket2::SockAddr::from(socket_addr);
             match socket.connect_timeout(&sock_addr, conn_timeout) {

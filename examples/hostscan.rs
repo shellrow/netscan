@@ -12,7 +12,8 @@ fn main() {
         Ok(scanner) => scanner,
         Err(e) => panic!("Error creating scanner: {}", e),
     };
-    let net: Ipv4Net = Ipv4Net::new(Ipv4Addr::new(192, 168, 1, 0), 24).unwrap();
+    let src_ip: Ipv4Addr = interface.ipv4[0].addr;
+    let net: Ipv4Net = Ipv4Net::new(src_ip, 24).unwrap();
     let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
     let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
     // Add scan target
