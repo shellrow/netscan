@@ -128,14 +128,13 @@ fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &S
                         IpNextLevelProtocol::Icmpv6,
                     );
                     packet_builder.set_ipv6(ipv6_packet_builder);
-                    let mut icmpv6_packet_builder = Icmpv6PacketBuilder{
+                    let icmpv6_packet_builder = Icmpv6PacketBuilder{
                         src_ip: src_ipv6,
                         dst_ip: dst_ipv6,
                         icmpv6_type: cross_socket::packet::icmpv6::Icmpv6Type::EchoRequest,
                         sequence_number: None,
                         identifier: None,
                     };
-                    icmpv6_packet_builder.icmpv6_type = cross_socket::packet::icmpv6::Icmpv6Type::EchoRequest;
                     packet_builder.set_icmpv6(icmpv6_packet_builder);
                 },
             },
