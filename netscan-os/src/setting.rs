@@ -1,6 +1,7 @@
-use pnet::datalink::MacAddr;
+use cross_socket::datalink::MacAddr;
 use std::net::IpAddr;
 use std::time::Duration;
+use cross_socket::packet::tcp::TcpOption;
 
 /// Probes for fingerprinting
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -75,4 +76,76 @@ pub(crate) struct ProbeSetting {
     pub wait_time: Duration,
     #[allow(dead_code)]
     pub send_rate: Duration,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum TcpProbeKind {
+    Syn1,
+    Syn2,
+    Syn3,
+    Syn4,
+    Syn5,
+    Syn6,
+    Ecn,
+}
+
+impl TcpProbeKind {
+    pub const VALUES: [Self; 7] = [
+        Self::Syn1,
+        Self::Syn2,
+        Self::Syn3,
+        Self::Syn4,
+        Self::Syn5,
+        Self::Syn6,
+        Self::Ecn,
+    ];
+    pub fn tcp_options(&self) -> Vec<TcpOption> {
+        match *self {
+            TcpProbeKind::Syn1 => vec![
+                TcpOption::wscale(10),
+                TcpOption::nop(),
+                TcpOption::mss(1460),
+                TcpOption::timestamp(u32::MAX, u32::MIN),
+                TcpOption::sack_perm(),
+            ],
+            TcpProbeKind::Syn2 => vec![
+                TcpOption::mss(1400),
+                TcpOption::wscale(0),
+                TcpOption::sack_perm(),
+                TcpOption::timestamp(u32::MAX, u32::MIN),
+            ],
+            TcpProbeKind::Syn3 => vec![
+                TcpOption::timestamp(u32::MAX, u32::MIN),
+                TcpOption::nop(),
+                TcpOption::nop(),
+                TcpOption::wscale(5),
+                TcpOption::nop(),
+                TcpOption::mss(640),
+            ],
+            TcpProbeKind::Syn4 => vec![
+                TcpOption::sack_perm(),
+                TcpOption::timestamp(u32::MAX, u32::MIN),
+                TcpOption::wscale(10),
+            ],
+            TcpProbeKind::Syn5 => vec![
+                TcpOption::mss(536),
+                TcpOption::sack_perm(),
+                TcpOption::timestamp(u32::MAX, u32::MIN),
+                TcpOption::wscale(10),
+            ],
+            TcpProbeKind::Syn6 => vec![
+                TcpOption::mss(265),
+                TcpOption::sack_perm(),
+                TcpOption::timestamp(u32::MAX, u32::MIN),
+            ],
+            TcpProbeKind::Ecn => vec![
+                TcpOption::wscale(10),
+                TcpOption::nop(),
+                TcpOption::mss(1460),
+                TcpOption::sack_perm(),
+                TcpOption::nop(),
+                TcpOption::nop(),
+            ],
+        }
+    }
 }

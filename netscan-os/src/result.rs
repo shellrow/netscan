@@ -1,4 +1,4 @@
-use np_listener::packet::TcpIpFingerprint;
+use cross_socket::packet::PacketFrame;
 
 use super::setting::ProbeType;
 use std::net::IpAddr;
@@ -6,7 +6,7 @@ use std::net::IpAddr;
 #[derive(Clone, Debug)]
 pub struct IcmpEchoResult {
     pub icmp_echo_reply: bool,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl IcmpEchoResult {
@@ -21,7 +21,7 @@ impl IcmpEchoResult {
 #[derive(Clone, Debug)]
 pub struct IcmpTimestampResult {
     pub icmp_timestamp_reply: bool,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl IcmpTimestampResult {
@@ -36,7 +36,7 @@ impl IcmpTimestampResult {
 #[derive(Clone, Debug)]
 pub struct IcmpAddressMaskResult {
     pub icmp_address_mask_reply: bool,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl IcmpAddressMaskResult {
@@ -51,7 +51,7 @@ impl IcmpAddressMaskResult {
 #[derive(Clone, Debug)]
 pub struct IcmpInformationResult {
     pub icmp_information_reply: bool,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl IcmpInformationResult {
@@ -66,7 +66,7 @@ impl IcmpInformationResult {
 #[derive(Clone, Debug)]
 pub struct IcmpUnreachableIpResult {
     pub icmp_unreachable_reply: bool,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl IcmpUnreachableIpResult {
@@ -81,7 +81,7 @@ impl IcmpUnreachableIpResult {
 #[derive(Clone, Debug)]
 pub struct TcpSynAckResult {
     pub syn_ack_response: bool,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl TcpSynAckResult {
@@ -96,7 +96,7 @@ impl TcpSynAckResult {
 #[derive(Clone, Debug)]
 pub struct TcpRstAckResult {
     pub rst_ack_response: bool,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl TcpRstAckResult {
@@ -111,7 +111,7 @@ impl TcpRstAckResult {
 #[derive(Clone, Debug)]
 pub struct TcpEcnResult {
     pub syn_ack_ece_response: bool,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl TcpEcnResult {
@@ -134,7 +134,7 @@ pub struct ProbeResult {
     pub tcp_syn_ack_result: Option<TcpSynAckResult>,
     pub tcp_rst_ack_result: Option<TcpRstAckResult>,
     pub tcp_ecn_result: Option<TcpEcnResult>,
-    pub fingerprints: Vec<TcpIpFingerprint>,
+    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl ProbeResult {
