@@ -4,6 +4,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use cross_socket::packet::builder::PacketBuildOption;
+use cross_socket::packet::ipv4::{Ipv4Packet, Ipv4Flags};
+use cross_socket::packet::ipv6::Ipv6Packet;
+use cross_socket::packet::udp::UdpPacket;
 use cross_socket::pcap::listener::Listner;
 use cross_socket::pcap::PacketCaptureOptions;
 use cross_socket::packet::PacketFrame;
@@ -336,6 +339,15 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
                         IcmpType::DestinationUnreachable => {
                             if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
                                 icmp_unreachable_ip_result.icmp_unreachable_reply = true;
+                                let ipv4_packet: Ipv4Packet = Ipv4Packet::from_bytes(&icmp_fingerprint.payload[4..cross_socket::packet::ipv4::IPV4_HEADER_LEN + 4]);
+                                let _udp_packet: UdpPacket = UdpPacket::from_bytes(&icmp_fingerprint.payload[cross_socket::packet::ipv4::IPV4_HEADER_LEN + 4..]);
+                                icmp_unreachable_ip_result.icmp_unreachable_size = icmp_fingerprint.payload.len() - 4;
+                                icmp_unreachable_ip_result.ip_total_length = ipv4_packet.total_length;
+                                icmp_unreachable_ip_result.ip_id = ipv4_packet.identification;
+                                if Ipv4Flags::from_u8(ipv4_packet.flags) == Ipv4Flags::DontFragment {
+                                    icmp_unreachable_ip_result.ip_df = true;
+                                }
+                                icmp_unreachable_ip_result.ip_ttl = ipv4_packet.ttl;
                                 icmp_unreachable_ip_result.fingerprints.push(f.clone());
                             }
                         }
@@ -373,6 +385,11 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
                         Icmpv6Type::DestinationUnreachable => {
                             if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
                                 icmp_unreachable_ip_result.icmp_unreachable_reply = true;
+                                let ipv6_packet: Ipv6Packet = Ipv6Packet::from_bytes(&icmpv6_fingerprint.payload[4..cross_socket::packet::ipv6::IPV6_HEADER_LEN + 4]);
+                                let _udp_packet: UdpPacket = UdpPacket::from_bytes(&icmpv6_fingerprint.payload[cross_socket::packet::ipv6::IPV6_HEADER_LEN + 4..]);
+                                icmp_unreachable_ip_result.icmp_unreachable_size = icmpv6_fingerprint.payload.len() - 4;
+                                icmp_unreachable_ip_result.ip_total_length = (icmpv6_fingerprint.payload.len() - 4) as u16;
+                                icmp_unreachable_ip_result.ip_ttl = ipv6_packet.hop_limit;
                                 icmp_unreachable_ip_result.fingerprints.push(f.clone());
                             }
                         }

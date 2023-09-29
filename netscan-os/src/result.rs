@@ -66,6 +66,11 @@ impl IcmpInformationResult {
 #[derive(Clone, Debug)]
 pub struct IcmpUnreachableIpResult {
     pub icmp_unreachable_reply: bool,
+    pub icmp_unreachable_size: usize,
+    pub ip_total_length: u16,
+    pub ip_id: u16,
+    pub ip_df: bool,
+    pub ip_ttl: u8,
     pub fingerprints: Vec<PacketFrame>,
 }
 
@@ -73,6 +78,11 @@ impl IcmpUnreachableIpResult {
     pub fn new() -> IcmpUnreachableIpResult {
         IcmpUnreachableIpResult {
             icmp_unreachable_reply: false,
+            icmp_unreachable_size: 0,
+            ip_total_length: 0,
+            ip_id: 0,
+            ip_df: false,
+            ip_ttl: 0,
             fingerprints: vec![],
         }
     }
