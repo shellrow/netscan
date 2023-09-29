@@ -56,6 +56,7 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
             tcp_packet_builder.flags = vec![TcpFlag::Syn];
         },
         ProbeType::TcpRstAckProbe => {
+            tcp_packet_builder.dst_port = probe_setting.probe_target.closed_tcp_port; 
             tcp_packet_builder.flags = vec![TcpFlag::Syn];
         },
         ProbeType::TcpEcnProbe => {
@@ -100,7 +101,7 @@ pub(crate) fn build_udp_probe_packet(probe_setting: &ProbeSetting) -> Vec<u8> {
                 let ipv4_packet_builder = Ipv4PacketBuilder::new(
                     src_ipv4,
                     dst_ipv4,
-                    IpNextLevelProtocol::Tcp,
+                    IpNextLevelProtocol::Udp,
                 );
                 packet_builder.set_ipv4(ipv4_packet_builder);
             },
@@ -112,7 +113,7 @@ pub(crate) fn build_udp_probe_packet(probe_setting: &ProbeSetting) -> Vec<u8> {
                 let ipv6_packet_builder = Ipv6PacketBuilder::new(
                     src_ipv6,
                     dst_ipv6,
-                    IpNextLevelProtocol::Tcp,
+                    IpNextLevelProtocol::Udp,
                 );
                 packet_builder.set_ipv6(ipv6_packet_builder);
             },
@@ -144,7 +145,7 @@ pub(crate) fn build_icmp_probe_packet(probe_setting: &ProbeSetting, probe_type: 
                 let ipv4_packet_builder = Ipv4PacketBuilder::new(
                     src_ipv4,
                     dst_ipv4,
-                    IpNextLevelProtocol::Tcp,
+                    IpNextLevelProtocol::Icmp,
                 );
                 packet_builder.set_ipv4(ipv4_packet_builder);
                 let mut icmp_packet_builder = IcmpPacketBuilder::new(
@@ -179,7 +180,7 @@ pub(crate) fn build_icmp_probe_packet(probe_setting: &ProbeSetting, probe_type: 
                 let ipv6_packet_builder = Ipv6PacketBuilder::new(
                     src_ipv6,
                     dst_ipv6,
-                    IpNextLevelProtocol::Tcp,
+                    IpNextLevelProtocol::Icmpv6,
                 );
                 packet_builder.set_ipv6(ipv6_packet_builder);
                 let mut icmpv6_packet_builder = Icmpv6PacketBuilder::new(src_ipv6, dst_ipv6);
