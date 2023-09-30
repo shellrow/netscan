@@ -6,7 +6,7 @@ use cross_socket::packet::icmpv6::Icmpv6PacketBuilder;
 use cross_socket::packet::ip::IpNextLevelProtocol;
 use cross_socket::packet::ipv4::Ipv4PacketBuilder;
 use cross_socket::packet::ipv6::Ipv6PacketBuilder;
-use cross_socket::packet::tcp::{TcpPacketBuilder, TcpFlag};
+use cross_socket::packet::tcp::{TcpPacketBuilder, TcpFlag, TcpOption};
 use cross_socket::packet::{builder::PacketBuilder, ethernet::EthernetPacketBuilder};
 use cross_socket::packet::udp::UDP_BASE_DST_PORT;
 use super::setting::{ProbeSetting, ProbeType, TcpProbeKind};
@@ -26,11 +26,21 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
     match probe_setting.src_ip {
         IpAddr::V4(src_ipv4) => match probe_setting.probe_target.ip_addr {
             IpAddr::V4(dst_ipv4) => {
-                let ipv4_packet_builder = Ipv4PacketBuilder::new(
+                let mut ipv4_packet_builder = Ipv4PacketBuilder::new(
                     src_ipv4,
                     dst_ipv4,
                     IpNextLevelProtocol::Tcp,
                 );
+                match probe_type {
+                    ProbeType::TcpProbe => {
+                        if let Some(probe_kind) = tcp_probe_kind {
+                            ipv4_packet_builder.total_length = Some(probe_kind.ip_total_length());
+                        }
+                    },
+                    _ => {
+                        ipv4_packet_builder.total_length = Some(64);
+                    },
+                }
                 packet_builder.set_ipv4(ipv4_packet_builder);
             },
             IpAddr::V6(_) => {},
@@ -51,6 +61,16 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
         SocketAddr::new(probe_setting.src_ip, probe_setting.src_port),
         SocketAddr::new(probe_setting.probe_target.ip_addr, probe_setting.probe_target.open_tcp_ports[0]),
     );
+    tcp_packet_builder.window = 65535;
+    tcp_packet_builder.options = vec![
+                TcpOption::mss(1460),
+                TcpOption::nop(),
+                TcpOption::wscale(6),
+                TcpOption::nop(),
+                TcpOption::nop(),
+                TcpOption::timestamp(u32::MAX, u32::MIN),
+                TcpOption::sack_perm(),
+            ];
     match probe_type {
         ProbeType::TcpSynAckProbe => {
             tcp_packet_builder.flags = vec![TcpFlag::Syn];

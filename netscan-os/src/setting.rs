@@ -99,6 +99,17 @@ impl TcpProbeKind {
         Self::Syn6,
         Self::Ecn,
     ];
+    pub fn ip_total_length(&self) -> u16 {
+        match *self {
+            TcpProbeKind::Syn1 => 60,
+            TcpProbeKind::Syn2 => 60,
+            TcpProbeKind::Syn3 => 60,
+            TcpProbeKind::Syn4 => 56,
+            TcpProbeKind::Syn5 => 60,
+            TcpProbeKind::Syn6 => 56,
+            TcpProbeKind::Ecn => 52,
+        }
+    }
     pub fn tcp_options(&self) -> Vec<TcpOption> {
         match *self {
             TcpProbeKind::Syn1 => vec![
