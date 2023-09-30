@@ -27,7 +27,7 @@ fn main() {
     fingerprinter.set_wait_time(Duration::from_millis(500));
     let probe_target: ProbeTarget = ProbeTarget {
         ip_addr: dst_ip,
-        open_tcp_ports: vec![80, 443],
+        open_tcp_port: 80,
         closed_tcp_port: 22,
         open_udp_port: 123,
         closed_udp_port: 33455,
@@ -45,9 +45,6 @@ fn main() {
         println!("{:?}", result.tcp_syn_ack_result);
         println!("{:?}", result.tcp_rst_ack_result);
         println!("{:?}", result.tcp_ecn_result);
-        for f in result.fingerprints {
-            println!("{:?}", f);
-        }
         println!();
     }
 }
