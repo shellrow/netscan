@@ -2,6 +2,7 @@ use crate::host::{HostInfo, PortInfo, PortStatus};
 use crate::result::ScanResult;
 use crate::setting::ScanSetting;
 use crate::setting::ScanType;
+use crate::setting::LISTENER_WAIT_TIME_MILLIS;
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
@@ -288,7 +289,7 @@ pub(crate) fn scan_hosts(
     });
 
     // Wait for listener to start (need fix for better way)
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
 
     // Send probe packets
     send_ping_packets(&socket, &scan_setting, ptx);
@@ -444,7 +445,7 @@ pub(crate) fn scan_ports(
     });
 
     // Wait for listener to start (need fix for better way)
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
 
     match scan_setting.scan_type {
         ScanType::TcpConnectScan => {
