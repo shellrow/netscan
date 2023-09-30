@@ -48,12 +48,12 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
         IpAddr::V6(src_ipv6) => match probe_setting.probe_target.ip_addr {
             IpAddr::V4(_) => {},
             IpAddr::V6(dst_ipv6) => {
-                let ipv6_packet_builder = Ipv6PacketBuilder::new(
+                let mut ipv6_packet_builder = Ipv6PacketBuilder::new(
                     src_ipv6,
                     dst_ipv6,
                     IpNextLevelProtocol::Tcp,
                 );
-                /* match probe_type {
+                match probe_type {
                     ProbeType::TcpProbe => {
                         if let Some(probe_kind) = tcp_probe_kind {
                             ipv6_packet_builder.payload_length = Some(probe_kind.ipv6_payload_length());
@@ -62,7 +62,7 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
                     _ => {
                         ipv6_packet_builder.payload_length = Some(44);
                     },
-                } */
+                }
                 packet_builder.set_ipv6(ipv6_packet_builder);
             },
         },

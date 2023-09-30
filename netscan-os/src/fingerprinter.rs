@@ -297,10 +297,10 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
     let mut result: ProbeResult = ProbeResult::new_with_types(probe_setting.probe_target.ip_addr, probe_setting.probe_types.clone());
     for f in fingerprints.lock().unwrap().iter() {
         let ip_next_protocol: IpNextLevelProtocol = if let Some(ip_packet) = &f.ipv4_packet {
-            ip_packet.next_level_protocol
+            ip_packet.next_protocol
         }else {
             if let Some(ip_packet) = &f.ipv6_packet {
-                ip_packet.next_header
+                ip_packet.next_protocol
             } else {
                 continue;
             }
