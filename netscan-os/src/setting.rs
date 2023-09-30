@@ -58,7 +58,7 @@ impl TcpOptionKind {
 #[derive(Clone, Debug)]
 pub struct ProbeTarget {
     pub ip_addr: IpAddr,
-    pub open_tcp_ports: Vec<u16>,
+    pub open_tcp_port: u16,
     pub closed_tcp_port: u16,
     pub open_udp_port: u16,
     pub closed_udp_port: u16,
@@ -99,7 +99,7 @@ impl TcpProbeKind {
         Self::Syn6,
         Self::Ecn,
     ];
-    pub fn ip_total_length(&self) -> u16 {
+    pub fn ipv4_total_length(&self) -> u16 {
         match *self {
             TcpProbeKind::Syn1 => 60,
             TcpProbeKind::Syn2 => 60,
@@ -108,6 +108,17 @@ impl TcpProbeKind {
             TcpProbeKind::Syn5 => 60,
             TcpProbeKind::Syn6 => 56,
             TcpProbeKind::Ecn => 52,
+        }
+    }
+    pub fn ipv6_payload_length(&self) -> u16 {
+        match *self {
+            TcpProbeKind::Syn1 => 40,
+            TcpProbeKind::Syn2 => 40,
+            TcpProbeKind::Syn3 => 40,
+            TcpProbeKind::Syn4 => 36,
+            TcpProbeKind::Syn5 => 40,
+            TcpProbeKind::Syn6 => 36,
+            TcpProbeKind::Ecn => 32,
         }
     }
     pub fn tcp_options(&self) -> Vec<TcpOption> {
