@@ -45,9 +45,6 @@ fn main() {
         println!("{:?}", result.tcp_syn_ack_result);
         println!("{:?}", result.tcp_rst_ack_result);
         println!("{:?}", result.tcp_ecn_result);
-        for f in result.fingerprints {
-            println!("{:?}", f);
-        }
         println!();
     }
 }

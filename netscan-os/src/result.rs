@@ -144,7 +144,6 @@ pub struct ProbeResult {
     pub tcp_syn_ack_result: Option<TcpSynAckResult>,
     pub tcp_rst_ack_result: Option<TcpRstAckResult>,
     pub tcp_ecn_result: Option<TcpEcnResult>,
-    pub fingerprints: Vec<PacketFrame>,
 }
 
 impl ProbeResult {
@@ -159,7 +158,6 @@ impl ProbeResult {
             tcp_syn_ack_result: None,
             tcp_rst_ack_result: None,
             tcp_ecn_result: None,
-            fingerprints: vec![],
         }
     }
     pub fn new_with_types(ip_addr: IpAddr, types: Vec<ProbeType>) -> ProbeResult {
@@ -205,7 +203,6 @@ impl ProbeResult {
             } else {
                 None
             },
-            fingerprints: vec![],
         }
     }
 }

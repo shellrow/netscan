@@ -22,6 +22,7 @@ use super::send;
 use super::setting::{ProbeSetting, ProbeTarget, ProbeType};
 
 const DEFAULT_SRC_PORT: u16 = 54433;
+const ICMP_UNUSED_BYTE_SIZE: usize = 4;
 
 /// Struct for fingerprint probe
 pub struct Fingerprinter {
@@ -339,9 +340,9 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
                         IcmpType::DestinationUnreachable => {
                             if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
                                 icmp_unreachable_ip_result.icmp_unreachable_reply = true;
-                                let ipv4_packet: Ipv4Packet = Ipv4Packet::from_bytes(&icmp_fingerprint.payload[4..cross_socket::packet::ipv4::IPV4_HEADER_LEN + 4]);
-                                let _udp_packet: UdpPacket = UdpPacket::from_bytes(&icmp_fingerprint.payload[cross_socket::packet::ipv4::IPV4_HEADER_LEN + 4..]);
-                                icmp_unreachable_ip_result.icmp_unreachable_size = icmp_fingerprint.payload.len() - 4;
+                                let ipv4_packet: Ipv4Packet = Ipv4Packet::from_bytes(&icmp_fingerprint.payload[ICMP_UNUSED_BYTE_SIZE..cross_socket::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]);
+                                let _udp_packet: UdpPacket = UdpPacket::from_bytes(&icmp_fingerprint.payload[cross_socket::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]);
+                                icmp_unreachable_ip_result.icmp_unreachable_size = icmp_fingerprint.payload.len() - ICMP_UNUSED_BYTE_SIZE;
                                 icmp_unreachable_ip_result.ip_total_length = ipv4_packet.total_length;
                                 icmp_unreachable_ip_result.ip_id = ipv4_packet.identification;
                                 if Ipv4Flags::from_u8(ipv4_packet.flags) == Ipv4Flags::DontFragment {
@@ -385,9 +386,9 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
                         Icmpv6Type::DestinationUnreachable => {
                             if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
                                 icmp_unreachable_ip_result.icmp_unreachable_reply = true;
-                                let ipv6_packet: Ipv6Packet = Ipv6Packet::from_bytes(&icmpv6_fingerprint.payload[4..cross_socket::packet::ipv6::IPV6_HEADER_LEN + 4]);
-                                let _udp_packet: UdpPacket = UdpPacket::from_bytes(&icmpv6_fingerprint.payload[cross_socket::packet::ipv6::IPV6_HEADER_LEN + 4..]);
-                                icmp_unreachable_ip_result.icmp_unreachable_size = icmpv6_fingerprint.payload.len() - 4;
+                                let ipv6_packet: Ipv6Packet = Ipv6Packet::from_bytes(&icmpv6_fingerprint.payload[ICMP_UNUSED_BYTE_SIZE..cross_socket::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]);
+                                let _udp_packet: UdpPacket = UdpPacket::from_bytes(&icmpv6_fingerprint.payload[cross_socket::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]);
+                                icmp_unreachable_ip_result.icmp_unreachable_size = icmpv6_fingerprint.payload.len() - ICMP_UNUSED_BYTE_SIZE;
                                 icmp_unreachable_ip_result.ip_total_length = (icmpv6_fingerprint.payload.len() - 4) as u16;
                                 icmp_unreachable_ip_result.ip_ttl = ipv6_packet.hop_limit;
                                 icmp_unreachable_ip_result.fingerprints.push(f.clone());
@@ -399,7 +400,6 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
             }
             _ => {}
         }
-        result.fingerprints.push(f.clone());
     }
     return result;
 }
@@ -428,7 +428,7 @@ fn get_mac_through_arp(
         }
     }
     let src_mac = socket.interface.mac_addr.clone().unwrap();
-    let timeout = Duration::from_millis(30000);
+    let timeout = Duration::from_millis(10000);
     let start = std::time::Instant::now();
     // Receive packets
     loop {
