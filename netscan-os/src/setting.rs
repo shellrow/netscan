@@ -3,6 +3,9 @@ use std::net::IpAddr;
 use std::time::Duration;
 use cross_socket::packet::tcp::TcpOption;
 
+/// Listener thread wait time (milliseconds)
+pub(crate) const LISTENER_WAIT_TIME_MILLIS: u64 = 100;
+
 /// Probes for fingerprinting
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ProbeType {

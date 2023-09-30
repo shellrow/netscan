@@ -1,6 +1,7 @@
 use crate::host::{HostInfo, PortInfo, PortStatus};
 use crate::result::ScanResult;
 use crate::setting::{ScanSetting, ScanType};
+use crate::setting::LISTENER_WAIT_TIME_MILLIS;
 use async_io::{Async, Timer};
 use cross_socket::packet::PacketFrame;
 use cross_socket::pcap::PacketCaptureOptions;
@@ -350,7 +351,7 @@ pub(crate) async fn scan_hosts(
     let lisner_handle: futures::future::RemoteHandle<()> = executor.spawn_with_handle(future).unwrap();
     
     // Wait for listener to start (need fix for better way)
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
 
     // Send probe packets
     send_ping_packets(&socket, &scan_setting, ptx).await;
@@ -506,7 +507,7 @@ pub(crate) async fn scan_ports(
     let lisner_handle: futures::future::RemoteHandle<()> = executor.spawn_with_handle(future).unwrap();
 
     // Wait for listener to start (need fix for better way)
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
 
     match scan_setting.scan_type {
         ScanType::TcpConnectScan => {

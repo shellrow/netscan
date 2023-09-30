@@ -20,7 +20,7 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.18"
+netscan = "0.19"
 ```
 
 ## Example

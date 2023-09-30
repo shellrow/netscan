@@ -20,6 +20,7 @@ use default_net::interface::MacAddr;
 use super::result::ProbeResult;
 use super::send;
 use super::setting::{ProbeSetting, ProbeTarget, ProbeType};
+use super::setting::LISTENER_WAIT_TIME_MILLIS;
 
 const DEFAULT_SRC_PORT: u16 = 54433;
 const ICMP_UNUSED_BYTE_SIZE: usize = 4;
@@ -285,7 +286,7 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
     });
 
     // Wait for listener to start (need fix for better way)
-    thread::sleep(Duration::from_millis(1));
+    thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
 
     send::send_packets(socket, &probe_setting);
     thread::sleep(probe_setting.wait_time);
