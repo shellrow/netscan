@@ -1,20 +1,17 @@
 use cross_socket::datalink::MacAddr;
 use std::net::IpAddr;
-
-#[cfg(target_os = "windows")]
 use cross_socket::datalink::interface::Interface;
 
-#[allow(dead_code)]
-pub(crate) fn get_interface_index_by_ip(ip_addr: IpAddr) -> Option<u32> {
+pub(crate) fn get_interface_by_ip(ip_addr: IpAddr) -> Option<Interface> {
     for iface in default_net::get_interfaces() {
-        for ip in iface.ipv4 {
+        for ip in iface.ipv4.clone() {
             if ip.addr == ip_addr {
-                return Some(iface.index);
+                return Some(iface);
             }
         }
-        for ip in iface.ipv6 {
+        for ip in iface.ipv6.clone() {
             if ip.addr == ip_addr {
-                return Some(iface.index);
+                return Some(iface);
             }
         }
     }
