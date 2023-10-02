@@ -1,7 +1,5 @@
 use cross_socket::datalink::MacAddr;
 use std::net::IpAddr;
-
-#[cfg(target_os = "windows")]
 use cross_socket::datalink::interface::Interface;
 
 pub(crate) fn get_interface_by_ip(ip_addr: IpAddr) -> Option<Interface> {
