@@ -421,18 +421,17 @@ fn get_mac_through_arp(
 
     // Send ARP request to default gateway
     match socket.send(packet_option) {
-        Ok(packet_len) => {
-            println!("Sent {} bytes", packet_len);
-        }
-        Err(e) => {
-            println!("Error: {}", e);
-        }
+        Ok(_) => {}
+        Err(_) => {}
     }
     let src_mac = socket.interface.mac_addr.clone().unwrap();
     let timeout = Duration::from_millis(10000);
     let start = std::time::Instant::now();
-    // Receive packets
+    // Receive packets until timeout
     loop {
+        if start.elapsed() > timeout {
+            return MacAddr::zero();
+        }
         match socket.receive() {
             Ok(packet) => {
                 let ethernet_packet = cross_socket::packet::ethernet::EthernetPacket::from_bytes(&packet);
@@ -441,15 +440,11 @@ fn get_mac_through_arp(
                 }
                 let arp_packet =
                     cross_socket::packet::arp::ArpPacket::from_bytes(&ethernet_packet.payload);
-                if arp_packet.sender_hw_addr.address() != src_mac.address() {
+                if arp_packet.sender_hw_addr.address() != src_mac.address() && arp_packet.sender_proto_addr == target_ip {
                     return arp_packet.sender_hw_addr;
                 }
             }
             Err(_) => {}
-        }
-        // break if timeout
-        if start.elapsed() > timeout {
-            return MacAddr::zero();
         }
     }
 }
