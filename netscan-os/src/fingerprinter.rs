@@ -17,6 +17,8 @@ use cross_socket::socket::DataLinkSocket;
 use cross_socket::packet::tcp::TcpFlag;
 use default_net::interface::MacAddr;
 
+use crate::interface;
+
 use super::result::ProbeResult;
 use super::send;
 use super::setting::{ProbeSetting, ProbeTarget, ProbeType};
@@ -27,135 +29,128 @@ const ICMP_UNUSED_BYTE_SIZE: usize = 4;
 
 /// Struct for fingerprint probe
 pub struct Fingerprinter {
-    /// Index of network interface  
-    pub if_index: u32,
-    /// Name of network interface  
-    pub if_name: String,
-    /// Source MAC Address
-    pub src_mac: String,
-    /// Destination MAC Address (Gateway)
-    pub dst_mac: String,
-    /// Source IP Address  
-    pub src_ip: IpAddr,
-    /// Source port
-    pub src_port: u16,
-    /// Probe Targets
-    pub probe_targets: Vec<ProbeTarget>,
-    /// Probe Types  
-    pub probe_types: Vec<ProbeType>,
-    /// Timeout setting    
-    pub timeout: Duration,
-    /// Wait time after send task is finished
-    pub wait_time: Duration,
-    /// Packet send rate
-    pub send_rate: Duration,
+    /// Probe setting
+    pub probe_setting: ProbeSetting,
     /// Result of probes  
-    pub probe_results: Vec<ProbeResult>,
+    pub probe_result: ProbeResult,
 }
 
 impl Fingerprinter {
-    /// Create new fingerprinter with interfece IP
+    /// Create new fingerprinter with Interfece IP
     pub fn new(src_ip: IpAddr) -> Result<Fingerprinter, String> {
-        let mut if_index: u32 = 0;
-        let mut if_name: String = String::new();
-        let mut src_mac: default_net::interface::MacAddr = default_net::interface::MacAddr::zero();
-        match src_ip {
-            IpAddr::V4(_) => {
-                for iface in default_net::get_interfaces() {
-                    for ip in iface.ipv4 {
-                        if ip.addr == src_ip {
-                            if_index = iface.index;
-                            if_name = iface.name;
-                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
-                            break;
-                        }
-                    }
-                }
-            }
-            IpAddr::V6(_) => {
-                for iface in default_net::get_interfaces() {
-                    for ip in iface.ipv6 {
-                        if ip.addr == src_ip {
-                            if_index = iface.index;
-                            if_name = iface.name;
-                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        if if_index == 0 || if_name.is_empty() || src_mac.octets() == default_net::interface::MacAddr::zero().octets() {
+        let network_interface = if let Some(network_interface) = interface::get_interface_by_ip(src_ip) {
+            network_interface
+        }else {
             return Err(String::from(
                 "Failed to create Scanner. Network Interface not found.",
             ));
-        }
-        let dst_mac: MacAddr = match default_net::get_default_gateway() {
-            Ok(default_gateway) => {
-                default_gateway.mac_addr
-            }
-            Err(_) => return Err(String::from("Failed to get gateway mac")),
         };
-        let fingerprinter = Fingerprinter {
-            if_index: if_index,
-            if_name: if_name,
-            src_mac: src_mac.to_string(),
-            dst_mac: dst_mac.to_string(),
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
+        let probe_setting: ProbeSetting = ProbeSetting {
+            if_index: network_interface.index,
+            if_name: network_interface.name.clone(),
+            src_mac: if use_tun { MacAddr::zero() } else { interface::get_interface_macaddr(&network_interface) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_gateway_macaddr(&network_interface) },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
-            probe_targets: vec![],
+            probe_target: ProbeTarget::new(),
             probe_types: vec![],
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
-            probe_results: vec![],
+            use_tun: use_tun,
+            loopback: loopback,
+        };
+        let fingerprinter = Fingerprinter {
+            probe_setting: probe_setting,
+            probe_result: ProbeResult::new(IpAddr::V4(Ipv4Addr::LOCALHOST)),
         };
         Ok(fingerprinter)
     }
-
+    /// Create new fingerprinter with Interfece Index
+    pub fn new_with_index(if_index: u32) -> Result<Fingerprinter, String> {
+        let network_interface = if let Some(network_interface) = interface::get_interface_by_index(if_index) {
+            network_interface
+        }else {
+            return Err(String::from(
+                "Failed to create Scanner. Network Interface not found.",
+            ));
+        };
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
+        let probe_setting: ProbeSetting = ProbeSetting {
+            if_index: network_interface.index,
+            if_name: network_interface.name.clone(),
+            src_mac: if use_tun { MacAddr::zero() } else { interface::get_interface_macaddr(&network_interface) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_gateway_macaddr(&network_interface) },
+            src_ip: src_ip,
+            src_port: DEFAULT_SRC_PORT,
+            probe_target: ProbeTarget::new(),
+            probe_types: vec![],
+            timeout: Duration::from_millis(30000),
+            wait_time: Duration::from_millis(200),
+            send_rate: Duration::from_millis(1),
+            use_tun: use_tun,
+            loopback: loopback,
+        };
+        let fingerprinter = Fingerprinter {
+            probe_setting: probe_setting,
+            probe_result: ProbeResult::new(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        };
+        Ok(fingerprinter)
+    }
+    /// Create new fingerprinter with Interfece Name
+    pub fn new_with_name(if_name: String) -> Result<Fingerprinter, String> {
+        let network_interface = if let Some(network_interface) = interface::get_interface_by_name(if_name) {
+            network_interface
+        }else {
+            return Err(String::from(
+                "Failed to create Scanner. Network Interface not found.",
+            ));
+        };
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
+        let probe_setting: ProbeSetting = ProbeSetting {
+            if_index: network_interface.index,
+            if_name: network_interface.name.clone(),
+            src_mac: if use_tun { MacAddr::zero() } else { interface::get_interface_macaddr(&network_interface) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_gateway_macaddr(&network_interface) },
+            src_ip: src_ip,
+            src_port: DEFAULT_SRC_PORT,
+            probe_target: ProbeTarget::new(),
+            probe_types: vec![],
+            timeout: Duration::from_millis(30000),
+            wait_time: Duration::from_millis(200),
+            send_rate: Duration::from_millis(1),
+            use_tun: use_tun,
+            loopback: loopback,
+        };
+        let fingerprinter = Fingerprinter {
+            probe_setting: probe_setting,
+            probe_result: ProbeResult::new(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+        };
+        Ok(fingerprinter)
+    }
     /// Create new fingerprinter with interfece IP and gateway IP
     pub fn new_with_gateway_ip(
         src_ip: IpAddr,
         gateway_ip: IpAddr,
     ) -> Result<Fingerprinter, String> {
-        let mut if_index: u32 = 0;
-        let mut if_name: String = String::new();
-        let mut src_mac: default_net::interface::MacAddr = default_net::interface::MacAddr::zero();
-        match src_ip {
-            IpAddr::V4(_) => {
-                for iface in default_net::get_interfaces() {
-                    for ip in iface.ipv4 {
-                        if ip.addr == src_ip {
-                            if_index = iface.index;
-                            if_name = iface.name;
-                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
-                            break;
-                        }
-                    }
-                }
-            }
-            IpAddr::V6(_) => {
-                for iface in default_net::get_interfaces() {
-                    for ip in iface.ipv6 {
-                        if ip.addr == src_ip {
-                            if_index = iface.index;
-                            if_name = iface.name;
-                            src_mac = iface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero());
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        if if_index == 0 || if_name.is_empty() || src_mac.octets() == default_net::interface::MacAddr::zero().octets() {
+        let network_interface = if let Some(network_interface) = interface::get_interface_by_ip(src_ip) {
+            network_interface
+        }else {
             return Err(String::from(
                 "Failed to create Scanner. Network Interface not found.",
             ));
-        }
-        let interface = crate::interface::get_interface_by_index(if_index).unwrap();
+        };
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
         let dst_mac: MacAddr = match gateway_ip {
             IpAddr::V4(ip) => {
-                get_mac_through_arp(interface, ip)
+                get_mac_through_arp(network_interface.clone(), ip)
             }
             IpAddr::V6(_) => {
                 return Err(String::from(
@@ -163,97 +158,85 @@ impl Fingerprinter {
                 ))
             }
         };
-        let fingerprinter = Fingerprinter {
-            if_index: if_index,
-            if_name: if_name,
-            src_mac: src_mac.to_string(),
-            dst_mac: dst_mac.to_string(),
+        let probe_setting: ProbeSetting = ProbeSetting {
+            if_index: network_interface.index,
+            if_name: network_interface.name,
+            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
+            dst_mac: dst_mac,
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
-            probe_targets: vec![],
+            probe_target: ProbeTarget::new(),
             probe_types: vec![],
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
-            probe_results: vec![],
+            use_tun: use_tun,
+            loopback: loopback,
+        };
+        let fingerprinter = Fingerprinter {
+            probe_setting: probe_setting,
+            probe_result: ProbeResult::new(IpAddr::V4(Ipv4Addr::LOCALHOST)),
         };
         Ok(fingerprinter)
     }
     /// Set source port number
     pub fn set_src_port(&mut self, src_port: u16) {
-        self.src_port = src_port;
+        self.probe_setting.src_port = src_port;
     }
-    /// Add probe target (IP address and tcp/udp port)
-    pub fn add_probe_target(&mut self, dst_info: ProbeTarget) {
-        self.probe_targets.push(dst_info);
-    }
-    /// Set probe targets
-    pub fn set_probe_targets(&mut self, probe_targets: Vec<ProbeTarget>) {
-        self.probe_targets = probe_targets;
+    /// Set probe target (IP address and tcp/udp port)
+    pub fn set_probe_target(&mut self, probe_target: ProbeTarget) {
+        self.probe_setting.probe_target = probe_target;
     }
     /// Add probe type
     pub fn add_probe_type(&mut self, probe_type: ProbeType) {
-        self.probe_types.push(probe_type);
+        self.probe_setting.probe_types.push(probe_type);
     }
     /// Set probe types
     pub fn set_probe_types(&mut self, probe_types: Vec<ProbeType>) {
-        self.probe_types = probe_types;
+        self.probe_setting.probe_types = probe_types;
     }
     /// Set all probe types
     pub fn set_full_probe(&mut self) {
-        self.probe_types.clear();
-        self.probe_types.push(ProbeType::IcmpEchoProbe);
-        if self.src_ip.is_ipv4() {
-            self.probe_types.push(ProbeType::IcmpTimestampProbe);
-            self.probe_types.push(ProbeType::IcmpAddressMaskProbe);
-            self.probe_types.push(ProbeType::IcmpInformationProbe);
+        self.probe_setting.probe_types.clear();
+        self.probe_setting.probe_types.push(ProbeType::IcmpEchoProbe);
+        if self.probe_setting.src_ip.is_ipv4() {
+            self.probe_setting.probe_types.push(ProbeType::IcmpTimestampProbe);
+            self.probe_setting.probe_types.push(ProbeType::IcmpAddressMaskProbe);
+            self.probe_setting.probe_types.push(ProbeType::IcmpInformationProbe);
         }
-        self.probe_types.push(ProbeType::IcmpUnreachableProbe);
-        self.probe_types.push(ProbeType::TcpSynAckProbe);
-        self.probe_types.push(ProbeType::TcpRstAckProbe);
-        self.probe_types.push(ProbeType::TcpEcnProbe);
-        self.probe_types.push(ProbeType::TcpProbe);
+        self.probe_setting.probe_types.push(ProbeType::IcmpUnreachableProbe);
+        self.probe_setting.probe_types.push(ProbeType::TcpSynAckProbe);
+        self.probe_setting.probe_types.push(ProbeType::TcpRstAckProbe);
+        self.probe_setting.probe_types.push(ProbeType::TcpEcnProbe);
+        self.probe_setting.probe_types.push(ProbeType::TcpProbe);
     }
     /// Set probe timeout  
     pub fn set_timeout(&mut self, timeout: Duration) {
-        self.timeout = timeout;
+        self.probe_setting.timeout = timeout;
     }
     /// Set wait-time after the sending task is completed  
     pub fn set_wait_time(&mut self, wait_time: Duration) {
-        self.wait_time = wait_time;
+        self.probe_setting.wait_time = wait_time;
     }
     /// Set packet send rate
     pub fn set_send_rate(&mut self, send_rate: Duration) {
-        self.send_rate = send_rate;
+        self.probe_setting.send_rate = send_rate;
     }
     /// Get probe result
-    pub fn get_probe_results(&self) -> Vec<ProbeResult> {
-        self.probe_results.clone()
+    pub fn get_probe_result(&self) -> ProbeResult {
+        self.probe_result.clone()
     }
     /// Run probe with the current settings
     pub fn run_probe(&mut self) {
-        let interface: default_net::Interface = crate::interface::get_interface_by_index(self.if_index).unwrap();
+        let interface: default_net::Interface = crate::interface::get_interface_by_index(self.probe_setting.if_index).unwrap();
         let mut socket: DataLinkSocket = DataLinkSocket::new(interface, false).unwrap();
-        for dst in self.probe_targets.clone() {
-            let mut probe_setting: ProbeSetting = ProbeSetting {
-                src_mac: cross_socket::datalink::MacAddr::from_hex_format(self.src_mac.as_str()),
-                dst_mac: cross_socket::datalink::MacAddr::from_hex_format(self.dst_mac.as_str()),
-                src_ip: self.src_ip,
-                src_port: self.src_port,
-                probe_target: dst.clone(),
-                probe_types: self.probe_types.clone(),
-                timeout: self.timeout,
-                wait_time: self.wait_time,
-                send_rate: self.send_rate,
-            };
-            let result: ProbeResult = probe(&mut socket, &mut probe_setting);
-            self.probe_results.push(result);
-        }
+        let result: ProbeResult = probe(&mut socket, &mut self.probe_setting);
+        self.probe_result = result;
     }
     /// Run probe and return result
-    pub fn probe(&mut self) -> Vec<ProbeResult> {
+    pub fn probe(&mut self) -> ProbeResult {
         self.run_probe();
-        self.probe_results.clone()
+        self.probe_result.clone()
     }
 }
 
@@ -272,6 +255,8 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
         store: true,
         store_limit: u32::MAX,
         receive_undefined: false,
+        use_tun: probe_setting.use_tun,
+        loopback: probe_setting.loopback,
     };
     let listener: Listner = Listner::new(capture_options);
     let stop_handle = listener.get_stop_handle();

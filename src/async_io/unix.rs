@@ -312,6 +312,8 @@ pub(crate) async fn scan_hosts(
         store: true,
         store_limit: u32::MAX,
         receive_undefined: false,
+        use_tun: scan_setting.use_tun,
+        loopback: scan_setting.loopback,
     };
     for target in scan_setting.targets.clone() {
         capture_options.src_ips.insert(target.ip_addr);
@@ -478,6 +480,8 @@ pub(crate) async fn scan_ports(
         store: true,
         store_limit: u32::MAX,
         receive_undefined: false,
+        use_tun: scan_setting.use_tun,
+        loopback: scan_setting.loopback,
     };
     for target in scan_setting.targets.clone() {
         capture_options.src_ips.insert(target.ip_addr);

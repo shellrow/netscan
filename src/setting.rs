@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
-
+use crate::cross_socket::datalink::MacAddr;
 use crate::host::HostInfo;
 
 pub(crate) const DEFAULT_SRC_PORT: u16 = 53443;
@@ -36,8 +36,8 @@ pub enum ScanType {
 pub struct ScanSetting {
     pub if_index: u32,
     pub if_name: String,
-    pub src_mac: [u8; 6],
-    pub dst_mac: [u8; 6],
+    pub src_mac: MacAddr,
+    pub dst_mac: MacAddr,
     pub src_ip: IpAddr,
     pub src_port: u16,
     pub targets: Vec<HostInfo>,
@@ -48,6 +48,8 @@ pub struct ScanSetting {
     pub timeout: Duration,
     pub wait_time: Duration,
     pub send_rate: Duration,
+    pub use_tun: bool,
+    pub loopback: bool,
 }
 
 impl ScanSetting {
@@ -55,9 +57,9 @@ impl ScanSetting {
         ScanSetting {
             if_index: 0,
             if_name: String::new(),
-            src_mac: [0; 6],
-            dst_mac: [0; 6],
-            src_ip: "".parse().unwrap(),
+            src_mac: MacAddr::zero(),
+            dst_mac: MacAddr::zero(),
+            src_ip: IpAddr::V4(Ipv4Addr::UNSPECIFIED),
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
             ip_map: HashMap::new(),
@@ -67,6 +69,8 @@ impl ScanSetting {
             timeout: Duration::from_secs(30),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(0),
+            use_tun: false,
+            loopback: false,
         }
     }
     /// Set source IP address

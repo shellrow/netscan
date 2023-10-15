@@ -1,5 +1,5 @@
 use cross_socket::datalink::MacAddr;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use cross_socket::packet::tcp::TcpOption;
 
@@ -67,18 +67,47 @@ pub struct ProbeTarget {
     pub closed_udp_port: u16,
 }
 
+impl ProbeTarget {
+    pub fn new() -> Self {
+        Self {
+            ip_addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            open_tcp_port: 80,
+            closed_tcp_port: 20,
+            open_udp_port: 53,
+            closed_udp_port: 33435,
+        }
+    }
+}
+
+/// Probe setting
 #[derive(Clone, Debug)]
-pub(crate) struct ProbeSetting {
+pub struct ProbeSetting {
+    /// Index of network interface
+    pub if_index: u32,
+    /// Name of network interface
+    pub if_name: String,
+    /// Source MAC Address
     pub src_mac: MacAddr,
+    /// Destination MAC Address
     pub dst_mac: MacAddr,
+    /// Source IP Address  
     pub src_ip: IpAddr,
+    /// Source port
     pub src_port: u16,
+    /// Probe Target
     pub probe_target: ProbeTarget,
+    /// Probe Types 
     pub probe_types: Vec<ProbeType>,
+    /// Timeout setting    
     pub timeout: Duration,
+    /// Wait time after send task is finished
     pub wait_time: Duration,
-    #[allow(dead_code)]
+    /// Packet send rate
     pub send_rate: Duration,
+    /// Use TUN interface
+    pub use_tun: bool,
+    /// Use loopback interface
+    pub loopback: bool,
 }
 
 #[derive(Copy, Clone, Debug)]

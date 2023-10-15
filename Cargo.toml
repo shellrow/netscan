@@ -13,9 +13,9 @@ license = "MIT"
 [dependencies]
 rayon = "1.7"
 rand = "0.8"
-default-net = "0.17"
+default-net = "0.18"
 dns-lookup = "2.0"
-cross-socket = "0.5"
+cross-socket = "0.6"
 socket2 = { version = "0.5", features = ["all"] }
 async-io = "1.13"
 futures = {version = "0.3", features = ["executor", "thread-pool"]}
@@ -28,6 +28,7 @@ ipnet = "2.7"
 dns-lookup = "2.0"
 
 [features]
+default = ["full"]
 service = ["netscan-service"]
 os = ["netscan-os"]
 full = ["service", "os"]
