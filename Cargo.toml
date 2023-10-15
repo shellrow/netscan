@@ -15,7 +15,7 @@ rayon = "1.7"
 rand = "0.8"
 default-net = "0.18"
 dns-lookup = "2.0"
-cross-socket = "0.6"
+cross-socket = "0.8"
 socket2 = { version = "0.5", features = ["all"] }
 async-io = "1.13"
 futures = {version = "0.3", features = ["executor", "thread-pool"]}

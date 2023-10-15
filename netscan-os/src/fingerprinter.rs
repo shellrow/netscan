@@ -251,6 +251,7 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
         ether_types: HashSet::new(),
         ip_protocols: HashSet::new(),
         duration: probe_setting.timeout,
+        read_timeout: probe_setting.wait_time,
         promiscuous: false,
         store: true,
         store_limit: u32::MAX,
