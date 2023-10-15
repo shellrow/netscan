@@ -13,5 +13,5 @@ license = "MIT"
 [dependencies]
 rayon = "1.7"
 rand = "0.8"
-default-net = "0.17"
-cross-socket = "0.5"
+default-net = "0.18"
+cross-socket = "0.8"

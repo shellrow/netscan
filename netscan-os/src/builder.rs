@@ -1,6 +1,6 @@
 use std::net::{IpAddr, SocketAddr};
 
-use cross_socket::packet::ethernet::EtherType;
+use cross_socket::packet::ethernet::{EtherType, ETHERNET_HEADER_LEN};
 use cross_socket::packet::icmp::IcmpPacketBuilder;
 use cross_socket::packet::icmpv6::Icmpv6PacketBuilder;
 use cross_socket::packet::ip::IpNextLevelProtocol;
@@ -110,7 +110,11 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
         },
     }
     packet_builder.set_tcp(tcp_packet_builder);
-    packet_builder.packet()
+    if probe_setting.use_tun {
+        packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
+    }else {
+        packet_builder.packet()
+    }
 }
 
 pub(crate) fn build_tcp_control_packet(probe_setting: &ProbeSetting, tcp_flags: Vec<TcpFlag>) -> Vec<u8> {
@@ -156,7 +160,11 @@ pub(crate) fn build_tcp_control_packet(probe_setting: &ProbeSetting, tcp_flags: 
     tcp_packet_builder.window = 65535;
     tcp_packet_builder.flags = tcp_flags;
     packet_builder.set_tcp(tcp_packet_builder);
-    packet_builder.packet()
+    if probe_setting.use_tun {
+        packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
+    }else {
+        packet_builder.packet()
+    }
 }
 
 pub(crate) fn build_udp_probe_packet(probe_setting: &ProbeSetting) -> Vec<u8> {
@@ -200,7 +208,11 @@ pub(crate) fn build_udp_probe_packet(probe_setting: &ProbeSetting) -> Vec<u8> {
         SocketAddr::new(probe_setting.probe_target.ip_addr, UDP_BASE_DST_PORT),
     );
     packet_builder.set_udp(udp_packet_builder);
-    packet_builder.packet()
+    if probe_setting.use_tun {
+        packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
+    }else {
+        packet_builder.packet()
+    }
 }
 
 pub(crate) fn build_icmp_probe_packet(probe_setting: &ProbeSetting, probe_type: ProbeType) -> Vec<u8> {
@@ -273,5 +285,9 @@ pub(crate) fn build_icmp_probe_packet(probe_setting: &ProbeSetting, probe_type: 
             },
         },
     }
-    packet_builder.packet()
+    if probe_setting.use_tun {
+        packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
+    }else {
+        packet_builder.packet()
+    }
 }

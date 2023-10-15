@@ -10,6 +10,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use default_net::interface::MacAddr;
 
 /// Host Scanner
 #[derive(Clone, Debug)]
@@ -36,12 +37,14 @@ impl HostScanner {
                 "Failed to create Scanner. Network Interface not found.",
             ));
         };
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
         let (tx, rx) = channel();
         let scan_setting: ScanSetting = ScanSetting {
             if_index: network_interface.index,
             if_name: network_interface.name,
-            src_mac: network_interface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero()).octets(),
-            dst_mac: interface::get_default_gateway_macaddr(),
+            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
@@ -52,6 +55,90 @@ impl HostScanner {
             scan_type: ScanType::IcmpPingScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+            use_tun: use_tun,
+            loopback: loopback,
+        };
+        let host_scanner = HostScanner {
+            scan_setting: scan_setting,
+            scan_result: ScanResult::new(),
+            tx: Arc::new(Mutex::new(tx)),
+            rx: Arc::new(Mutex::new(rx)),
+        };
+        Ok(host_scanner)
+    }
+    /// Create new HostScanner with Interface Index
+    ///
+    /// Initialized with default value based on the specified Interface Index
+    pub fn new_with_index(if_index: u32) -> Result<HostScanner, String> {
+        let network_interface = if let Some(network_interface) = interface::get_interface_by_index(if_index) {
+            network_interface
+        }else {
+            return Err(String::from(
+                "Failed to create Scanner. Network Interface not found.",
+            ));
+        };
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
+        let (tx, rx) = channel();
+        let scan_setting: ScanSetting = ScanSetting {
+            if_index: network_interface.index,
+            if_name: network_interface.name,
+            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_ip: src_ip,
+            src_port: DEFAULT_SRC_PORT,
+            targets: vec![],
+            ip_map: HashMap::new(),
+            timeout: Duration::from_millis(30000),
+            wait_time: Duration::from_millis(200),
+            send_rate: Duration::from_millis(0),
+            scan_type: ScanType::IcmpPingScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+            use_tun: use_tun,
+            loopback: loopback,
+        };
+        let host_scanner = HostScanner {
+            scan_setting: scan_setting,
+            scan_result: ScanResult::new(),
+            tx: Arc::new(Mutex::new(tx)),
+            rx: Arc::new(Mutex::new(rx)),
+        };
+        Ok(host_scanner)
+    }
+    /// Create new HostScanner with Interface Name
+    ///
+    /// Initialized with default value based on the specified Interface Name
+    pub fn new_with_name(if_name: String) -> Result<HostScanner, String> {
+        let network_interface = if let Some(network_interface) = interface::get_interface_by_name(if_name) {
+            network_interface
+        }else {
+            return Err(String::from(
+                "Failed to create Scanner. Network Interface not found.",
+            ));
+        };
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
+        let (tx, rx) = channel();
+        let scan_setting: ScanSetting = ScanSetting {
+            if_index: network_interface.index,
+            if_name: network_interface.name,
+            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_ip: src_ip,
+            src_port: DEFAULT_SRC_PORT,
+            targets: vec![],
+            ip_map: HashMap::new(),
+            timeout: Duration::from_millis(30000),
+            wait_time: Duration::from_millis(200),
+            send_rate: Duration::from_millis(0),
+            scan_type: ScanType::IcmpPingScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+            use_tun: use_tun,
+            loopback: loopback,
         };
         let host_scanner = HostScanner {
             scan_setting: scan_setting,
@@ -139,12 +226,14 @@ impl PortScanner {
                 "Failed to create Scanner. Network Interface not found.",
             ));
         };
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
         let (tx, rx) = channel();
         let scan_setting = ScanSetting {
             if_index: network_interface.index,
             if_name: network_interface.name,
-            src_mac: network_interface.mac_addr.unwrap_or(default_net::interface::MacAddr::zero()).octets(),
-            dst_mac: interface::get_default_gateway_macaddr(),
+            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
@@ -155,6 +244,90 @@ impl PortScanner {
             scan_type: ScanType::TcpSynScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+            use_tun: use_tun,
+            loopback: loopback,
+        };
+        let port_scanner = PortScanner {
+            scan_setting: scan_setting,
+            scan_result: ScanResult::new(),
+            tx: Arc::new(Mutex::new(tx)),
+            rx: Arc::new(Mutex::new(rx)),
+        };
+        Ok(port_scanner)
+    }
+    /// Create new PortScanner with source Interface Index
+    ///
+    /// Initialized with default value based on the specified Interface Index
+    pub fn new_with_index(if_index: u32) -> Result<PortScanner, String> {
+        let network_interface = if let Some(network_interface) = interface::get_interface_by_index(if_index) {
+            network_interface
+        }else {
+            return Err(String::from(
+                "Failed to create Scanner. Network Interface not found.",
+            ));
+        };
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let (tx, rx) = channel();
+        let scan_setting = ScanSetting {
+            if_index: network_interface.index,
+            if_name: network_interface.name,
+            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_ip: src_ip,
+            src_port: DEFAULT_SRC_PORT,
+            targets: vec![],
+            ip_map: HashMap::new(),
+            timeout: Duration::from_millis(30000),
+            wait_time: Duration::from_millis(200),
+            send_rate: Duration::from_millis(0),
+            scan_type: ScanType::TcpSynScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+            use_tun: use_tun,
+            loopback: loopback,
+        };
+        let port_scanner = PortScanner {
+            scan_setting: scan_setting,
+            scan_result: ScanResult::new(),
+            tx: Arc::new(Mutex::new(tx)),
+            rx: Arc::new(Mutex::new(rx)),
+        };
+        Ok(port_scanner)
+    }
+    /// Create new PortScanner with source Interface Name
+    ///
+    /// Initialized with default value based on the specified Interface Name
+    pub fn new_with_name(if_name: String) -> Result<PortScanner, String> {
+        let network_interface = if let Some(network_interface) = interface::get_interface_by_name(if_name) {
+            network_interface
+        }else {
+            return Err(String::from(
+                "Failed to create Scanner. Network Interface not found.",
+            ));
+        };
+        let use_tun = network_interface.is_tun();
+        let loopback = network_interface.is_loopback();
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let (tx, rx) = channel();
+        let scan_setting = ScanSetting {
+            if_index: network_interface.index,
+            if_name: network_interface.name,
+            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
+            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_ip: src_ip,
+            src_port: DEFAULT_SRC_PORT,
+            targets: vec![],
+            ip_map: HashMap::new(),
+            timeout: Duration::from_millis(30000),
+            wait_time: Duration::from_millis(200),
+            send_rate: Duration::from_millis(0),
+            scan_type: ScanType::TcpSynScan,
+            hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
+            ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
+            use_tun: use_tun,
+            loopback: loopback,
         };
         let port_scanner = PortScanner {
             scan_setting: scan_setting,
