@@ -14,14 +14,13 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use cross_socket::{socket::DataLinkSocket, packet::{builder::PacketBuilder, ethernet::{EthernetPacketBuilder, EtherType}, ipv4::Ipv4PacketBuilder, ip::IpNextLevelProtocol, tcp::{TcpPacketBuilder, TcpFlag, TcpOption}, ipv6::Ipv6PacketBuilder, icmp::IcmpPacketBuilder, icmpv6::Icmpv6PacketBuilder}};
-use cross_socket::datalink::MacAddr;
 use cross_socket::packet::udp::UDP_BASE_DST_PORT;
 
 fn send_tcp_syn_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
-        src_mac: MacAddr::new(scan_setting.src_mac.clone()),
-        dst_mac: MacAddr::new(scan_setting.dst_mac.clone()),
+        src_mac: scan_setting.src_mac.clone(),
+        dst_mac: scan_setting.dst_mac.clone(),
         ether_type: if scan_setting.src_ip.is_ipv4() {
             EtherType::Ipv4
         } else {
@@ -290,6 +289,8 @@ pub(crate) fn scan_hosts(
         store: true,
         store_limit: u32::MAX,
         receive_undefined: false,
+        use_tun: scan_setting.use_tun,
+        loopback: scan_setting.loopback,
     };
     for target in scan_setting.targets.clone() {
         capture_options.src_ips.insert(target.ip_addr);
@@ -428,6 +429,8 @@ pub(crate) fn scan_ports(
         store: true,
         store_limit: u32::MAX,
         receive_undefined: false,
+        use_tun: scan_setting.use_tun,
+        loopback: scan_setting.loopback,
     };
     for target in scan_setting.targets.clone() {
         capture_options.src_ips.insert(target.ip_addr);
