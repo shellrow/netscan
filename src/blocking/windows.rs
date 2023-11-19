@@ -3,24 +3,30 @@ use crate::result::ScanResult;
 use crate::setting::ScanSetting;
 use crate::setting::ScanType;
 use crate::setting::LISTENER_WAIT_TIME_MILLIS;
-use cross_socket::packet::PacketFrame;
-use cross_socket::pcap::PacketCaptureOptions;
-use cross_socket::pcap::listener::Listner;
+use crate::pcap::PacketFrame;
+use crate::pcap::PacketCaptureOptions;
+use crate::pcap::listener::Listner;
 use rayon::prelude::*;
+use xenet::datalink::DataLinkSender;
+use xenet::util::packet_builder::udp::UdpPacketBuilder;
 use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use cross_socket::{socket::DataLinkSocket, packet::{builder::PacketBuilder, ethernet::{EthernetPacketBuilder, EtherType}, ipv4::Ipv4PacketBuilder, ip::IpNextLevelProtocol, tcp::{TcpPacketBuilder, TcpFlag, TcpOption}, ipv6::Ipv6PacketBuilder, icmp::IcmpPacketBuilder, icmpv6::Icmpv6PacketBuilder}};
-use cross_socket::packet::udp::UDP_BASE_DST_PORT;
+use xenet::packet::ethernet::EtherType;
+use xenet::packet::ip::IpNextLevelProtocol;
+use xenet::packet::tcp::{TcpFlags, TcpOption};
+use xenet::util::packet_builder::{builder::PacketBuilder, ethernet::EthernetPacketBuilder, ipv4::Ipv4PacketBuilder, tcp::TcpPacketBuilder, ipv6::Ipv6PacketBuilder, icmp::IcmpPacketBuilder, icmpv6::Icmpv6PacketBuilder};
 
-fn send_tcp_syn_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+const UDP_BASE_DST_PORT: u16 = 33435;
+
+fn send_tcp_syn_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
-        src_mac: scan_setting.src_mac.clone(),
-        dst_mac: scan_setting.dst_mac.clone(),
+        src_mac: scan_setting.src_mac,
+        dst_mac: scan_setting.dst_mac,
         ether_type: if scan_setting.src_ip.is_ipv4() {
             EtherType::Ipv4
         } else {
@@ -59,7 +65,7 @@ fn send_tcp_syn_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &Sca
                 SocketAddr::new(scan_setting.src_ip, scan_setting.src_port),
                 SocketAddr::new(target.ip_addr, port.port),
             );
-            tcp_packet_builder.flags = vec![TcpFlag::Syn];
+            tcp_packet_builder.flags = TcpFlags::SYN;
             tcp_packet_builder.options = vec![
                 TcpOption::mss(1460),
                 TcpOption::sack_perm(),
@@ -71,9 +77,11 @@ fn send_tcp_syn_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &Sca
 
             let packet_bytes: Vec<u8> = packet_builder.packet();
 
-            match socket.send_to(&packet_bytes) {
-                Ok(_) => {}
-                Err(_) => {}
+            match sender.send(&packet_bytes) {
+                Some(_r) => {
+                    // TODO: Handle error
+                }
+                None => {}
             }
             let socket_addr = SocketAddr::new(target.ip_addr, port.port);
             match ptx.lock() {
@@ -88,11 +96,11 @@ fn send_tcp_syn_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &Sca
     }
 }
 
-fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_icmp_echo_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
-        src_mac: socket.interface.mac_addr.clone().unwrap(),
-        dst_mac: socket.interface.gateway.clone().unwrap().mac_addr,
+        src_mac: scan_setting.src_mac,
+        dst_mac: scan_setting.dst_mac,
         ether_type: if scan_setting.src_ip.is_ipv4() {
             EtherType::Ipv4
         } else {
@@ -114,7 +122,7 @@ fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &S
                         src_ipv4,
                         dst_ipv4,
                     );
-                    icmp_packet_builder.icmp_type = cross_socket::packet::icmp::IcmpType::EchoRequest;
+                    icmp_packet_builder.icmp_type = xenet::packet::icmp::IcmpType::EchoRequest;
                     packet_builder.set_icmp(icmp_packet_builder);
                 },
                 IpAddr::V6(_) => {},
@@ -131,7 +139,7 @@ fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &S
                     let icmpv6_packet_builder = Icmpv6PacketBuilder{
                         src_ip: src_ipv6,
                         dst_ip: dst_ipv6,
-                        icmpv6_type: cross_socket::packet::icmpv6::Icmpv6Type::EchoRequest,
+                        icmpv6_type: xenet::packet::icmpv6::Icmpv6Type::EchoRequest,
                         sequence_number: None,
                         identifier: None,
                     };
@@ -142,9 +150,11 @@ fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &S
 
         let packet_bytes: Vec<u8> = packet_builder.packet();
 
-        match socket.send_to(&packet_bytes) {
-            Ok(_) => {}
-            Err(_) => {}
+        match sender.send(&packet_bytes) {
+            Some(_r) => {
+                // TODO: Handle error
+            }
+            None => {}
         }
         let socket_addr = SocketAddr::new(target.ip_addr, 0);
         match ptx.lock() {
@@ -158,11 +168,11 @@ fn send_icmp_echo_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &S
     }
 }
 
-fn send_udp_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_udp_ping_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
-        src_mac: socket.interface.mac_addr.clone().unwrap(),
-        dst_mac: socket.interface.gateway.clone().unwrap().mac_addr,
+        src_mac: scan_setting.src_mac,
+        dst_mac: scan_setting.dst_mac,
         ether_type: EtherType::Ipv4,
     };
     packet_builder.set_ethernet(ethernet_packet_builder);
@@ -191,7 +201,7 @@ fn send_udp_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &Sc
                 },
             },
         }
-        let udp_packet_builder = cross_socket::packet::udp::UdpPacketBuilder::new(
+        let udp_packet_builder = UdpPacketBuilder::new(
             SocketAddr::new(scan_setting.src_ip, scan_setting.src_port),
             SocketAddr::new(target.ip_addr, UDP_BASE_DST_PORT),
         );
@@ -199,9 +209,11 @@ fn send_udp_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &Sc
 
         let packet_bytes: Vec<u8> = packet_builder.packet();
 
-        match socket.send_to(&packet_bytes) {
-            Ok(_) => {}
-            Err(_) => {}
+        match sender.send(&packet_bytes) {
+            Some(_r) => {
+                // TODO: Handle error
+            }
+            None => {}
         }
         let socket_addr = SocketAddr::new(target.ip_addr, 0);
         match ptx.lock() {
@@ -215,16 +227,16 @@ fn send_udp_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &Sc
     }
 }
 
-fn send_ping_packets_datalink(socket: &mut DataLinkSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_ping_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
-            send_icmp_echo_packets_datalink(socket, scan_setting, ptx);
+            send_icmp_echo_packets_datalink(sender, scan_setting, ptx);
         }
         ScanType::TcpPingScan => {
-            send_tcp_syn_packets_datalink(socket, scan_setting, ptx);
+            send_tcp_syn_packets_datalink(sender, scan_setting, ptx);
         }
         ScanType::UdpPingScan => {
-            send_udp_ping_packets_datalink(socket, scan_setting, ptx);
+            send_udp_ping_packets_datalink(sender, scan_setting, ptx);
         }
         _ => {
             return;
@@ -272,8 +284,23 @@ pub(crate) fn scan_hosts(
         Some(interface) => interface,
         None => return ScanResult::new(),
     };
-    // Create new socket
-    let mut socket: DataLinkSocket = DataLinkSocket::new(interface, false).unwrap();
+
+    // Create sender
+    let config = xenet::datalink::Config {
+        write_buffer_size: 4096,
+        read_buffer_size: 4096,
+        read_timeout: Some(scan_setting.wait_time),
+        write_timeout: None,
+        channel_type: xenet::datalink::ChannelType::Layer2,
+        bpf_fd_attempts: 1000,
+        linux_fanout: None,
+        promiscuous: false,
+    };
+    let (mut tx, mut _rx) = match xenet::datalink::channel(&interface, config) {
+        Ok(xenet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+        Ok(_) => panic!("Unhandled channel type"),
+        Err(e) => panic!("Failed to create channel: {}", e),
+    };
 
     let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
         interface_index: scan_setting.if_index,
@@ -332,7 +359,7 @@ pub(crate) fn scan_hosts(
     thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
 
     // Send probe packets
-    send_ping_packets_datalink(&mut socket, &scan_setting, ptx);
+    send_ping_packets_datalink(&mut tx, &scan_setting, ptx);
     thread::sleep(scan_setting.wait_time);
     *stop_handle.lock().unwrap() = true;
 
@@ -345,22 +372,22 @@ pub(crate) fn scan_hosts(
         let mut ports: Vec<PortInfo> = vec![];
         match scan_setting.scan_type {
             ScanType::IcmpPingScan => {
-                if p.icmp_packet.is_none() && p.icmpv6_packet.is_none() {
+                if p.icmp_header.is_none() && p.icmpv6_header.is_none() {
                     continue;
                 }
             }
             ScanType::TcpPingScan => {
-                if p.tcp_packet.is_none() {
+                if p.tcp_header.is_none() {
                     continue;
                 }
-                if let Some(tcp_packet) = &p.tcp_packet {
-                    if tcp_packet.flags.contains(&TcpFlag::Syn) && tcp_packet.flags.contains(&TcpFlag::Ack) {
+                if let Some(tcp_packet) = &p.tcp_header {
+                    if tcp_packet.flags == TcpFlags::SYN | TcpFlags::ACK {
                         let port_info: PortInfo = PortInfo {
                             port: tcp_packet.source,
                             status: PortStatus::Open,
                         };
                         ports.push(port_info);
-                    }else if tcp_packet.flags.contains(&TcpFlag::Rst) && tcp_packet.flags.contains(&TcpFlag::Ack) {
+                    }else if tcp_packet.flags == TcpFlags::RST | TcpFlags::ACK {
                         let port_info: PortInfo = PortInfo {
                             port: tcp_packet.source,
                             status: PortStatus::Closed,
@@ -374,20 +401,20 @@ pub(crate) fn scan_hosts(
                 }
             }
             ScanType::UdpPingScan => {
-                if p.icmp_packet.is_none() && p.icmpv6_packet.is_none() {
+                if p.icmp_header.is_none() && p.icmp_header.is_none() {
                     continue;
                 }
             }
             _ => {}
         }
-        let host_info: HostInfo = if let Some(ipv4_packet) = &p.ipv4_packet {
+        let host_info: HostInfo = if let Some(ipv4_packet) = &p.ipv4_header {
             HostInfo {
                 ip_addr: IpAddr::V4(ipv4_packet.source),
                 host_name: scan_setting.ip_map.get(&IpAddr::V4(ipv4_packet.source)).unwrap_or(&String::new()).clone(),
                 ttl: ipv4_packet.ttl,
                 ports: ports,
             }
-        }else if let Some(ipv6_packet) = &p.ipv6_packet {
+        }else if let Some(ipv6_packet) = &p.ipv6_header {
             HostInfo {
                 ip_addr: IpAddr::V6(ipv6_packet.source),
                 host_name: scan_setting.ip_map.get(&IpAddr::V6(ipv6_packet.source)).unwrap_or(&String::new()).clone(),
@@ -413,8 +440,23 @@ pub(crate) fn scan_ports(
         Some(interface) => interface,
         None => return ScanResult::new(),
     };
-    // Create new socket
-    let mut socket: DataLinkSocket = DataLinkSocket::new(interface, false).unwrap();
+
+    // Create sender
+    let config = xenet::datalink::Config {
+        write_buffer_size: 4096,
+        read_buffer_size: 4096,
+        read_timeout: Some(scan_setting.wait_time),
+        write_timeout: None,
+        channel_type: xenet::datalink::ChannelType::Layer2,
+        bpf_fd_attempts: 1000,
+        linux_fanout: None,
+        promiscuous: false,
+    };
+    let (mut tx, mut _rx) = match xenet::datalink::channel(&interface, config) {
+        Ok(xenet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+        Ok(_) => panic!("Unhandled channel type"),
+        Err(e) => panic!("Failed to create channel: {}", e),
+    };
 
     let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
         interface_index: scan_setting.if_index,
@@ -467,7 +509,7 @@ pub(crate) fn scan_ports(
             send_tcp_connect_requests(&scan_setting, ptx);
         }
         _ => {
-            send_tcp_syn_packets_datalink(&mut socket, &scan_setting, ptx);
+            send_tcp_syn_packets_datalink(&mut tx, &scan_setting, ptx);
         }
     }
     thread::sleep(scan_setting.wait_time);
@@ -480,12 +522,12 @@ pub(crate) fn scan_ports(
     let mut result: ScanResult = ScanResult::new();
     let mut socket_set: HashSet<SocketAddr> = HashSet::new();
     for p in packets.lock().unwrap().iter() {
-        if p.ipv4_packet.is_none() && p.ipv6_packet.is_none() {
+        if p.ipv4_header.is_none() && p.ipv6_header.is_none() {
             continue;
         }
         let ip_addr: IpAddr = {
-            if let Some(ipv4_packet) = &p.ipv4_packet {
-                if let Some(tcp_packet) = &p.tcp_packet {
+            if let Some(ipv4_packet) = &p.ipv4_header {
+                if let Some(tcp_packet) = &p.tcp_header {
                     if socket_set.contains(&SocketAddr::new(IpAddr::V4(ipv4_packet.source), tcp_packet.source)) {
                         continue;
                     }
@@ -493,8 +535,8 @@ pub(crate) fn scan_ports(
                     continue;
                 }
                 IpAddr::V4(ipv4_packet.source) 
-            }else if let Some(ipv6_packet) = &p.ipv6_packet {
-                if let Some(tcp_packet) = &p.tcp_packet {
+            }else if let Some(ipv6_packet) = &p.ipv6_header {
+                if let Some(tcp_packet) = &p.tcp_header {
                     if socket_set.contains(&SocketAddr::new(IpAddr::V6(ipv6_packet.source), tcp_packet.source)) {
                         continue;
                     }
@@ -506,13 +548,13 @@ pub(crate) fn scan_ports(
                 continue;
             }
         };
-        let port_info: PortInfo = if let Some(tcp_packet) = &p.tcp_packet {
-            if tcp_packet.flags.contains(&TcpFlag::Syn) && tcp_packet.flags.contains(&TcpFlag::Ack) {
+        let port_info: PortInfo = if let Some(tcp_packet) = &p.tcp_header {
+            if tcp_packet.flags == TcpFlags::SYN | TcpFlags::ACK {
                 PortInfo {
                     port: tcp_packet.source,
                     status: PortStatus::Open,
                 }
-            }else if tcp_packet.flags.contains(&TcpFlag::Rst) && tcp_packet.flags.contains(&TcpFlag::Ack) {
+            } else if tcp_packet.flags == TcpFlags::RST | TcpFlags::ACK {
                 PortInfo {
                     port: tcp_packet.source,
                     status: PortStatus::Closed,
@@ -535,9 +577,9 @@ pub(crate) fn scan_ports(
             let host_info: HostInfo = HostInfo {
                 ip_addr: ip_addr,
                 host_name: scan_setting.ip_map.get(&ip_addr).unwrap_or(&String::new()).clone(),
-                ttl: if let Some(ipv4_packet) = &p.ipv4_packet {
+                ttl: if let Some(ipv4_packet) = &p.ipv4_header {
                     ipv4_packet.ttl
-                }else if let Some(ipv6_packet) = &p.ipv6_packet {
+                }else if let Some(ipv6_packet) = &p.ipv6_header {
                     ipv6_packet.hop_limit
                 }else{
                     0

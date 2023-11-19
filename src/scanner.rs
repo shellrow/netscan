@@ -10,7 +10,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use default_net::interface::MacAddr;
+use xenet::net::mac::MacAddr;
 
 /// Host Scanner
 #[derive(Clone, Debug)]

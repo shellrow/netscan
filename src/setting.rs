@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
-use crate::cross_socket::datalink::MacAddr;
+use xenet::net::mac::MacAddr;
 use crate::host::HostInfo;
 
 pub(crate) const DEFAULT_SRC_PORT: u16 = 53443;

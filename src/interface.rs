@@ -1,6 +1,6 @@
-use cross_socket::datalink::MacAddr;
+use xenet::net::mac::MacAddr;
+use xenet::net::interface::Interface;
 use std::net::{IpAddr, Ipv6Addr};
-use cross_socket::datalink::interface::Interface;
 
 fn is_global_ipv6(ipv6_addr: &Ipv6Addr) -> bool {
     !(ipv6_addr.is_unspecified()
@@ -34,7 +34,7 @@ fn is_global_ipv6(ipv6_addr: &Ipv6Addr) -> bool {
 }
 
 pub(crate) fn get_interface_by_ip(ip_addr: IpAddr) -> Option<Interface> {
-    for iface in default_net::get_interfaces() {
+    for iface in xenet::net::interface::get_interfaces() {
         for ip in iface.ipv4.clone() {
             if ip.addr == ip_addr {
                 return Some(iface);
@@ -50,7 +50,7 @@ pub(crate) fn get_interface_by_ip(ip_addr: IpAddr) -> Option<Interface> {
 }
 
 pub(crate) fn get_interface_by_index(index: u32) -> Option<Interface> {
-    for iface in default_net::get_interfaces() {
+    for iface in xenet::net::interface::get_interfaces() {
         if iface.index == index {
             return Some(iface);
         }
@@ -59,7 +59,7 @@ pub(crate) fn get_interface_by_index(index: u32) -> Option<Interface> {
 }
 
 pub(crate) fn get_interface_by_name(name: String) -> Option<Interface> {
-    for iface in default_net::get_interfaces() {
+    for iface in xenet::net::interface::get_interfaces() {
         if iface.name == name {
             return Some(iface);
         }
@@ -85,7 +85,7 @@ pub(crate) fn get_interface_ipv6(iface: &Interface) -> Option<IpAddr> {
 
 #[cfg(target_os = "windows")]
 pub fn get_default_gateway_macaddr() -> MacAddr {
-    match default_net::get_default_gateway() {
+    match xenet::net::gateway::get_default_gateway() {
         Ok(gateway) => gateway.mac_addr,
         Err(_) => MacAddr::zero(),
     }
