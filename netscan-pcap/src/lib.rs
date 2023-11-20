@@ -182,7 +182,7 @@ impl PacketFrame {
                 packet_frame.udp_header = Some(udp_header);
             }
         }
-        packet_frame.payload = frame.payload.to_vec();
+        packet_frame.payload = frame.payload;
         packet_frame
     }
 }

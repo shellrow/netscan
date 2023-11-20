@@ -68,7 +68,7 @@ pub(crate) fn start_capture (
                     //packets.lock().unwrap().push(packet_frame);
                 }
             }
-            Err(e) => panic!("parse_frame: unable to receive packet: {}", e),
+            Err(_) => {},
         }
         if *stop.lock().unwrap() {
             break;
