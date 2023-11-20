@@ -3,19 +3,22 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use cross_socket::packet::builder::PacketBuildOption;
-use cross_socket::packet::ipv4::{Ipv4Packet, Ipv4Flags};
-use cross_socket::packet::ipv6::Ipv6Packet;
-use cross_socket::packet::udp::UdpPacket;
-use cross_socket::pcap::listener::Listner;
-use cross_socket::pcap::PacketCaptureOptions;
-use cross_socket::packet::PacketFrame;
-use cross_socket::packet::ip::IpNextLevelProtocol;
-use cross_socket::packet::icmp::IcmpType;
-use cross_socket::packet::icmpv6::Icmpv6Type;
-use cross_socket::socket::DataLinkSocket;
-use cross_socket::packet::tcp::TcpFlag;
-use default_net::interface::MacAddr;
+use xenet::packet::frame::{ParseOption, Frame};
+use xenet::util::packet_builder::util::PacketBuildOption;
+use xenet::packet::ipv4::{Ipv4Packet, Ipv4Flags};
+use xenet::packet::ipv6::Ipv6Packet;
+use xenet::packet::udp::UdpPacket;
+use netscan_pcap::listener::Listner;
+use netscan_pcap::PacketCaptureOptions;
+use netscan_pcap::PacketFrame;
+use xenet::packet::ip::IpNextLevelProtocol;
+use xenet::packet::icmp::IcmpType;
+use xenet::packet::icmpv6::Icmpv6Type;
+use xenet::datalink::DataLinkSender;
+use xenet::packet::tcp::TcpFlags;
+use xenet::net::mac::MacAddr;
+use xenet::net::interface::Interface;
+//use xenet::packet::Packet;
 
 use crate::interface;
 
@@ -228,9 +231,23 @@ impl Fingerprinter {
     }
     /// Run probe with the current settings
     pub fn run_probe(&mut self) {
-        let interface: default_net::Interface = crate::interface::get_interface_by_index(self.probe_setting.if_index).unwrap();
-        let mut socket: DataLinkSocket = DataLinkSocket::new(interface, false).unwrap();
-        let result: ProbeResult = probe(&mut socket, &mut self.probe_setting);
+        let interface: Interface = crate::interface::get_interface_by_index(self.probe_setting.if_index).unwrap();
+        let config = xenet::datalink::Config {
+            write_buffer_size: 4096,
+            read_buffer_size: 4096,
+            read_timeout: Some(self.probe_setting.wait_time),
+            write_timeout: None,
+            channel_type: xenet::datalink::ChannelType::Layer2,
+            bpf_fd_attempts: 1000,
+            linux_fanout: None,
+            promiscuous: false,
+        };
+        let (mut tx, mut _rx) = match xenet::datalink::channel(&interface, config) {
+            Ok(xenet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+            Ok(_) => panic!("Unhandled channel type"),
+            Err(e) => panic!("Failed to create channel: {}", e),
+        };
+        let result: ProbeResult = probe(&mut tx, &mut self.probe_setting);
         self.probe_result = result;
     }
     /// Run probe and return result
@@ -240,10 +257,10 @@ impl Fingerprinter {
     }
 }
 
-fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResult {
+fn probe(sender: &mut Box<dyn DataLinkSender>, probe_setting: &ProbeSetting) -> ProbeResult {
     let capture_options: PacketCaptureOptions = PacketCaptureOptions {
-        interface_index: socket.interface.index,
-        interface_name: socket.interface.name.clone(),
+        interface_index: probe_setting.if_index,
+        interface_name: probe_setting.if_name.clone(),
         src_ips: [probe_setting.probe_target.ip_addr].iter().cloned().collect(),
         dst_ips: HashSet::new(),
         src_ports: HashSet::new(),
@@ -274,7 +291,7 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
     // Wait for listener to start (need fix for better way)
     thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
 
-    send::send_packets(socket, &probe_setting);
+    send::send_packets(sender, &probe_setting);
     thread::sleep(probe_setting.wait_time);
     *stop_handle.lock().unwrap() = true;
 
@@ -284,29 +301,29 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
     // Parse fingerprints and set result
     let mut result: ProbeResult = ProbeResult::new_with_types(probe_setting.probe_target.ip_addr, probe_setting.probe_types.clone());
     for f in fingerprints.lock().unwrap().iter() {
-        let ip_next_protocol: IpNextLevelProtocol = if let Some(ip_packet) = &f.ipv4_packet {
-            ip_packet.next_protocol
+        let ip_next_protocol: IpNextLevelProtocol = if let Some(ip_packet) = &f.ipv4_header {
+            ip_packet.next_level_protocol
         }else {
-            if let Some(ip_packet) = &f.ipv6_packet {
-                ip_packet.next_protocol
+            if let Some(ip_packet) = &f.ipv6_header {
+                ip_packet.next_header
             } else {
                 continue;
             }
         };
         match ip_next_protocol {
             IpNextLevelProtocol::Tcp => {
-                if let Some(tcp_fingerprint) = &f.tcp_packet {
-                    if tcp_fingerprint.flags.contains(&TcpFlag::Syn) && tcp_fingerprint.flags.contains(&TcpFlag::Ack) && !tcp_fingerprint.flags.contains(&TcpFlag::Ece) {
+                if let Some(tcp_fingerprint) = &f.tcp_header {
+                    if tcp_fingerprint.flags == TcpFlags::SYN | TcpFlags::ACK && tcp_fingerprint.flags != TcpFlags::SYN | TcpFlags::ACK | TcpFlags::ECE {
                         if let Some(tcp_syn_ack_result) = &mut result.tcp_syn_ack_result {
                             tcp_syn_ack_result.syn_ack_response = true;
                             tcp_syn_ack_result.fingerprints.push(f.clone());
                         }
-                    }else if tcp_fingerprint.flags.contains(&TcpFlag::Rst) && tcp_fingerprint.flags.contains(&TcpFlag::Ack) {
+                    }else if tcp_fingerprint.flags == TcpFlags::RST | TcpFlags::ACK {
                         if let Some(tcp_rst_ack_result) = &mut result.tcp_rst_ack_result {
                             tcp_rst_ack_result.rst_ack_response = true;
                             tcp_rst_ack_result.fingerprints.push(f.clone());
                         }
-                    } else if tcp_fingerprint.flags.contains(&TcpFlag::Syn) && tcp_fingerprint.flags.contains(&TcpFlag::Ack) && tcp_fingerprint.flags.contains(&TcpFlag::Ece) {
+                    } else if tcp_fingerprint.flags == TcpFlags::SYN | TcpFlags::ACK | TcpFlags::ECE {
                         if let Some(tcp_rst_ack_result) = &mut result.tcp_ecn_result {
                             tcp_rst_ack_result.syn_ack_ece_response = true;
                             tcp_rst_ack_result.fingerprints.push(f.clone());
@@ -316,7 +333,7 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
             }
             IpNextLevelProtocol::Udp => {}
             IpNextLevelProtocol::Icmp => {
-                if let Some(icmp_fingerprint) = &f.icmp_packet {
+                if let Some(icmp_fingerprint) = &f.icmp_header {
                     match icmp_fingerprint.icmp_type {
                         IcmpType::EchoReply => {
                             if let Some(icmp_echo_result) = &mut result.icmp_echo_result {
@@ -327,15 +344,15 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
                         IcmpType::DestinationUnreachable => {
                             if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
                                 icmp_unreachable_ip_result.icmp_unreachable_reply = true;
-                                let ipv4_packet: Ipv4Packet = Ipv4Packet::from_bytes(&icmp_fingerprint.payload[ICMP_UNUSED_BYTE_SIZE..cross_socket::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]);
-                                let _udp_packet: UdpPacket = UdpPacket::from_bytes(&icmp_fingerprint.payload[cross_socket::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]);
-                                icmp_unreachable_ip_result.icmp_unreachable_size = icmp_fingerprint.payload.len() - ICMP_UNUSED_BYTE_SIZE;
-                                icmp_unreachable_ip_result.ip_total_length = ipv4_packet.total_length;
-                                icmp_unreachable_ip_result.ip_id = ipv4_packet.identification;
-                                if Ipv4Flags::from_u8(ipv4_packet.flags) == Ipv4Flags::DontFragment {
+                                let ipv4_packet: Ipv4Packet = Ipv4Packet::new(&f.payload[ICMP_UNUSED_BYTE_SIZE..xenet::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]).unwrap();
+                                let _udp_packet: UdpPacket = UdpPacket::new(&f.payload[xenet::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]).unwrap();
+                                icmp_unreachable_ip_result.icmp_unreachable_size = f.payload.len() - ICMP_UNUSED_BYTE_SIZE;
+                                icmp_unreachable_ip_result.ip_total_length = ipv4_packet.get_total_length();
+                                icmp_unreachable_ip_result.ip_id = ipv4_packet.get_identification();
+                                if ipv4_packet.get_flags() == Ipv4Flags::DontFragment {
                                     icmp_unreachable_ip_result.ip_df = true;
                                 }
-                                icmp_unreachable_ip_result.ip_ttl = ipv4_packet.ttl;
+                                icmp_unreachable_ip_result.ip_ttl = ipv4_packet.get_ttl();
                                 icmp_unreachable_ip_result.fingerprints.push(f.clone());
                             }
                         }
@@ -362,7 +379,7 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
                 }
             }
             IpNextLevelProtocol::Icmpv6 => {
-                if let Some(icmpv6_fingerprint) = &f.icmpv6_packet {
+                if let Some(icmpv6_fingerprint) = &f.icmpv6_header {
                     match icmpv6_fingerprint.icmpv6_type {
                         Icmpv6Type::EchoReply => {
                             if let Some(icmp_echo_result) = &mut result.icmp_echo_result {
@@ -373,11 +390,11 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
                         Icmpv6Type::DestinationUnreachable => {
                             if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
                                 icmp_unreachable_ip_result.icmp_unreachable_reply = true;
-                                let ipv6_packet: Ipv6Packet = Ipv6Packet::from_bytes(&icmpv6_fingerprint.payload[ICMP_UNUSED_BYTE_SIZE..cross_socket::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]);
-                                let _udp_packet: UdpPacket = UdpPacket::from_bytes(&icmpv6_fingerprint.payload[cross_socket::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]);
-                                icmp_unreachable_ip_result.icmp_unreachable_size = icmpv6_fingerprint.payload.len() - ICMP_UNUSED_BYTE_SIZE;
-                                icmp_unreachable_ip_result.ip_total_length = (icmpv6_fingerprint.payload.len() - 4) as u16;
-                                icmp_unreachable_ip_result.ip_ttl = ipv6_packet.hop_limit;
+                                let ipv6_packet: Ipv6Packet = Ipv6Packet::new(&f.payload[ICMP_UNUSED_BYTE_SIZE..xenet::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]).unwrap();
+                                let _udp_packet: UdpPacket = UdpPacket::new(&f.payload[xenet::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]).unwrap();
+                                icmp_unreachable_ip_result.icmp_unreachable_size = f.payload.len() - ICMP_UNUSED_BYTE_SIZE;
+                                icmp_unreachable_ip_result.ip_total_length = (f.payload.len() - ICMP_UNUSED_BYTE_SIZE) as u16;
+                                icmp_unreachable_ip_result.ip_ttl = ipv6_packet.get_hop_limit();
                                 icmp_unreachable_ip_result.fingerprints.push(f.clone());
                             }
                         }
@@ -392,25 +409,42 @@ fn probe(socket: &mut DataLinkSocket, probe_setting: &ProbeSetting) -> ProbeResu
 }
 
 fn get_mac_through_arp(
-    interface: cross_socket::datalink::interface::Interface,
+    interface: Interface,
     target_ip: Ipv4Addr,
 ) -> MacAddr {
     // Create new socket
-    let mut socket: DataLinkSocket = DataLinkSocket::new(interface, false).unwrap();
+    let config = xenet::datalink::Config {
+        write_buffer_size: 4096,
+        read_buffer_size: 4096,
+        read_timeout: Some(Duration::from_millis(100)),
+        write_timeout: None,
+        channel_type: xenet::datalink::ChannelType::Layer2,
+        bpf_fd_attempts: 1000,
+        linux_fanout: None,
+        promiscuous: false,
+    };
+    let (mut tx, mut rx) = match xenet::datalink::channel(&interface, config) {
+        Ok(xenet::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
+        Ok(_) => panic!("Unhandled channel type"),
+        Err(e) => panic!("Failed to create channel: {}", e),
+    };
     // Packet option for ARP request
     let mut packet_option = PacketBuildOption::new();
-    packet_option.src_mac = socket.interface.mac_addr.clone().unwrap();
+    packet_option.src_mac = interface.mac_addr.clone().unwrap();
     packet_option.dst_mac = MacAddr::zero();
-    packet_option.ether_type = cross_socket::packet::ethernet::EtherType::Arp;
-    packet_option.src_ip = IpAddr::V4(socket.interface.ipv4[0].addr);
+    packet_option.ether_type = xenet::packet::ethernet::EtherType::Arp;
+    packet_option.src_ip = IpAddr::V4(interface.ipv4[0].addr);
     packet_option.dst_ip = IpAddr::V4(target_ip);
 
-    // Send ARP request to default gateway
-    match socket.send(packet_option) {
-        Ok(_) => {}
-        Err(_) => {}
+    let arp_packet: Vec<u8> = xenet::util::packet_builder::util::build_full_arp_packet(packet_option);
+    // Send ARP request
+    match tx.send(&arp_packet) {
+        Some(_r) => {
+            // TODO: Handle error
+        }
+        None => {}
     }
-    let src_mac = socket.interface.mac_addr.clone().unwrap();
+    let src_mac = interface.mac_addr.clone().unwrap();
     let timeout = Duration::from_millis(10000);
     let start = std::time::Instant::now();
     // Receive packets until timeout
@@ -418,16 +452,19 @@ fn get_mac_through_arp(
         if start.elapsed() > timeout {
             return MacAddr::zero();
         }
-        match socket.receive() {
+        match rx.next() {
             Ok(packet) => {
-                let ethernet_packet = cross_socket::packet::ethernet::EthernetPacket::from_bytes(&packet);
-                if ethernet_packet.ethertype != cross_socket::packet::ethernet::EtherType::Arp {
-                    continue;
-                }
-                let arp_packet =
-                    cross_socket::packet::arp::ArpPacket::from_bytes(&ethernet_packet.payload);
-                if arp_packet.sender_hw_addr.address() != src_mac.address() && arp_packet.sender_proto_addr == target_ip {
-                    return arp_packet.sender_hw_addr;
+                let frame: Frame = Frame::from_bytes(&packet, ParseOption::default());
+                if let Some(datalink) = frame.datalink {
+                    if let Some(ethernet_header) = datalink.ethernet {
+                        if ethernet_header.ethertype == xenet::packet::ethernet::EtherType::Arp {
+                            if let Some(arp_header) = datalink.arp {
+                                if arp_header.sender_hw_addr.address() != src_mac.address() && arp_header.sender_proto_addr == target_ip {
+                                    return arp_header.sender_hw_addr;
+                                }
+                            }
+                        }
+                    }
                 }
             }
             Err(_) => {}

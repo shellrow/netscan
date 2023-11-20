@@ -1,7 +1,7 @@
-use cross_socket::datalink::MacAddr;
+use xenet::net::mac::MacAddr;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
-use cross_socket::packet::tcp::TcpOption;
+use xenet::packet::tcp::TcpOption;
 
 /// Listener thread wait time (milliseconds)
 pub(crate) const LISTENER_WAIT_TIME_MILLIS: u64 = 100;

@@ -1,5 +1,5 @@
 mod capture;
-pub(crate) mod listener;
+pub mod listener;
 
 use xenet::packet::ethernet::EtherType;
 use xenet::packet::ip::IpNextLevelProtocol;
@@ -17,7 +17,7 @@ use std::time::Duration;
 
 /// Packet capture options
 #[derive(Clone, Debug)]
-pub(crate) struct PacketCaptureOptions {
+pub struct PacketCaptureOptions {
     /// Interface index
     pub interface_index: u32,
     /// Interface name
@@ -132,6 +132,7 @@ pub struct PacketFrame {
     pub icmpv6_header: Option<Icmpv6Header>,
     pub tcp_header: Option<TcpHeader>,
     pub udp_header: Option<UdpHeader>,
+    pub payload: Vec<u8>,
 }
 
 impl PacketFrame {
@@ -146,6 +147,7 @@ impl PacketFrame {
             icmpv6_header: None,
             tcp_header: None,
             udp_header: None,
+            payload: vec![],
         }
     }
     pub fn from_xenet_frame(frame: xenet::packet::frame::Frame) -> PacketFrame {
@@ -180,6 +182,7 @@ impl PacketFrame {
                 packet_frame.udp_header = Some(udp_header);
             }
         }
+        packet_frame.payload = frame.payload.to_vec();
         packet_frame
     }
 }

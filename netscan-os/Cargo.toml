@@ -14,4 +14,5 @@ license = "MIT"
 rayon = "1.7"
 rand = "0.8"
 default-net = "0.18"
-cross-socket = "0.8"
+xenet = "0.1.0"
+netscan-pcap = { path = "../netscan-pcap", version = "0.1.0" }

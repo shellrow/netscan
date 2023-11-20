@@ -1,6 +1,5 @@
 mod interface;
 
-pub mod pcap;
 pub mod async_io;
 pub mod blocking;
 pub mod host;

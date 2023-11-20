@@ -1,4 +1,4 @@
-use cross_socket::packet::PacketFrame;
+use netscan_pcap::PacketFrame;
 
 use super::setting::ProbeType;
 use std::net::IpAddr;

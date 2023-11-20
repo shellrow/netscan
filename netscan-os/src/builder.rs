@@ -1,15 +1,17 @@
 use std::net::{IpAddr, SocketAddr};
 
-use cross_socket::packet::ethernet::{EtherType, ETHERNET_HEADER_LEN};
-use cross_socket::packet::icmp::IcmpPacketBuilder;
-use cross_socket::packet::icmpv6::Icmpv6PacketBuilder;
-use cross_socket::packet::ip::IpNextLevelProtocol;
-use cross_socket::packet::ipv4::Ipv4PacketBuilder;
-use cross_socket::packet::ipv6::Ipv6PacketBuilder;
-use cross_socket::packet::tcp::{TcpPacketBuilder, TcpFlag, TcpOption};
-use cross_socket::packet::{builder::PacketBuilder, ethernet::EthernetPacketBuilder};
-use cross_socket::packet::udp::UDP_BASE_DST_PORT;
+use xenet::packet::ethernet::{EtherType, ETHERNET_HEADER_LEN};
+use xenet::util::packet_builder::icmp::IcmpPacketBuilder;
+use xenet::util::packet_builder::icmpv6::Icmpv6PacketBuilder;
+use xenet::packet::ip::IpNextLevelProtocol;
+use xenet::util::packet_builder::ipv4::Ipv4PacketBuilder;
+use xenet::util::packet_builder::ipv6::Ipv6PacketBuilder;
+use xenet::packet::tcp::{TcpFlags, TcpOption};
+use xenet::util::packet_builder::tcp::TcpPacketBuilder;
+use xenet::util::packet_builder::{builder::PacketBuilder, ethernet::EthernetPacketBuilder};
 use super::setting::{ProbeSetting, ProbeType, TcpProbeKind};
+
+const UDP_BASE_DST_PORT: u16 = 33435;
 
 pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: ProbeType, tcp_probe_kind: Option<TcpProbeKind>) -> Vec<u8> {
     let mut packet_builder = PacketBuilder::new();
@@ -83,30 +85,30 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
             ];
     match probe_type {
         ProbeType::TcpSynAckProbe => {
-            tcp_packet_builder.flags = vec![TcpFlag::Syn];
+            tcp_packet_builder.flags = TcpFlags::SYN;
         },
         ProbeType::TcpRstAckProbe => {
             tcp_packet_builder.dst_port = probe_setting.probe_target.closed_tcp_port; 
-            tcp_packet_builder.flags = vec![TcpFlag::Syn];
+            tcp_packet_builder.flags = TcpFlags::SYN;
         },
         ProbeType::TcpEcnProbe => {
-            tcp_packet_builder.flags = vec![TcpFlag::Cwr, TcpFlag::Ece, TcpFlag::Syn];
+            tcp_packet_builder.flags = TcpFlags::CWR | TcpFlags::ECE | TcpFlags::SYN;
         },
         ProbeType::TcpProbe => {
             if let Some(probe_kind) = tcp_probe_kind {
                 match probe_kind {
                     TcpProbeKind::Ecn => {
-                        tcp_packet_builder.flags = vec![TcpFlag::Cwr, TcpFlag::Ece, TcpFlag::Syn];
+                        tcp_packet_builder.flags = TcpFlags::CWR | TcpFlags::ECE | TcpFlags::SYN;
                     },
                     _ => {
-                        tcp_packet_builder.flags = vec![TcpFlag::Syn];
+                        tcp_packet_builder.flags = TcpFlags::SYN;
                     },
                 }
                 tcp_packet_builder.options = probe_kind.tcp_options();
             }
         },
         _ => {
-            tcp_packet_builder.flags = vec![TcpFlag::Syn];
+            tcp_packet_builder.flags = TcpFlags::SYN;
         },
     }
     packet_builder.set_tcp(tcp_packet_builder);
@@ -117,7 +119,7 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
     }
 }
 
-pub(crate) fn build_tcp_control_packet(probe_setting: &ProbeSetting, tcp_flags: Vec<TcpFlag>) -> Vec<u8> {
+pub(crate) fn build_tcp_control_packet(probe_setting: &ProbeSetting, tcp_flags: u8) -> Vec<u8> {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
         src_mac: probe_setting.src_mac.clone(),
@@ -203,7 +205,7 @@ pub(crate) fn build_udp_probe_packet(probe_setting: &ProbeSetting) -> Vec<u8> {
             },
         },
     }
-    let udp_packet_builder = cross_socket::packet::udp::UdpPacketBuilder::new(
+    let udp_packet_builder = xenet::util::packet_builder::udp::UdpPacketBuilder::new(
         SocketAddr::new(probe_setting.src_ip, probe_setting.src_port),
         SocketAddr::new(probe_setting.probe_target.ip_addr, UDP_BASE_DST_PORT),
     );
@@ -242,19 +244,19 @@ pub(crate) fn build_icmp_probe_packet(probe_setting: &ProbeSetting, probe_type: 
                 );
                 match probe_type {
                     ProbeType::IcmpEchoProbe => {
-                        icmp_packet_builder.icmp_type = cross_socket::packet::icmp::IcmpType::EchoRequest;
+                        icmp_packet_builder.icmp_type = xenet::packet::icmp::IcmpType::EchoRequest;
                     },
                     ProbeType::IcmpTimestampProbe => {
-                        icmp_packet_builder.icmp_type = cross_socket::packet::icmp::IcmpType::TimestampRequest;
+                        icmp_packet_builder.icmp_type = xenet::packet::icmp::IcmpType::TimestampRequest;
                     },
                     ProbeType::IcmpAddressMaskProbe => {
-                        icmp_packet_builder.icmp_type = cross_socket::packet::icmp::IcmpType::AddressMaskRequest;
+                        icmp_packet_builder.icmp_type = xenet::packet::icmp::IcmpType::AddressMaskRequest;
                     },
                     ProbeType::IcmpInformationProbe => {
-                        icmp_packet_builder.icmp_type = cross_socket::packet::icmp::IcmpType::InformationRequest;
+                        icmp_packet_builder.icmp_type = xenet::packet::icmp::IcmpType::InformationRequest;
                     },
                     _ => {
-                        icmp_packet_builder.icmp_type = cross_socket::packet::icmp::IcmpType::EchoRequest;
+                        icmp_packet_builder.icmp_type = xenet::packet::icmp::IcmpType::EchoRequest;
                     },
                 }
                 
@@ -275,10 +277,10 @@ pub(crate) fn build_icmp_probe_packet(probe_setting: &ProbeSetting, probe_type: 
                 // On ICMPv6, Only EchoRequest is available.
                 match probe_type {
                     ProbeType::IcmpEchoProbe => {
-                        icmpv6_packet_builder.icmpv6_type = cross_socket::packet::icmpv6::Icmpv6Type::EchoRequest;
+                        icmpv6_packet_builder.icmpv6_type = xenet::packet::icmpv6::Icmpv6Type::EchoRequest;
                     },
                     _ => {
-                        icmpv6_packet_builder.icmpv6_type = cross_socket::packet::icmpv6::Icmpv6Type::EchoRequest;
+                        icmpv6_packet_builder.icmpv6_type = xenet::packet::icmpv6::Icmpv6Type::EchoRequest;
                     },
                 }
                 packet_builder.set_icmpv6(icmpv6_packet_builder);

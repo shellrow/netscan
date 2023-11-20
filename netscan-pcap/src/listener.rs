@@ -1,12 +1,12 @@
-use crate::pcap::PacketFrame;
-use crate::pcap::capture::start_capture;
-use crate::pcap::PacketCaptureOptions;
+use crate::PacketFrame;
+use crate::capture::start_capture;
+use crate::PacketCaptureOptions;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 
 /// Listner
 #[derive(Debug)]
-pub(crate) struct Listner {
+pub struct Listner {
     /// Packet capture options
     pub options: PacketCaptureOptions,
     /// Message Sender
