@@ -18,7 +18,6 @@ use xenet::datalink::DataLinkSender;
 use xenet::packet::tcp::TcpFlags;
 use xenet::net::mac::MacAddr;
 use xenet::net::interface::Interface;
-//use xenet::packet::Packet;
 
 use crate::interface;
 
