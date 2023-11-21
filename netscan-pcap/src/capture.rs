@@ -58,26 +58,49 @@ pub(crate) fn start_capture (
                 let frame: Frame = Frame::from_bytes(&packet, parse_option);
                 if filter_packet(&frame, &capture_options) {
                     let packet_frame = PacketFrame::from_xenet_frame(frame);
-                    msg_tx.lock().unwrap().send(packet_frame.clone()).unwrap();
+                    match msg_tx.lock() {
+                        Ok(msg_tx) => {
+                            match msg_tx.send(packet_frame.clone()) {
+                                Ok(_) => {},
+                                Err(_) => {},
+                            }
+                        }
+                        Err(_) => {},
+                    }
                     if capture_options.store {
-                        let mut packets = packets.lock().unwrap();
-                        if packets.len() < capture_options.store_limit as usize {
-                            packets.push(packet_frame.clone());
+                        match packets.lock() {
+                            Ok(mut packets) => {
+                                if packets.len() < capture_options.store_limit as usize {
+                                    packets.push(packet_frame.clone());
+                                }
+                            }
+                            Err(_) => {},
                         }
                     }
-                    //packets.lock().unwrap().push(packet_frame);
                 }
             }
             Err(_) => {},
         }
-        if *stop.lock().unwrap() {
-            break;
+        match stop.lock() {
+            Ok(stop) => {
+                if *stop {
+                    break;
+                }
+            }
+            Err(_) => {},
         }
         if Instant::now().duration_since(start_time) > capture_options.duration {
             break;
         }
     }
-    let packets = packets.lock().unwrap().clone(); 
+    let packets: Vec<PacketFrame> = match packets.lock() {
+        Ok(packets) => {
+            packets.clone()
+        }
+        Err(_) => {
+            return Vec::new();
+        }
+    };
     packets
 }
 

@@ -16,8 +16,6 @@ pub struct Listner {
     pub rx: Arc<Mutex<Receiver<PacketFrame>>>,
     /// Stop handle
     pub stop: Arc<Mutex<bool>>,
-    /// Packets store
-    pub packets: Arc<Mutex<Vec<PacketFrame>>>,
 }
 
 impl Listner {
@@ -29,7 +27,6 @@ impl Listner {
             tx: Arc::new(Mutex::new(tx)),
             rx: Arc::new(Mutex::new(rx)),
             stop: Arc::new(Mutex::new(false)),
-            packets: Arc::new(Mutex::new(Vec::new())),
         };
         listener
     }
@@ -45,17 +42,9 @@ impl Listner {
         self.stop.clone()
     }
 
-    // Get packets
-    pub fn get_packets(&self) -> Vec<PacketFrame> {
-        self.packets.lock().unwrap().clone()
-    }
-
-    /// Start capture
-    pub fn start(&self) {
+    /// Start capture and return captured packets
+    pub fn start(&self) -> Vec<PacketFrame> {
         let options = self.options.clone();
-        let packets: Vec<PacketFrame> = start_capture(options, &self.tx, &self.stop);
-        for packet in packets {
-            self.packets.lock().unwrap().push(packet);
-        }
+        start_capture(options, &self.tx, &self.stop)
     }
 }

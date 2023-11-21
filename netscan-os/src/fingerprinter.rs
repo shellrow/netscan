@@ -79,7 +79,19 @@ impl Fingerprinter {
                 "Failed to create Scanner. Network Interface not found.",
             ));
         };
-        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let src_ip: IpAddr = match interface::get_interface_ipv4(&network_interface) {
+            Some(ip) => ip,
+            None => {
+                match interface::get_interface_ipv6(&network_interface) {
+                    Some(ip) => ip,
+                    None => {
+                        return Err(String::from(
+                            "Failed to create Fingerprinter. Invalid Interface IP address.",
+                        ))
+                    }
+                }
+            }
+        };
         let use_tun = network_interface.is_tun();
         let loopback = network_interface.is_loopback();
         let probe_setting: ProbeSetting = ProbeSetting {
@@ -230,7 +242,12 @@ impl Fingerprinter {
     }
     /// Run probe with the current settings
     pub fn run_probe(&mut self) {
-        let interface: Interface = crate::interface::get_interface_by_index(self.probe_setting.if_index).unwrap();
+        let interface: Interface = match crate::interface::get_interface_by_index(self.probe_setting.if_index) {
+            Some(interface) => interface,
+            None => {
+                return;
+            },
+        };
         let config = xenet::datalink::Config {
             write_buffer_size: 4096,
             read_buffer_size: 4096,
@@ -281,9 +298,16 @@ fn probe(sender: &mut Box<dyn DataLinkSender>, probe_setting: &ProbeSetting) -> 
     let receive_fingerprints: Arc<Mutex<Vec<PacketFrame>>> = Arc::clone(&fingerprints);
 
     let handler = thread::spawn(move || {
-        listener.start();
-        for f in listener.get_packets() {
-            receive_fingerprints.lock().unwrap().push(f);
+        let packets: Vec<PacketFrame> = listener.start();
+        for f in packets {
+            match receive_fingerprints.lock() {
+                Ok(mut fingerprints) => {
+                    fingerprints.push(f);
+                }
+                Err(e) => {
+                    eprintln!("Error: {:?}", e);
+                }
+            }
         }
     });
 
@@ -292,116 +316,142 @@ fn probe(sender: &mut Box<dyn DataLinkSender>, probe_setting: &ProbeSetting) -> 
 
     send::send_packets(sender, &probe_setting);
     thread::sleep(probe_setting.wait_time);
-    *stop_handle.lock().unwrap() = true;
+
+    // Stop listener
+    match stop_handle.lock() {
+        Ok(mut stop) => {
+            *stop = true;
+        }
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+        }
+    }
 
     // Wait for listener to stop
-    handler.join().unwrap();
-    
+    match handler.join() {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+        }
+    }
     // Parse fingerprints and set result
     let mut result: ProbeResult = ProbeResult::new_with_types(probe_setting.probe_target.ip_addr, probe_setting.probe_types.clone());
-    for f in fingerprints.lock().unwrap().iter() {
-        let ip_next_protocol: IpNextLevelProtocol = if let Some(ip_packet) = &f.ipv4_header {
-            ip_packet.next_level_protocol
-        }else {
-            if let Some(ip_packet) = &f.ipv6_header {
-                ip_packet.next_header
-            } else {
-                continue;
-            }
-        };
-        match ip_next_protocol {
-            IpNextLevelProtocol::Tcp => {
-                if let Some(tcp_fingerprint) = &f.tcp_header {
-                    if tcp_fingerprint.flags == TcpFlags::SYN | TcpFlags::ACK && tcp_fingerprint.flags != TcpFlags::SYN | TcpFlags::ACK | TcpFlags::ECE {
-                        if let Some(tcp_syn_ack_result) = &mut result.tcp_syn_ack_result {
-                            tcp_syn_ack_result.syn_ack_response = true;
-                            tcp_syn_ack_result.fingerprints.push(f.clone());
-                        }
-                    }else if tcp_fingerprint.flags == TcpFlags::RST | TcpFlags::ACK {
-                        if let Some(tcp_rst_ack_result) = &mut result.tcp_rst_ack_result {
-                            tcp_rst_ack_result.rst_ack_response = true;
-                            tcp_rst_ack_result.fingerprints.push(f.clone());
-                        }
-                    } else if tcp_fingerprint.flags == TcpFlags::SYN | TcpFlags::ACK | TcpFlags::ECE {
-                        if let Some(tcp_rst_ack_result) = &mut result.tcp_ecn_result {
-                            tcp_rst_ack_result.syn_ack_ece_response = true;
-                            tcp_rst_ack_result.fingerprints.push(f.clone());
-                        }
+    match fingerprints.lock() {
+        Ok(fingerprints) => {
+            for f in fingerprints.iter() {
+                let ip_next_protocol: IpNextLevelProtocol = if let Some(ip_packet) = &f.ipv4_header {
+                    ip_packet.next_level_protocol
+                }else {
+                    if let Some(ip_packet) = &f.ipv6_header {
+                        ip_packet.next_header
+                    } else {
+                        continue;
                     }
-                }
-            }
-            IpNextLevelProtocol::Udp => {}
-            IpNextLevelProtocol::Icmp => {
-                if let Some(icmp_fingerprint) = &f.icmp_header {
-                    match icmp_fingerprint.icmp_type {
-                        IcmpType::EchoReply => {
-                            if let Some(icmp_echo_result) = &mut result.icmp_echo_result {
-                                icmp_echo_result.icmp_echo_reply = true;
-                                icmp_echo_result.fingerprints.push(f.clone());
-                            }
-                        }
-                        IcmpType::DestinationUnreachable => {
-                            if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
-                                icmp_unreachable_ip_result.icmp_unreachable_reply = true;
-                                let ipv4_packet: Ipv4Packet = Ipv4Packet::new(&f.payload[ICMP_UNUSED_BYTE_SIZE..xenet::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]).unwrap();
-                                let _udp_packet: UdpPacket = UdpPacket::new(&f.payload[xenet::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]).unwrap();
-                                icmp_unreachable_ip_result.icmp_unreachable_size = f.payload.len() - ICMP_UNUSED_BYTE_SIZE;
-                                icmp_unreachable_ip_result.ip_total_length = ipv4_packet.get_total_length();
-                                icmp_unreachable_ip_result.ip_id = ipv4_packet.get_identification();
-                                if ipv4_packet.get_flags() == Ipv4Flags::DontFragment {
-                                    icmp_unreachable_ip_result.ip_df = true;
+                };
+                match ip_next_protocol {
+                    IpNextLevelProtocol::Tcp => {
+                        if let Some(tcp_fingerprint) = &f.tcp_header {
+                            if tcp_fingerprint.flags == TcpFlags::SYN | TcpFlags::ACK && tcp_fingerprint.flags != TcpFlags::SYN | TcpFlags::ACK | TcpFlags::ECE {
+                                if let Some(tcp_syn_ack_result) = &mut result.tcp_syn_ack_result {
+                                    tcp_syn_ack_result.syn_ack_response = true;
+                                    tcp_syn_ack_result.fingerprints.push(f.clone());
                                 }
-                                icmp_unreachable_ip_result.ip_ttl = ipv4_packet.get_ttl();
-                                icmp_unreachable_ip_result.fingerprints.push(f.clone());
+                            }else if tcp_fingerprint.flags == TcpFlags::RST | TcpFlags::ACK {
+                                if let Some(tcp_rst_ack_result) = &mut result.tcp_rst_ack_result {
+                                    tcp_rst_ack_result.rst_ack_response = true;
+                                    tcp_rst_ack_result.fingerprints.push(f.clone());
+                                }
+                            } else if tcp_fingerprint.flags == TcpFlags::SYN | TcpFlags::ACK | TcpFlags::ECE {
+                                if let Some(tcp_rst_ack_result) = &mut result.tcp_ecn_result {
+                                    tcp_rst_ack_result.syn_ack_ece_response = true;
+                                    tcp_rst_ack_result.fingerprints.push(f.clone());
+                                }
                             }
                         }
-                        IcmpType::TimestampReply => {
-                            if let Some(icmp_timestamp_result) = &mut result.icmp_timestamp_result {
-                                icmp_timestamp_result.icmp_timestamp_reply = true;
-                                icmp_timestamp_result.fingerprints.push(f.clone());
-                            }
-                        }
-                        IcmpType::AddressMaskReply => {
-                            if let Some(icmp_address_mask_result) = &mut result.icmp_address_mask_result {
-                                icmp_address_mask_result.icmp_address_mask_reply = true;
-                                icmp_address_mask_result.fingerprints.push(f.clone());
-                            }
-                        }
-                        IcmpType::InformationReply => {
-                            if let Some(icmp_information_result) = &mut result.icmp_information_result {
-                                icmp_information_result.icmp_information_reply = true;
-                                icmp_information_result.fingerprints.push(f.clone());
-                            }
-                        }
-                        _ => {}
                     }
+                    IpNextLevelProtocol::Udp => {}
+                    IpNextLevelProtocol::Icmp => {
+                        if let Some(icmp_fingerprint) = &f.icmp_header {
+                            match icmp_fingerprint.icmp_type {
+                                IcmpType::EchoReply => {
+                                    if let Some(icmp_echo_result) = &mut result.icmp_echo_result {
+                                        icmp_echo_result.icmp_echo_reply = true;
+                                        icmp_echo_result.fingerprints.push(f.clone());
+                                    }
+                                }
+                                IcmpType::DestinationUnreachable => {
+                                    if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
+                                        icmp_unreachable_ip_result.icmp_unreachable_reply = true;
+                                        if let Some(ipv4_packet) = Ipv4Packet::new(&f.payload[ICMP_UNUSED_BYTE_SIZE..xenet::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]) {
+                                            if let Some(_udp_packet) = UdpPacket::new(&f.payload[xenet::packet::ipv4::IPV4_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]) {
+                                                // TODO
+                                            }
+                                            icmp_unreachable_ip_result.ip_total_length = ipv4_packet.get_total_length();
+                                            icmp_unreachable_ip_result.ip_id = ipv4_packet.get_identification();
+                                            if ipv4_packet.get_flags() == Ipv4Flags::DontFragment {
+                                                icmp_unreachable_ip_result.ip_df = true;
+                                            }
+                                            icmp_unreachable_ip_result.ip_ttl = ipv4_packet.get_ttl();
+                                        }
+                                        icmp_unreachable_ip_result.icmp_unreachable_size = f.payload.len() - ICMP_UNUSED_BYTE_SIZE;
+                                        icmp_unreachable_ip_result.fingerprints.push(f.clone());
+                                    }
+                                }
+                                IcmpType::TimestampReply => {
+                                    if let Some(icmp_timestamp_result) = &mut result.icmp_timestamp_result {
+                                        icmp_timestamp_result.icmp_timestamp_reply = true;
+                                        icmp_timestamp_result.fingerprints.push(f.clone());
+                                    }
+                                }
+                                IcmpType::AddressMaskReply => {
+                                    if let Some(icmp_address_mask_result) = &mut result.icmp_address_mask_result {
+                                        icmp_address_mask_result.icmp_address_mask_reply = true;
+                                        icmp_address_mask_result.fingerprints.push(f.clone());
+                                    }
+                                }
+                                IcmpType::InformationReply => {
+                                    if let Some(icmp_information_result) = &mut result.icmp_information_result {
+                                        icmp_information_result.icmp_information_reply = true;
+                                        icmp_information_result.fingerprints.push(f.clone());
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    IpNextLevelProtocol::Icmpv6 => {
+                        if let Some(icmpv6_fingerprint) = &f.icmpv6_header {
+                            match icmpv6_fingerprint.icmpv6_type {
+                                Icmpv6Type::EchoReply => {
+                                    if let Some(icmp_echo_result) = &mut result.icmp_echo_result {
+                                        icmp_echo_result.icmp_echo_reply = true;
+                                        icmp_echo_result.fingerprints.push(f.clone());
+                                    }
+                                }
+                                Icmpv6Type::DestinationUnreachable => {
+                                    if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
+                                        icmp_unreachable_ip_result.icmp_unreachable_reply = true;
+                                        if let Some(ipv6_packet) = Ipv6Packet::new(&f.payload[ICMP_UNUSED_BYTE_SIZE..xenet::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]) {
+                                            if let Some(_udp_packet) = UdpPacket::new(&f.payload[xenet::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]) {
+                                                // TODO
+                                            }
+                                            icmp_unreachable_ip_result.ip_ttl = ipv6_packet.get_hop_limit();
+                                        }
+                                        icmp_unreachable_ip_result.icmp_unreachable_size = f.payload.len() - ICMP_UNUSED_BYTE_SIZE;
+                                        icmp_unreachable_ip_result.ip_total_length = (f.payload.len() - ICMP_UNUSED_BYTE_SIZE) as u16;
+                                        icmp_unreachable_ip_result.fingerprints.push(f.clone());
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
-            IpNextLevelProtocol::Icmpv6 => {
-                if let Some(icmpv6_fingerprint) = &f.icmpv6_header {
-                    match icmpv6_fingerprint.icmpv6_type {
-                        Icmpv6Type::EchoReply => {
-                            if let Some(icmp_echo_result) = &mut result.icmp_echo_result {
-                                icmp_echo_result.icmp_echo_reply = true;
-                                icmp_echo_result.fingerprints.push(f.clone());
-                            }
-                        }
-                        Icmpv6Type::DestinationUnreachable => {
-                            if let Some(icmp_unreachable_ip_result) = &mut result.icmp_unreachable_ip_result {
-                                icmp_unreachable_ip_result.icmp_unreachable_reply = true;
-                                let ipv6_packet: Ipv6Packet = Ipv6Packet::new(&f.payload[ICMP_UNUSED_BYTE_SIZE..xenet::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE]).unwrap();
-                                let _udp_packet: UdpPacket = UdpPacket::new(&f.payload[xenet::packet::ipv6::IPV6_HEADER_LEN + ICMP_UNUSED_BYTE_SIZE..]).unwrap();
-                                icmp_unreachable_ip_result.icmp_unreachable_size = f.payload.len() - ICMP_UNUSED_BYTE_SIZE;
-                                icmp_unreachable_ip_result.ip_total_length = (f.payload.len() - ICMP_UNUSED_BYTE_SIZE) as u16;
-                                icmp_unreachable_ip_result.ip_ttl = ipv6_packet.get_hop_limit();
-                                icmp_unreachable_ip_result.fingerprints.push(f.clone());
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            _ => {}
+        }
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
         }
     }
     return result;
@@ -427,9 +477,15 @@ fn get_mac_through_arp(
         Ok(_) => panic!("Unhandled channel type"),
         Err(e) => panic!("Failed to create channel: {}", e),
     };
+    let src_mac = match interface.mac_addr {
+        Some(mac) => mac,
+        None => {
+            return MacAddr::zero();
+        },
+    };
     // Packet option for ARP request
     let mut packet_option = PacketBuildOption::new();
-    packet_option.src_mac = interface.mac_addr.clone().unwrap();
+    packet_option.src_mac = src_mac;
     packet_option.dst_mac = MacAddr::zero();
     packet_option.ether_type = xenet::packet::ethernet::EtherType::Arp;
     packet_option.src_ip = IpAddr::V4(interface.ipv4[0].addr);
@@ -438,12 +494,10 @@ fn get_mac_through_arp(
     let arp_packet: Vec<u8> = xenet::util::packet_builder::util::build_full_arp_packet(packet_option);
     // Send ARP request
     match tx.send(&arp_packet) {
-        Some(_r) => {
-            // TODO: Handle error
-        }
+        Some(_) => {}
         None => {}
     }
-    let src_mac = interface.mac_addr.clone().unwrap();
+    
     let timeout = Duration::from_millis(10000);
     let start = std::time::Instant::now();
     // Receive packets until timeout

@@ -349,8 +349,8 @@ pub(crate) async fn scan_hosts(
 
     let executor = ThreadPool::new().unwrap();
     let future = async move {
-        listener.start();
-        for p in listener.get_packets() {
+        let packets: Vec<PacketFrame> = listener.start();
+        for p in packets {
             receive_packets.lock().unwrap().push(p);
         }
     };
@@ -362,7 +362,15 @@ pub(crate) async fn scan_hosts(
     // Send probe packets
     send_ping_packets(&socket, &scan_setting, ptx).await;
     thread::sleep(scan_setting.wait_time);
-    *stop_handle.lock().unwrap() = true;
+    // Stop listener
+    match stop_handle.lock() {
+        Ok(mut stop) => {
+            *stop = true;
+        }
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+        }
+    }
 
     // Wait for listener to complete task
     lisner_handle.await;
@@ -508,8 +516,8 @@ pub(crate) async fn scan_ports(
 
     let executor = ThreadPool::new().unwrap();
     let future = async move {
-        listener.start();
-        for p in listener.get_packets() {
+        let packets: Vec<PacketFrame> = listener.start();
+        for p in packets {
             receive_packets.lock().unwrap().push(p);
         }
     };
@@ -528,7 +536,15 @@ pub(crate) async fn scan_ports(
     }
 
     thread::sleep(scan_setting.wait_time);
-    *stop_handle.lock().unwrap() = true;
+    // Stop listener
+    match stop_handle.lock() {
+        Ok(mut stop) => {
+            *stop = true;
+        }
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+        }
+    }
 
     // Wait for listener to complete task
     lisner_handle.await;

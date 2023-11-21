@@ -25,45 +25,35 @@ pub(crate) fn send_packets(
             ProbeType::IcmpEchoProbe => {
                 let packet: Vec<u8> = builder::build_icmp_probe_packet(probe_setting, probe_type);
                 match sender.send(&packet) {
-                    Some(_r) => {
-                        // TODO: Handle error
-                    }
+                    Some(_) => {}
                     None => {}
                 }
             }
             ProbeType::IcmpTimestampProbe => {
                 let packet: Vec<u8> = builder::build_icmp_probe_packet(probe_setting, probe_type);
                 match sender.send(&packet) {
-                    Some(_r) => {
-                        // TODO: Handle error
-                    }
+                    Some(_) => {}
                     None => {}
                 }
             }
             ProbeType::IcmpAddressMaskProbe => {
                 let packet: Vec<u8> = builder::build_icmp_probe_packet(probe_setting, probe_type);
                 match sender.send(&packet) {
-                    Some(_r) => {
-                        // TODO: Handle error
-                    }
+                    Some(_) => {}
                     None => {}
                 }
             }
             ProbeType::IcmpInformationProbe => {
                 let packet: Vec<u8> = builder::build_icmp_probe_packet(probe_setting, probe_type);
                 match sender.send(&packet) {
-                    Some(_r) => {
-                        // TODO: Handle error
-                    }
+                    Some(_) => {}
                     None => {}
                 }
             }
             ProbeType::IcmpUnreachableProbe => {
                 let packet: Vec<u8> = builder::build_udp_probe_packet(probe_setting);
                 match sender.send(&packet) {
-                    Some(_r) => {
-                        // TODO: Handle error
-                    }
+                    Some(_) => {}
                     None => {}
                 }
             }
@@ -71,9 +61,7 @@ pub(crate) fn send_packets(
                 for tcp_probe_kind in TcpProbeKind::VALUES.iter().copied() {
                     let packet: Vec<u8> = builder::build_tcp_probe_packet(probe_setting, probe_type, Some(tcp_probe_kind));
                     match sender.send(&packet) {
-                        Some(_r) => {
-                            // TODO: Handle error
-                        }
+                        Some(_) => {}
                         None => {}
                     }
                     tcp_syn_count -= 1;
@@ -81,9 +69,7 @@ pub(crate) fn send_packets(
                         thread::sleep(probe_setting.wait_time);
                         let ack_packet: Vec<u8> = builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
                         match sender.send(&ack_packet) {
-                            Some(_r) => {
-                                // TODO: Handle error
-                            }
+                            Some(_) => {}
                             None => {}
                         }
                     }
@@ -92,9 +78,7 @@ pub(crate) fn send_packets(
             ProbeType::TcpSynAckProbe => {
                 let packet: Vec<u8> = builder::build_tcp_probe_packet(probe_setting, probe_type, None);
                 match sender.send(&packet) {
-                    Some(_r) => {
-                        // TODO: Handle error
-                    }
+                    Some(_) => {}
                     None => {}
                 }
                 tcp_syn_count -= 1;
@@ -102,9 +86,7 @@ pub(crate) fn send_packets(
                     thread::sleep(probe_setting.wait_time);
                     let ack_packet: Vec<u8> = builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
                     match sender.send(&ack_packet) {
-                        Some(_r) => {
-                            // TODO: Handle error
-                        }
+                        Some(_) => {}
                         None => {}
                     }
                 }
@@ -112,18 +94,14 @@ pub(crate) fn send_packets(
             ProbeType::TcpRstAckProbe => {
                 let packet: Vec<u8> = builder::build_tcp_probe_packet(probe_setting, probe_type, None);
                 match sender.send(&packet) {
-                    Some(_r) => {
-                        // TODO: Handle error
-                    }
+                    Some(_) => {}
                     None => {}
                 }
             }
             ProbeType::TcpEcnProbe => {
                 let packet: Vec<u8> = builder::build_tcp_probe_packet(probe_setting, probe_type, None);
                 match sender.send(&packet) {
-                    Some(_r) => {
-                        // TODO: Handle error
-                    }
+                    Some(_) => {}
                     None => {}
                 }
                 tcp_syn_count -= 1;
@@ -131,9 +109,7 @@ pub(crate) fn send_packets(
                     thread::sleep(probe_setting.wait_time);
                     let ack_packet: Vec<u8> = builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
                     match sender.send(&ack_packet) {
-                        Some(_r) => {
-                            // TODO: Handle error
-                        }
+                        Some(_) => {}
                         None => {}
                     }
                 }
