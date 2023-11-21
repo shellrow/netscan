@@ -7,8 +7,6 @@ pub mod result;
 pub mod scanner;
 pub mod setting;
 
-pub use cross_socket;
-
 #[cfg(feature = "service")]
 extern crate netscan_service;
 

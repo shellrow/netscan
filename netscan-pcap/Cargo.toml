@@ -1,0 +1,14 @@
+[package]
+name = "netscan-pcap"
+version = "0.22.0"
+edition = "2021"
+authors = ["shellrow <shellrow@protonmail.com>"]
+description = "Packet capture library for netscan"
+repository = "https://github.com/shellrow/netscan"
+readme = "../README.md"
+keywords = ["network"]
+categories = ["network-programming"]
+license = "MIT"
+
+[dependencies]
+xenet = "0.2.0"
