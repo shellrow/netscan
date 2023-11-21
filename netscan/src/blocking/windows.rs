@@ -78,9 +78,7 @@ fn send_tcp_syn_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_sett
             let packet_bytes: Vec<u8> = packet_builder.packet();
 
             match sender.send(&packet_bytes) {
-                Some(_r) => {
-                    // TODO: Handle error
-                }
+                Some(_) => {}
                 None => {}
             }
             let socket_addr = SocketAddr::new(target.ip_addr, port.port);
@@ -151,9 +149,7 @@ fn send_icmp_echo_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_se
         let packet_bytes: Vec<u8> = packet_builder.packet();
 
         match sender.send(&packet_bytes) {
-            Some(_r) => {
-                // TODO: Handle error
-            }
+            Some(_) => {}
             None => {}
         }
         let socket_addr = SocketAddr::new(target.ip_addr, 0);
@@ -210,9 +206,7 @@ fn send_udp_ping_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_set
         let packet_bytes: Vec<u8> = packet_builder.packet();
 
         match sender.send(&packet_bytes) {
-            Some(_r) => {
-                // TODO: Handle error
-            }
+            Some(_) => {}
             None => {}
         }
         let socket_addr = SocketAddr::new(target.ip_addr, 0);
@@ -349,8 +343,8 @@ pub(crate) fn scan_hosts(
     let receive_packets: Arc<Mutex<Vec<PacketFrame>>> = Arc::clone(&packets);
 
     let handler = thread::spawn(move || {
-        listener.start();
-        for p in listener.get_packets() {
+        let packets: Vec<PacketFrame> = listener.start();
+        for p in packets {
             receive_packets.lock().unwrap().push(p);
         }
     });
@@ -495,8 +489,8 @@ pub(crate) fn scan_ports(
     let receive_packets: Arc<Mutex<Vec<PacketFrame>>> = Arc::clone(&packets);
 
     let handler = thread::spawn(move || {
-        listener.start();
-        for p in listener.get_packets() {
+        let packets: Vec<PacketFrame> = listener.start();
+        for p in packets {
             receive_packets.lock().unwrap().push(p);
         }
     });
@@ -513,10 +507,23 @@ pub(crate) fn scan_ports(
         }
     }
     thread::sleep(scan_setting.wait_time);
-    *stop_handle.lock().unwrap() = true;
+    // Stop listener
+    match stop_handle.lock() {
+        Ok(mut stop) => {
+            *stop = true;
+        }
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+        }
+    }
 
     // Wait for listener to stop
-    handler.join().unwrap();
+    match handler.join() {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("Error: {:?}", e);
+        }
+    }
 
     // Parse packets and store results
     let mut result: ScanResult = ScanResult::new();
