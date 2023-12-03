@@ -11,4 +11,4 @@ categories = ["network-programming"]
 license = "MIT"
 
 [dependencies]
-xenet = "0.2.0"
+xenet = "0.3.0"
