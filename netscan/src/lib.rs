@@ -7,6 +7,10 @@ pub mod result;
 pub mod scanner;
 pub mod setting;
 
+pub mod pcap {
+    pub use netscan_pcap::*;
+}
+
 #[cfg(feature = "service")]
 extern crate netscan_service;
 
