@@ -1,6 +1,8 @@
 mod capture;
 pub mod listener;
 
+pub use xenet::net::mac::MacAddr;
+pub use xenet::packet;
 use xenet::packet::ethernet::EtherType;
 use xenet::packet::ip::IpNextLevelProtocol;
 use xenet::packet::ethernet::EthernetHeader;
