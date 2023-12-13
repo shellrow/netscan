@@ -83,15 +83,9 @@ pub(crate) fn get_interface_ipv6(iface: &Interface) -> Option<IpAddr> {
     return None;
 }
 
-#[cfg(target_os = "windows")]
 pub fn get_default_gateway_macaddr() -> MacAddr {
     match xenet::net::gateway::get_default_gateway() {
         Ok(gateway) => gateway.mac_addr,
         Err(_) => MacAddr::zero(),
     }
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn get_default_gateway_macaddr() -> MacAddr {
-    MacAddr::zero()
 }
