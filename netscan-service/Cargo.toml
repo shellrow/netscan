@@ -12,6 +12,10 @@ license = "MIT"
 
 [dependencies]
 rayon = "1.8"
+async-io = "1.13"
+futures = { version = "0.3", features = ["executor", "thread-pool"] }
+futures-lite = "1.13"
 dns-lookup = "2.0"
 rustls = { version="0.21", features=["dangerous_configuration"] }
 rustls-native-certs = "0.6"
+phf = { version = "0.11", features = ["macros"] }
