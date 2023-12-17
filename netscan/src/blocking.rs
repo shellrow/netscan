@@ -392,7 +392,7 @@ pub(crate) fn scan_hosts(
         store: true,
         store_limit: u32::MAX,
         receive_undefined: false,
-        use_tun: scan_setting.use_tun,
+        tunnel: scan_setting.tunnel,
         loopback: scan_setting.loopback,
     };
     for target in scan_setting.targets.clone() {
@@ -548,7 +548,7 @@ pub(crate) fn scan_ports(
         store: true,
         store_limit: u32::MAX,
         receive_undefined: false,
-        use_tun: scan_setting.use_tun,
+        tunnel: scan_setting.tunnel,
         loopback: scan_setting.loopback,
     };
     for target in scan_setting.targets.clone() {

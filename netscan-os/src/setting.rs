@@ -105,7 +105,7 @@ pub struct ProbeSetting {
     /// Packet send rate
     pub send_rate: Duration,
     /// Use TUN interface
-    pub use_tun: bool,
+    pub tunnel: bool,
     /// Use loopback interface
     pub loopback: bool,
 }

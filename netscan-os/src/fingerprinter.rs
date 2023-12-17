@@ -61,7 +61,7 @@ impl Fingerprinter {
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
         };
         let fingerprinter = Fingerprinter {
@@ -106,7 +106,7 @@ impl Fingerprinter {
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
         };
         let fingerprinter = Fingerprinter {
@@ -139,7 +139,7 @@ impl Fingerprinter {
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
         };
         let fingerprinter = Fingerprinter {
@@ -184,7 +184,7 @@ impl Fingerprinter {
             timeout: Duration::from_millis(30000),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(1),
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
         };
         let fingerprinter = Fingerprinter {
@@ -289,7 +289,7 @@ fn probe(sender: &mut Box<dyn DataLinkSender>, probe_setting: &ProbeSetting) -> 
         store: true,
         store_limit: u32::MAX,
         receive_undefined: false,
-        use_tun: probe_setting.use_tun,
+        tunnel: probe_setting.tunnel,
         loopback: probe_setting.loopback,
     };
     let listener: Listner = Listner::new(capture_options);

@@ -112,7 +112,7 @@ pub(crate) fn build_tcp_probe_packet(probe_setting: &ProbeSetting, probe_type: P
         },
     }
     packet_builder.set_tcp(tcp_packet_builder);
-    if probe_setting.use_tun {
+    if probe_setting.tunnel {
         packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
     }else {
         packet_builder.packet()
@@ -162,7 +162,7 @@ pub(crate) fn build_tcp_control_packet(probe_setting: &ProbeSetting, tcp_flags: 
     tcp_packet_builder.window = 65535;
     tcp_packet_builder.flags = tcp_flags;
     packet_builder.set_tcp(tcp_packet_builder);
-    if probe_setting.use_tun {
+    if probe_setting.tunnel {
         packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
     }else {
         packet_builder.packet()
@@ -210,7 +210,7 @@ pub(crate) fn build_udp_probe_packet(probe_setting: &ProbeSetting) -> Vec<u8> {
         SocketAddr::new(probe_setting.probe_target.ip_addr, UDP_BASE_DST_PORT),
     );
     packet_builder.set_udp(udp_packet_builder);
-    if probe_setting.use_tun {
+    if probe_setting.tunnel {
         packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
     }else {
         packet_builder.packet()
@@ -287,7 +287,7 @@ pub(crate) fn build_icmp_probe_packet(probe_setting: &ProbeSetting, probe_type: 
             },
         },
     }
-    if probe_setting.use_tun {
+    if probe_setting.tunnel {
         packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
     }else {
         packet_builder.packet()

@@ -48,13 +48,10 @@ pub struct PacketCaptureOptions {
     /// Store limit
     pub store_limit: u32,
     /// Receive undefined packets
-    #[allow(dead_code)]
     pub receive_undefined: bool,
     /// Use TUN interface
-    #[allow(dead_code)]
-    pub use_tun: bool,
+    pub tunnel: bool,
     /// Loopback interface
-    #[allow(dead_code)]
     pub loopback: bool,
 }
 

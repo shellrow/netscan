@@ -48,7 +48,7 @@ pub struct ScanSetting {
     pub timeout: Duration,
     pub wait_time: Duration,
     pub send_rate: Duration,
-    pub use_tun: bool,
+    pub tunnel: bool,
     pub loopback: bool,
     pub minimize_packet: bool,
 }
@@ -70,7 +70,7 @@ impl ScanSetting {
             timeout: Duration::from_secs(30),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(0),
-            use_tun: false,
+            tunnel: false,
             loopback: false,
             minimize_packet: false,
         }

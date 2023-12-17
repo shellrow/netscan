@@ -55,7 +55,7 @@ impl HostScanner {
             scan_type: ScanType::IcmpPingScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
             minimize_packet: false,
         };
@@ -97,7 +97,7 @@ impl HostScanner {
             scan_type: ScanType::IcmpPingScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
             minimize_packet: false,
         };
@@ -139,7 +139,7 @@ impl HostScanner {
             scan_type: ScanType::IcmpPingScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
             minimize_packet: false,
         };
@@ -249,7 +249,7 @@ impl PortScanner {
             scan_type: ScanType::TcpSynScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
             minimize_packet: false,
         };
@@ -291,7 +291,7 @@ impl PortScanner {
             scan_type: ScanType::TcpSynScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
             minimize_packet: false,
         };
@@ -333,7 +333,7 @@ impl PortScanner {
             scan_type: ScanType::TcpSynScan,
             hosts_concurrency: DEFAULT_HOSTS_CONCURRENCY,
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
-            use_tun: use_tun,
+            tunnel: use_tun,
             loopback: loopback,
             minimize_packet: false,
         };
