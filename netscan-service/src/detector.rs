@@ -8,6 +8,7 @@ use std::io::{BufReader, BufWriter};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use futures::stream::{self, StreamExt};
 
 use crate::tcp_service::PORT_SERVICE_MAP;
 
@@ -32,8 +33,17 @@ impl ServiceDetector {
     pub fn detect(&self) -> HashMap<u16, ServiceProbeResult> {
         self.detect_mt()
     }
+    /// Run service detection asynchronously and return result
+    pub async fn async_detect(&self) -> HashMap<u16, ServiceProbeResult> {
+        self.detect_async().await
+    }
+    /// Run service detection and store result in self.result
     pub fn start_detection(&mut self) {
         self.result = self.detect_mt()
+    }
+    /// Run service detection asynchronously and store result in self.result
+    pub async fn start_async_detection(&mut self) {
+        self.result = self.detect_async().await
     }
     /// Get result of service detection
     pub fn get_result(&self) -> &HashMap<u16, ServiceProbeResult> {
@@ -59,60 +69,122 @@ impl ServiceDetector {
                 let mut reader = BufReader::new(&stream);
                 let mut writer = BufWriter::new(&stream);
                 if let Some(payload) = payload_info {
-                    writer.write_all(&payload.payload).unwrap();
-                    writer.flush().unwrap();
-                    let mut response: Vec<u8> = Vec::new();
-                    reader.read_to_end(&mut response).unwrap();
                     match payload.payload_type {
-                        PayloadType::HTTP => {
-                            probe_result.service_detail = parse_http_header(&response);
-                        },
-                        PayloadType::HTTPS => {
-                            match send_payload_tls(self.setting.hostname.clone(), port, payload.payload, self.setting.accept_invalid_certs) {
-                                Ok(res) => {
-                                    probe_result.service_detail = parse_http_header(&res);
-                                },
+                        PayloadType::Http => {
+                            match writer.write_all(&payload.payload) {
+                                Ok(_) => {
+                                    match writer.flush() {
+                                        Ok(_) => {
+                                            match read_response(&mut reader) {
+                                                Ok(bytes) => {
+                                                    probe_result.service_detail = parse_http_header(&bytes);
+                                                    probe_result.response = bytes;
+                                                },
+                                                Err(e) => {
+                                                    probe_result.error = Some(ServiceProbeError::ReadError(e.to_string()));
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            probe_result.error = Some(ServiceProbeError::WriteError(e.to_string()));
+                                        }
+                                    }
+                                }
                                 Err(e) => {
-                                    probe_result.error = Some(ServiceProbeError::TlsError(e));
+                                    probe_result.error = Some(ServiceProbeError::WriteError(e.to_string()));
                                 }
                             }
                         },
-                        PayloadType::TLS => {
-                            match send_payload_tls(self.setting.hostname.clone(), port, payload.payload, self.setting.accept_invalid_certs) {
+                        PayloadType::Https => {
+                            let hostname: String = if self.setting.hostname.is_empty() {
+                                self.setting.ip_addr.to_string()
+                            }else {
+                                self.setting.hostname.clone()
+                            };
+                            match send_payload_tls(hostname, port, payload.payload, self.setting.accept_invalid_certs) {
                                 Ok(res) => {
+                                    probe_result.response = res.clone();
+                                    probe_result.service_detail = parse_http_header(&res);
+                                },
+                                Err(e) => {
+                                    probe_result.error = Some(ServiceProbeError::TlsError(e.to_string()));
+                                }
+                            }
+                        },
+                        PayloadType::CommonTls => {
+                            let hostname: String = if self.setting.hostname.is_empty() {
+                                self.setting.ip_addr.to_string()
+                            }else {
+                                self.setting.hostname.clone()
+                            };
+                            match send_payload_tls(hostname, port, payload.payload, self.setting.accept_invalid_certs) {
+                                Ok(res) => {
+                                    probe_result.response = res.clone();
                                     probe_result.service_detail = Some(String::from_utf8(res).unwrap());
                                 },
                                 Err(e) => {
-                                    probe_result.error = Some(ServiceProbeError::TlsError(e));
+                                    probe_result.error = Some(ServiceProbeError::TlsError(e.to_string()));
                                 }
                             }
                         },
                         _ => {
-                            match String::from_utf8(response.clone()) {
-                                Ok(res) => {
-                                    probe_result.service_detail = Some(res);
-                                },
-                                Err(_) => {
-                                    probe_result.service_detail = Some(String::from_utf8_lossy(&response).to_string());
+                            match writer.write_all(&payload.payload) {
+                                Ok(_) => {
+                                    match writer.flush() {
+                                        Ok(_) => {
+                                            match read_response(&mut reader) {
+                                                Ok(bytes) => {
+                                                    match String::from_utf8(bytes.clone()) {
+                                                        Ok(res) => {
+                                                            probe_result.service_detail = Some(res.replace("\r\n", ""));
+                                                        },
+                                                        Err(_) => {
+                                                            probe_result.service_detail = Some(String::from_utf8_lossy(&bytes).to_string());
+                                                        }
+                                                    }
+                                                    probe_result.response = bytes;
+                                                },
+                                                Err(e) => {
+                                                    probe_result.error = Some(ServiceProbeError::ReadError(e.to_string()));
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            probe_result.error = Some(ServiceProbeError::WriteError(e.to_string()));
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    probe_result.error = Some(ServiceProbeError::WriteError(e.to_string()));
                                 }
                             }
                         },   
                     }
-                    probe_result.response = response;
                 }else {
                     // NULL probe
-                    let mut response: Vec<u8> = Vec::new();
-                    reader.read_to_end(&mut response).unwrap();
-                    match String::from_utf8(response.clone()) {
-                        Ok(res) => {
-                            probe_result.service_detail = Some(res);
+                    match read_response(&mut reader) {
+                        Ok(bytes) => {
+                            match String::from_utf8(bytes.clone()) {
+                                Ok(res) => {
+                                    probe_result.service_detail = Some(res.replace("\r\n", ""));
+                                },
+                                Err(_) => {
+                                    probe_result.service_detail = Some(String::from_utf8_lossy(&bytes).to_string());
+                                }
+                            }
+                            probe_result.response = bytes;
                         },
-                        Err(_) => {
-                            probe_result.service_detail = Some(String::from_utf8_lossy(&response).to_string());
+                        Err(e) => {
+                            probe_result.error = Some(ServiceProbeError::ReadError(e.to_string()));
                         }
                     }
-                    probe_result.response = response;
                 }
+                /* match stream.shutdown(std::net::Shutdown::Both) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        probe_result.error = Some(ServiceProbeError::ConnectionError(e.to_string()));
+                    }
+                } */
             },
             Err(e) => {
                 probe_result.error = Some(ServiceProbeError::ConnectionError(e.to_string()));
@@ -130,18 +202,53 @@ impl ServiceDetector {
         let result_map: HashMap<u16, ServiceProbeResult> = service_map.lock().unwrap().clone();
         result_map
     }    
+    /// Run service detection asynchronously and return result
+    async fn detect_async(&self) -> HashMap<u16, ServiceProbeResult> {
+        let service_map: Arc<Mutex<HashMap<u16, ServiceProbeResult>>> = Arc::new(Mutex::new(HashMap::new()));
+        let fut_port = stream::iter(self.setting.clone().ports).for_each_concurrent(
+            self.setting.concurrent_limit,
+            |port| {
+                let c_service_map: Arc<Mutex<HashMap<u16, ServiceProbeResult>>> = Arc::clone(&service_map);
+                async move {
+                    let probe_result: ServiceProbeResult = self.probe_port(port, self.setting.payload_map.get(&port).cloned());
+                    c_service_map.lock().unwrap().insert(port, probe_result);
+                }
+            },
+        );
+        fut_port.await;
+        let result_map: HashMap<u16, ServiceProbeResult> = service_map.lock().unwrap().clone();
+        result_map
+    }
+}
+
+/// Read to end and return response as Vec<u8>
+/// This ignore io::Error on read_to_end because it is expected when reading response.
+/// If no response is received, and io::Error is occurred, return Err.
+fn read_response(reader: &mut BufReader<&TcpStream>) -> std::io::Result<Vec<u8>> {
+    let mut io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::Other, "No response");
+    let mut response: Vec<u8> = Vec::new();
+    match reader.read_to_end(&mut response) {
+        Ok(_) => {}
+        Err(e) => {
+            io_error = e;
+        }
+    }
+    if response.len() == 0 {
+        return Err(io_error);
+    }else {
+        Ok(response)
+    }
 }
 
 /// Send payload using TLS connection and return response
+/// This ignore io::Error on read_to_end because it is expected when reading response.
+/// If no response is received, and io::Error is occurred, return Err.
 fn send_payload_tls(
     hostname: String,
     port: u16,
     payload: Vec<u8>,
     accept_invalid_certs: bool,
-) -> Result<Vec<u8>, String> {
-    if hostname.is_empty() {
-        return Err(String::from("Error: Invalid host name"));
-    }
+) -> std::io::Result<Vec<u8>> {
     let sock_addr: String = format!("{}:{}", hostname, port);
     let mut root_store = rustls::RootCertStore::empty();
     match rustls_native_certs::load_native_certs() {
@@ -150,7 +257,7 @@ fn send_payload_tls(
                 root_store.add(&rustls::Certificate(cert.0)).unwrap();
             }
         }
-        Err(e) => return Err(format!("Error: {}", e.to_string()))
+        Err(e) => return Err(e),
     }
 
     let mut config = rustls::ClientConfig::builder()
@@ -171,43 +278,36 @@ fn send_payload_tls(
 
     let mut stream: TcpStream = match TcpStream::connect(sock_addr.clone()) {
         Ok(s) => s,
-        Err(e) => return Err(format!("Error: {}", e.to_string())),
+        Err(e) => return Err(e),
     };
     match stream.set_read_timeout(Some(Duration::from_secs(10))) {
         Ok(_) => {}
-        Err(e) => return Err(format!("Error: {}", e.to_string())),
+        Err(e) => return Err(e),
     }
     let mut tls_stream: rustls::Stream<rustls::ClientConnection, TcpStream> =
         rustls::Stream::new(&mut tls_connection, &mut stream);
     match tls_stream.write_all(&payload) {
         Ok(_) => {}
-        Err(e) => return Err(format!("Error: {}", e.to_string())),
+        Err(e) => return Err(e),
     }
+    let mut io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::Other, "No response");
     let mut res = Vec::new();
     match tls_stream.read_to_end(&mut res) {
         Ok(_) => {}
-        Err(e) => return Err(format!("Error: {}", e.to_string())),
+        Err(e) => {
+            io_error = e;
+        },
     }
-    Ok(res)
+    if res.len() == 0 {
+        return Err(io_error);
+    }else {
+        Ok(res)
+    }
 }
 
 /// Parse HTTP header and return server name
 /// 
 /// The server name possibly contains version number.
-/* fn parse_http_header(response_header: String) -> String {
-    let header_fields: Vec<&str> = response_header.split("\r\n").collect();
-    if header_fields.len() == 1 {
-        return response_header;
-    }
-    for field in header_fields {
-        if field.contains("Server:") {
-            return field.trim().to_string();
-        }
-    }
-    String::new()
-} */
-
-/// Parse HTTP header and return server name
 fn parse_http_header(res_bytes: &Vec<u8>) -> Option<String> {
     let res_string: String = res_bytes.iter().map(|&c| c as char).collect();
     let header_fields: Vec<&str> = res_string.split("\r\n").collect();
@@ -226,70 +326,3 @@ fn parse_http_header(res_bytes: &Vec<u8>) -> Option<String> {
     }
     None
 }
-
-/* fn write_head_request(writer: &mut BufWriter<&TcpStream>, _ip_addr: String) {
-    let msg = format!("HEAD / HTTP/1.0\r\n\r\n");
-    match writer.write(msg.as_bytes()) {
-        Ok(_) => {}
-        Err(_) => {}
-    }
-    writer.flush().unwrap();
-} */
-
-/* fn head_request_secure(hostname: String, port: u16, accept_invalid_certs: bool) -> String {
-    if hostname.is_empty() {
-        return String::from("Error: Invalid host name");
-    }
-    let sock_addr: String = format!("{}:{}", hostname, port);
-    let mut root_store = rustls::RootCertStore::empty();
-    match rustls_native_certs::load_native_certs() {
-        Ok(certs) => {
-            for cert in certs {
-                root_store.add(&rustls::Certificate(cert.0)).unwrap();
-            }
-        }
-        Err(e) => return format!("Error: {}", e.to_string()),
-    }
-
-    let mut config = rustls::ClientConfig::builder()
-        .with_safe_defaults()
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
-    if accept_invalid_certs {
-        // Create dangerous config
-        let mut dangerous_config: rustls::client::DangerousClientConfig =
-            rustls::ClientConfig::dangerous(&mut config);
-        // Disable certificate verification
-        dangerous_config.set_certificate_verifier(Arc::new(NoCertificateVerification {}));
-    }
-
-    let mut tls_connection: rustls::ClientConnection =
-        rustls::ClientConnection::new(Arc::new(config), hostname.as_str().try_into().unwrap())
-            .unwrap();
-
-    let mut stream: TcpStream = match TcpStream::connect(sock_addr.clone()) {
-        Ok(s) => s,
-        Err(e) => return format!("Error: {}", e.to_string()),
-    };
-    match stream.set_read_timeout(Some(Duration::from_secs(10))) {
-        Ok(_) => {}
-        Err(e) => return format!("Error: {}", e.to_string()),
-    }
-    let mut tls_stream: rustls::Stream<rustls::ClientConnection, TcpStream> =
-        rustls::Stream::new(&mut tls_connection, &mut stream);
-    let message: String = format!(
-        "HEAD / HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nAccept-Encoding: identity\r\n\r\n",
-        hostname
-    );
-    match tls_stream.write_all(message.as_bytes()) {
-        Ok(_) => {}
-        Err(e) => return format!("Error: {}", e.to_string()),
-    }
-    let mut plaintext = Vec::new();
-    match tls_stream.read_to_end(&mut plaintext) {
-        Ok(_) => {}
-        Err(e) => return format!("Error: {}", e.to_string()),
-    }
-    let result: String = plaintext.iter().map(|&c| c as char).collect();
-    result
-} */

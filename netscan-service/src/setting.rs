@@ -1,4 +1,4 @@
-use crate::payload::{PayloadBuilder, PayloadInfo, PayloadType};
+use crate::payload::{PayloadBuilder, PayloadInfo};
 use std::{collections::HashMap, time::Duration, net::{IpAddr, Ipv4Addr}};
 
 /// Probe setting for service detection
@@ -22,6 +22,8 @@ pub struct ProbeSetting {
     /// 
     /// If not set, default null probe will be used. (No payload, just open TCP connection and read response)
     pub payload_map: HashMap<u16, PayloadInfo>,
+    /// Concurrent connection limit for service detection
+    pub concurrent_limit: usize,
 }
 
 impl ProbeSetting {
@@ -35,36 +37,26 @@ impl ProbeSetting {
             read_timeout: Duration::from_secs(5),
             accept_invalid_certs: false,
             payload_map: HashMap::new(),
+            concurrent_limit: 10,
         }
     }
     pub fn default(ip_addr: IpAddr, hostname: String, ports: Vec<u16>) -> ProbeSetting {
         let mut payload_map: HashMap<u16, PayloadInfo> = HashMap::new();
         let http_head = PayloadBuilder::http_head();
         let https_head = PayloadBuilder::https_head(hostname.clone());
-        payload_map.insert(80, PayloadInfo {
-            payload: http_head.clone(),
-            payload_type: PayloadType::HTTP,
-        });
-        payload_map.insert(443, PayloadInfo {
-            payload: https_head.clone(),
-            payload_type: PayloadType::HTTPS,
-        });
-        payload_map.insert(8080, PayloadInfo {
-            payload: http_head,
-            payload_type: PayloadType::HTTP,
-        });
-        payload_map.insert(8443, PayloadInfo {
-            payload: https_head,
-            payload_type: PayloadType::HTTPS,
-        });
+        payload_map.insert(80, http_head.clone());
+        payload_map.insert(443, https_head.clone());
+        payload_map.insert(8080, http_head);
+        payload_map.insert(8443, https_head);
         ProbeSetting {
             ip_addr: ip_addr,
             hostname: hostname,
             ports: ports,
-            connect_timeout: Duration::from_millis(200),
+            connect_timeout: Duration::from_secs(1),
             read_timeout: Duration::from_secs(5),
             accept_invalid_certs: false,
             payload_map: payload_map,
+            concurrent_limit: 10,
         }
     }
     /// Set Destination IP address

@@ -2,7 +2,8 @@ use default_net;
 use dns_lookup;
 use netscan::host::{HostInfo, PortStatus};
 use netscan::scanner::PortScanner;
-use netscan::service::{PortDatabase, ServiceDetector};
+use netscan::service::setting::ProbeSetting;
+use netscan::service::detector::ServiceDetector;
 use netscan::setting::ScanType;
 use std::net::IpAddr;
 use std::time::Duration;
@@ -27,7 +28,7 @@ fn main() {
         Err(e) => panic!("Error resolving host: {}", e),
     };
     let dst: HostInfo =
-        HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![22, 80, 443, 5000, 8080]);
+        HostInfo::new_with_ip_addr(dst_ip).with_ports(vec![21, 22, 53, 80, 443, 5000, 8080]);
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_host_name("scanme.nmap.org".to_string()).with_ports(vec![22, 80, 443, 5000, 8080]);
     //let dst: HostInfo = HostInfo::new_with_host_name("scanme.nmap.org".to_string()).with_ports(vec![22, 80, 443, 5000, 8080]);
@@ -53,11 +54,11 @@ fn main() {
                 println!("{}: {:?}", port_info.port, port_info.status);
             }
         }
-        let mut service_detector = ServiceDetector::new();
-        service_detector.set_dst_ip(host_info.ip_addr);
-        service_detector.set_dst_name(host_info.host_name.clone());
-        service_detector.set_ports(result.get_open_ports(host_info.ip_addr));
-        let service_map = service_detector.detect(Some(PortDatabase::default()));
-        println!("{:?}", service_map);
+        let probe_setting: ProbeSetting = ProbeSetting::default(host_info.ip_addr, "scanme.nmap.org".to_string(), host_info.get_open_ports());
+        let service_detector = ServiceDetector::new(probe_setting);
+        let service_result = service_detector.detect();
+        for (port, probe_result) in &service_result {
+            println!("{}: {:?}", port, probe_result);
+        }
     }
 }
