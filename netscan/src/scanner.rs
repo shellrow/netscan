@@ -156,7 +156,7 @@ impl HostScanner {
     pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<SocketAddr>>> {
         self.rx.clone()
     }
-    /// Run Host Scan
+    /// Run async scan and store result
     pub async fn run_scan(&mut self) {
         let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
         for dst in self.scan_setting.targets.clone() {
@@ -174,7 +174,8 @@ impl HostScanner {
         }
         self.scan_result = result;
     }
-    pub fn run_async_scan(&mut self) {
+    /// Run scan and store result
+    pub fn run_sync_scan(&mut self) {
         let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
         for dst in self.scan_setting.targets.clone() {
             ip_map.insert(dst.ip_addr, dst.host_name);
@@ -190,13 +191,14 @@ impl HostScanner {
         }
         self.scan_result = result;
     }
-    /// Run scan and return result
+    /// Run async scan and return result
     pub async fn scan(&mut self) -> ScanResult {
         self.run_scan().await;
         self.scan_result.clone()
     }
+    /// Run scan and return result
     pub fn sync_scan(&mut self) -> ScanResult {
-        self.run_async_scan();
+        self.run_sync_scan();
         self.scan_result.clone()
     }
 }
@@ -345,7 +347,7 @@ impl PortScanner {
     pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<SocketAddr>>> {
         self.rx.clone()
     }
-    /// Run Port Scan
+    /// Run async scan and store result
     pub async fn run_scan(&mut self) {
         let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
         for dst in self.scan_setting.targets.clone() {
@@ -365,6 +367,7 @@ impl PortScanner {
         }
         self.scan_result = result;
     }
+    /// Run scan and store result
     pub fn run_sync_scan(&mut self) {
         let mut ip_map: HashMap<IpAddr, String> = HashMap::new();
         for dst in self.scan_setting.targets.clone() {
@@ -383,11 +386,12 @@ impl PortScanner {
         }
         self.scan_result = result;
     }
-    /// Run scan and return result
+    /// Run async scan and return result
     pub async fn scan(&mut self) -> ScanResult {
         self.run_scan().await;
         self.scan_result.clone()
     }
+    /// Run scan and return result
     pub fn sync_scan(&mut self) -> ScanResult {
         self.run_sync_scan();
         self.scan_result.clone()
