@@ -44,13 +44,27 @@ async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, 
                             dst_socket_addr,
                         );
                         tcp_packet_builder.flags = TcpFlags::SYN;
-                        tcp_packet_builder.options = vec![
-                            TcpOption::mss(1460),
-                            TcpOption::sack_perm(),
-                            TcpOption::nop(),
-                            TcpOption::nop(),
-                            TcpOption::wscale(7),
-                        ];
+                        if scan_setting.minimize_packet {
+                            tcp_packet_builder.options = vec![
+                                TcpOption::mss(1460),
+                                TcpOption::sack_perm(),
+                                TcpOption::nop(),
+                                TcpOption::nop(),
+                                TcpOption::wscale(7),
+                            ];
+                        }else{
+                            tcp_packet_builder.window = 65535;
+                            tcp_packet_builder.options = vec![
+                                        TcpOption::mss(1460),
+                                        TcpOption::nop(),
+                                        TcpOption::wscale(6),
+                                        TcpOption::nop(),
+                                        TcpOption::nop(),
+                                        TcpOption::timestamp(u32::MAX, u32::MIN),
+                                        TcpOption::sack_perm(),
+                                    ];
+                        }
+                        
                         let packet_bytes: Vec<u8> = tcp_packet_builder.build();
                         
                         match socket.send_to(&packet_bytes, dst_socket_addr).await {

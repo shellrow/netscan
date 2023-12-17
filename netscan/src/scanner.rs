@@ -57,6 +57,7 @@ impl HostScanner {
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
             use_tun: use_tun,
             loopback: loopback,
+            minimize_packet: false,
         };
         let host_scanner = HostScanner {
             scan_setting: scan_setting,
@@ -98,6 +99,7 @@ impl HostScanner {
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
             use_tun: use_tun,
             loopback: loopback,
+            minimize_packet: false,
         };
         let host_scanner = HostScanner {
             scan_setting: scan_setting,
@@ -139,6 +141,7 @@ impl HostScanner {
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
             use_tun: use_tun,
             loopback: loopback,
+            minimize_packet: false,
         };
         let host_scanner = HostScanner {
             scan_setting: scan_setting,
@@ -248,6 +251,7 @@ impl PortScanner {
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
             use_tun: use_tun,
             loopback: loopback,
+            minimize_packet: false,
         };
         let port_scanner = PortScanner {
             scan_setting: scan_setting,
@@ -289,6 +293,7 @@ impl PortScanner {
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
             use_tun: use_tun,
             loopback: loopback,
+            minimize_packet: false,
         };
         let port_scanner = PortScanner {
             scan_setting: scan_setting,
@@ -330,6 +335,7 @@ impl PortScanner {
             ports_concurrency: DEFAULT_PORTS_CONCURRENCY,
             use_tun: use_tun,
             loopback: loopback,
+            minimize_packet: false,
         };
         let port_scanner = PortScanner {
             scan_setting: scan_setting,

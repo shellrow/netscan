@@ -22,7 +22,84 @@ use xenet::util::packet_builder::{builder::PacketBuilder, ethernet::EthernetPack
 
 const UDP_BASE_DST_PORT: u16 = 33435;
 
-fn send_tcp_syn_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_tcp_syn_packets(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+    let mut packet_builder = PacketBuilder::new();
+    let ethernet_packet_builder = EthernetPacketBuilder {
+        src_mac: scan_setting.src_mac,
+        dst_mac: scan_setting.dst_mac,
+        ether_type: if scan_setting.src_ip.is_ipv4() {
+            EtherType::Ipv4
+        } else {
+            EtherType::Ipv6
+        },
+    };
+    packet_builder.set_ethernet(ethernet_packet_builder);
+
+    for target in &scan_setting.targets {
+        match scan_setting.src_ip {
+            IpAddr::V4(src_ipv4) => match target.ip_addr {
+                IpAddr::V4(dst_ipv4) => {
+                    let mut ipv4_packet_builder = Ipv4PacketBuilder::new(
+                        src_ipv4,
+                        dst_ipv4,
+                        IpNextLevelProtocol::Tcp,
+                    );
+                    ipv4_packet_builder.total_length = Some(64);
+                    packet_builder.set_ipv4(ipv4_packet_builder);
+                },
+                IpAddr::V6(_) => {},
+            },
+            IpAddr::V6(src_ipv6) => match target.ip_addr {
+                IpAddr::V4(_) => {},
+                IpAddr::V6(dst_ipv6) => {
+                    let mut ipv6_packet_builder = Ipv6PacketBuilder::new(
+                        src_ipv6,
+                        dst_ipv6,
+                        IpNextLevelProtocol::Tcp,
+                    );
+                    ipv6_packet_builder.payload_length = Some(44);
+                    packet_builder.set_ipv6(ipv6_packet_builder);
+                },
+            },
+        }
+        for port in &target.ports {
+            let mut tcp_packet_builder = TcpPacketBuilder::new(
+                SocketAddr::new(scan_setting.src_ip, scan_setting.src_port),
+                SocketAddr::new(target.ip_addr, port.port),
+            );
+            tcp_packet_builder.flags = TcpFlags::SYN;
+            tcp_packet_builder.window = 65535;
+            tcp_packet_builder.options = vec![
+                        TcpOption::mss(1460),
+                        TcpOption::nop(),
+                        TcpOption::wscale(6),
+                        TcpOption::nop(),
+                        TcpOption::nop(),
+                        TcpOption::timestamp(u32::MAX, u32::MIN),
+                        TcpOption::sack_perm(),
+                    ];
+            packet_builder.set_tcp(tcp_packet_builder);
+
+            let packet_bytes: Vec<u8> = packet_builder.packet();
+
+            match sender.send(&packet_bytes) {
+                Some(_) => {}
+                None => {}
+            }
+            let socket_addr = SocketAddr::new(target.ip_addr, port.port);
+            match ptx.lock() {
+                Ok(lr) => match lr.send(socket_addr) {
+                    Ok(_) => {}
+                    Err(_) => {}
+                },
+                Err(_) => {}
+            }
+            thread::sleep(scan_setting.send_rate);
+        }
+    }
+}
+
+fn send_tcp_syn_packets_min(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
         src_mac: scan_setting.src_mac,
@@ -94,7 +171,7 @@ fn send_tcp_syn_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_sett
     }
 }
 
-fn send_icmp_echo_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_icmp_echo_packets(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
         src_mac: scan_setting.src_mac,
@@ -164,7 +241,7 @@ fn send_icmp_echo_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_se
     }
 }
 
-fn send_udp_ping_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+fn send_udp_ping_packets(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     let mut packet_builder = PacketBuilder::new();
     let ethernet_packet_builder = EthernetPacketBuilder {
         src_mac: scan_setting.src_mac,
@@ -224,13 +301,17 @@ fn send_udp_ping_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_set
 fn send_ping_packets_datalink(sender: &mut Box<dyn DataLinkSender>, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
-            send_icmp_echo_packets_datalink(sender, scan_setting, ptx);
+            send_icmp_echo_packets(sender, scan_setting, ptx);
         }
         ScanType::TcpPingScan => {
-            send_tcp_syn_packets_datalink(sender, scan_setting, ptx);
+            if scan_setting.minimize_packet {
+                send_tcp_syn_packets_min(sender, scan_setting, ptx);
+            }else{
+                send_tcp_syn_packets(sender, scan_setting, ptx);
+            }
         }
         ScanType::UdpPingScan => {
-            send_udp_ping_packets_datalink(sender, scan_setting, ptx);
+            send_udp_ping_packets(sender, scan_setting, ptx);
         }
         _ => {
             return;
@@ -503,7 +584,11 @@ pub(crate) fn scan_ports(
             send_tcp_connect_requests(&scan_setting, ptx);
         }
         _ => {
-            send_tcp_syn_packets_datalink(&mut tx, &scan_setting, ptx);
+            if scan_setting.minimize_packet {
+                send_tcp_syn_packets_min(&mut tx, &scan_setting, ptx);
+            }else {
+                send_tcp_syn_packets(&mut tx, &scan_setting, ptx);
+            }
         }
     }
     thread::sleep(scan_setting.wait_time);

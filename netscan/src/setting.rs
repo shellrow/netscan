@@ -50,6 +50,7 @@ pub struct ScanSetting {
     pub send_rate: Duration,
     pub use_tun: bool,
     pub loopback: bool,
+    pub minimize_packet: bool,
 }
 
 impl ScanSetting {
@@ -71,6 +72,7 @@ impl ScanSetting {
             send_rate: Duration::from_millis(0),
             use_tun: false,
             loopback: false,
+            minimize_packet: false,
         }
     }
     /// Set source IP address
