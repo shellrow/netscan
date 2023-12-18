@@ -1,6 +1,7 @@
 use crate::payload::{PayloadInfo, PayloadType};
+use crate::result::{ServiceProbeError, ServiceProbeResult};
 use crate::setting::{NoCertificateVerification, ProbeSetting};
-use crate::result::{ServiceProbeResult, ServiceProbeError};
+use futures::stream::{self, StreamExt};
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::io::prelude::*;
@@ -8,7 +9,6 @@ use std::io::{BufReader, BufWriter};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use futures::stream::{self, StreamExt};
 
 use crate::tcp_service::PORT_SERVICE_MAP;
 
@@ -59,7 +59,8 @@ impl ServiceDetector {
             Some(name) => name.to_string(),
             None => String::new(),
         };
-        let mut probe_result: ServiceProbeResult = ServiceProbeResult::new(port, service_name, Vec::new());
+        let mut probe_result: ServiceProbeResult =
+            ServiceProbeResult::new(port, service_name, Vec::new());
         let socket_addr: SocketAddr = SocketAddr::new(self.setting.ip_addr, port);
         match TcpStream::connect_timeout(&socket_addr, self.setting.connect_timeout) {
             Ok(stream) => {
@@ -70,110 +71,121 @@ impl ServiceDetector {
                 let mut writer = BufWriter::new(&stream);
                 if let Some(payload) = payload_info {
                     match payload.payload_type {
-                        PayloadType::Http => {
-                            match writer.write_all(&payload.payload) {
-                                Ok(_) => {
-                                    match writer.flush() {
-                                        Ok(_) => {
-                                            match read_response(&mut reader) {
-                                                Ok(bytes) => {
-                                                    probe_result.service_detail = parse_http_header(&bytes);
-                                                    probe_result.response = bytes;
-                                                },
-                                                Err(e) => {
-                                                    probe_result.error = Some(ServiceProbeError::ReadError(e.to_string()));
-                                                }
-                                            }
-                                        }
-                                        Err(e) => {
-                                            probe_result.error = Some(ServiceProbeError::WriteError(e.to_string()));
-                                        }
+                        PayloadType::Http => match writer.write_all(&payload.payload) {
+                            Ok(_) => match writer.flush() {
+                                Ok(_) => match read_response(&mut reader) {
+                                    Ok(bytes) => {
+                                        probe_result.service_detail = parse_http_header(&bytes);
+                                        probe_result.response = bytes;
                                     }
-                                }
+                                    Err(e) => {
+                                        probe_result.error =
+                                            Some(ServiceProbeError::ReadError(e.to_string()));
+                                    }
+                                },
                                 Err(e) => {
-                                    probe_result.error = Some(ServiceProbeError::WriteError(e.to_string()));
+                                    probe_result.error =
+                                        Some(ServiceProbeError::WriteError(e.to_string()));
                                 }
+                            },
+                            Err(e) => {
+                                probe_result.error =
+                                    Some(ServiceProbeError::WriteError(e.to_string()));
                             }
                         },
                         PayloadType::Https => {
                             let hostname: String = if self.setting.hostname.is_empty() {
                                 self.setting.ip_addr.to_string()
-                            }else {
+                            } else {
                                 self.setting.hostname.clone()
                             };
-                            match send_payload_tls(hostname, port, payload.payload, self.setting.accept_invalid_certs) {
+                            match send_payload_tls(
+                                hostname,
+                                port,
+                                payload.payload,
+                                self.setting.accept_invalid_certs,
+                            ) {
                                 Ok(res) => {
                                     probe_result.response = res.clone();
                                     probe_result.service_detail = parse_http_header(&res);
-                                },
+                                }
                                 Err(e) => {
-                                    probe_result.error = Some(ServiceProbeError::TlsError(e.to_string()));
+                                    probe_result.error =
+                                        Some(ServiceProbeError::TlsError(e.to_string()));
                                 }
                             }
-                        },
+                        }
                         PayloadType::CommonTls => {
                             let hostname: String = if self.setting.hostname.is_empty() {
                                 self.setting.ip_addr.to_string()
-                            }else {
+                            } else {
                                 self.setting.hostname.clone()
                             };
-                            match send_payload_tls(hostname, port, payload.payload, self.setting.accept_invalid_certs) {
+                            match send_payload_tls(
+                                hostname,
+                                port,
+                                payload.payload,
+                                self.setting.accept_invalid_certs,
+                            ) {
                                 Ok(res) => {
                                     probe_result.response = res.clone();
-                                    probe_result.service_detail = Some(String::from_utf8(res).unwrap());
-                                },
+                                    probe_result.service_detail =
+                                        Some(String::from_utf8(res).unwrap());
+                                }
                                 Err(e) => {
-                                    probe_result.error = Some(ServiceProbeError::TlsError(e.to_string()));
+                                    probe_result.error =
+                                        Some(ServiceProbeError::TlsError(e.to_string()));
                                 }
                             }
-                        },
-                        _ => {
-                            match writer.write_all(&payload.payload) {
-                                Ok(_) => {
-                                    match writer.flush() {
-                                        Ok(_) => {
-                                            match read_response(&mut reader) {
-                                                Ok(bytes) => {
-                                                    match String::from_utf8(bytes.clone()) {
-                                                        Ok(res) => {
-                                                            probe_result.service_detail = Some(res.replace("\r\n", ""));
-                                                        },
-                                                        Err(_) => {
-                                                            probe_result.service_detail = Some(String::from_utf8_lossy(&bytes).to_string());
-                                                        }
-                                                    }
-                                                    probe_result.response = bytes;
-                                                },
-                                                Err(e) => {
-                                                    probe_result.error = Some(ServiceProbeError::ReadError(e.to_string()));
-                                                }
+                        }
+                        _ => match writer.write_all(&payload.payload) {
+                            Ok(_) => match writer.flush() {
+                                Ok(_) => match read_response(&mut reader) {
+                                    Ok(bytes) => {
+                                        match String::from_utf8(bytes.clone()) {
+                                            Ok(res) => {
+                                                probe_result.service_detail =
+                                                    Some(res.replace("\r\n", ""));
+                                            }
+                                            Err(_) => {
+                                                probe_result.service_detail = Some(
+                                                    String::from_utf8_lossy(&bytes).to_string(),
+                                                );
                                             }
                                         }
-                                        Err(e) => {
-                                            probe_result.error = Some(ServiceProbeError::WriteError(e.to_string()));
-                                        }
+                                        probe_result.response = bytes;
                                     }
-                                }
+                                    Err(e) => {
+                                        probe_result.error =
+                                            Some(ServiceProbeError::ReadError(e.to_string()));
+                                    }
+                                },
                                 Err(e) => {
-                                    probe_result.error = Some(ServiceProbeError::WriteError(e.to_string()));
+                                    probe_result.error =
+                                        Some(ServiceProbeError::WriteError(e.to_string()));
                                 }
+                            },
+                            Err(e) => {
+                                probe_result.error =
+                                    Some(ServiceProbeError::WriteError(e.to_string()));
                             }
-                        },   
+                        },
                     }
-                }else {
+                } else {
                     // NULL probe
                     match read_response(&mut reader) {
                         Ok(bytes) => {
                             match String::from_utf8(bytes.clone()) {
                                 Ok(res) => {
                                     probe_result.service_detail = Some(res.replace("\r\n", ""));
-                                },
+                                }
                                 Err(_) => {
-                                    probe_result.service_detail = Some(String::from_utf8_lossy(&bytes).to_string());
+                                    probe_result.service_detail =
+                                        Some(String::from_utf8_lossy(&bytes).to_string());
                                 }
                             }
                             probe_result.response = bytes;
-                        },
+                        }
                         Err(e) => {
                             probe_result.error = Some(ServiceProbeError::ReadError(e.to_string()));
                         }
@@ -185,32 +197,37 @@ impl ServiceDetector {
                         probe_result.error = Some(ServiceProbeError::ConnectionError(e.to_string()));
                     }
                 } */
-            },
+            }
             Err(e) => {
                 probe_result.error = Some(ServiceProbeError::ConnectionError(e.to_string()));
             }
         }
-        probe_result 
+        probe_result
     }
     /// Run service detection in parallel and return result
     fn detect_mt(&self) -> HashMap<u16, ServiceProbeResult> {
-        let service_map: Arc<Mutex<HashMap<u16, ServiceProbeResult>>> = Arc::new(Mutex::new(HashMap::new()));
+        let service_map: Arc<Mutex<HashMap<u16, ServiceProbeResult>>> =
+            Arc::new(Mutex::new(HashMap::new()));
         self.setting.clone().ports.into_par_iter().for_each(|port| {
-            let probe_result: ServiceProbeResult = self.probe_port(port, self.setting.payload_map.get(&port).cloned());
+            let probe_result: ServiceProbeResult =
+                self.probe_port(port, self.setting.payload_map.get(&port).cloned());
             service_map.lock().unwrap().insert(port, probe_result);
         });
         let result_map: HashMap<u16, ServiceProbeResult> = service_map.lock().unwrap().clone();
         result_map
-    }    
+    }
     /// Run service detection asynchronously and return result
     async fn detect_async(&self) -> HashMap<u16, ServiceProbeResult> {
-        let service_map: Arc<Mutex<HashMap<u16, ServiceProbeResult>>> = Arc::new(Mutex::new(HashMap::new()));
+        let service_map: Arc<Mutex<HashMap<u16, ServiceProbeResult>>> =
+            Arc::new(Mutex::new(HashMap::new()));
         let fut_port = stream::iter(self.setting.clone().ports).for_each_concurrent(
             self.setting.concurrent_limit,
             |port| {
-                let c_service_map: Arc<Mutex<HashMap<u16, ServiceProbeResult>>> = Arc::clone(&service_map);
+                let c_service_map: Arc<Mutex<HashMap<u16, ServiceProbeResult>>> =
+                    Arc::clone(&service_map);
                 async move {
-                    let probe_result: ServiceProbeResult = self.probe_port(port, self.setting.payload_map.get(&port).cloned());
+                    let probe_result: ServiceProbeResult =
+                        self.probe_port(port, self.setting.payload_map.get(&port).cloned());
                     c_service_map.lock().unwrap().insert(port, probe_result);
                 }
             },
@@ -225,7 +242,8 @@ impl ServiceDetector {
 /// This ignore io::Error on read_to_end because it is expected when reading response.
 /// If no response is received, and io::Error is occurred, return Err.
 fn read_response(reader: &mut BufReader<&TcpStream>) -> std::io::Result<Vec<u8>> {
-    let mut io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::Other, "No response");
+    let mut io_error: std::io::Error =
+        std::io::Error::new(std::io::ErrorKind::Other, "No response");
     let mut response: Vec<u8> = Vec::new();
     match reader.read_to_end(&mut response) {
         Ok(_) => {}
@@ -235,7 +253,7 @@ fn read_response(reader: &mut BufReader<&TcpStream>) -> std::io::Result<Vec<u8>>
     }
     if response.len() == 0 {
         return Err(io_error);
-    }else {
+    } else {
         Ok(response)
     }
 }
@@ -290,23 +308,24 @@ fn send_payload_tls(
         Ok(_) => {}
         Err(e) => return Err(e),
     }
-    let mut io_error: std::io::Error = std::io::Error::new(std::io::ErrorKind::Other, "No response");
+    let mut io_error: std::io::Error =
+        std::io::Error::new(std::io::ErrorKind::Other, "No response");
     let mut res = Vec::new();
     match tls_stream.read_to_end(&mut res) {
         Ok(_) => {}
         Err(e) => {
             io_error = e;
-        },
+        }
     }
     if res.len() == 0 {
         return Err(io_error);
-    }else {
+    } else {
         Ok(res)
     }
 }
 
 /// Parse HTTP header and return server name
-/// 
+///
 /// The server name possibly contains version number.
 fn parse_http_header(res_bytes: &Vec<u8>) -> Option<String> {
     let res_string: String = res_bytes.iter().map(|&c| c as char).collect();
@@ -314,7 +333,7 @@ fn parse_http_header(res_bytes: &Vec<u8>) -> Option<String> {
     if header_fields.len() == 1 {
         if res_string.contains("Server:") {
             return Some(res_string);
-        }else {
+        } else {
             return None;
         }
     }

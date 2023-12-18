@@ -21,11 +21,7 @@ impl ServiceProbeResult {
     }
 
     /// Create a new probe result with an error
-    pub fn with_error(
-        port: u16,
-        service_name: String,
-        error: ServiceProbeError,
-    ) -> Self {
+    pub fn with_error(port: u16, service_name: String, error: ServiceProbeError) -> Self {
         ServiceProbeResult {
             port,
             service_name,

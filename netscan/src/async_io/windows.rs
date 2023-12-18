@@ -1,13 +1,11 @@
 use crate::host::{HostInfo, PortInfo, PortStatus};
-use crate::result::{ScanResult, ScanStatus};
-use crate::setting::{ScanSetting, ScanType};
-use crate::setting::LISTENER_WAIT_TIME_MILLIS;
-use async_io::{Async, Timer};
-use xenet::util::packet_builder::udp::UdpPacketBuilder;
-use crate::pcap::PacketFrame;
-use crate::pcap::PacketCaptureOptions;
 use crate::pcap::listener::Listner;
-use xenet::socket::{SocketOption, IpVersion, SocketType};
+use crate::pcap::PacketCaptureOptions;
+use crate::pcap::PacketFrame;
+use crate::result::{ScanResult, ScanStatus};
+use crate::setting::LISTENER_WAIT_TIME_MILLIS;
+use crate::setting::{ScanSetting, ScanType};
+use async_io::{Async, Timer};
 use futures::executor::ThreadPool;
 use futures::stream::{self, StreamExt};
 use futures::task::SpawnExt;
@@ -21,15 +19,23 @@ use std::thread;
 use std::time::Duration;
 use xenet::packet::ip::IpNextLevelProtocol;
 use xenet::packet::tcp::{TcpFlags, TcpOption};
-use xenet::util::packet_builder::{tcp::TcpPacketBuilder, icmp::IcmpPacketBuilder, icmpv6::Icmpv6PacketBuilder};
 use xenet::socket::AsyncSocket;
+use xenet::socket::{IpVersion, SocketOption, SocketType};
+use xenet::util::packet_builder::udp::UdpPacketBuilder;
+use xenet::util::packet_builder::{
+    icmp::IcmpPacketBuilder, icmpv6::Icmpv6PacketBuilder, tcp::TcpPacketBuilder,
+};
 
 const UDP_BASE_DST_PORT: u16 = 33435;
 
 // Winsock2 does not allow TCP data to be sent over Raw Socket
 // https://docs.microsoft.com/en-US/windows/win32/winsock/tcp-ip-raw-sockets-2#limitations-on-raw-sockets
 #[allow(dead_code)]
-async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+async fn send_tcp_syn_packets(
+    socket: &AsyncSocket,
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>,
+) {
     let fut_host = stream::iter(scan_setting.targets.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency,
         |dst| async move {
@@ -52,21 +58,21 @@ async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, 
                                 TcpOption::nop(),
                                 TcpOption::wscale(7),
                             ];
-                        }else{
+                        } else {
                             tcp_packet_builder.window = 65535;
                             tcp_packet_builder.options = vec![
-                                        TcpOption::mss(1460),
-                                        TcpOption::nop(),
-                                        TcpOption::wscale(6),
-                                        TcpOption::nop(),
-                                        TcpOption::nop(),
-                                        TcpOption::timestamp(u32::MAX, u32::MIN),
-                                        TcpOption::sack_perm(),
-                                    ];
+                                TcpOption::mss(1460),
+                                TcpOption::nop(),
+                                TcpOption::wscale(6),
+                                TcpOption::nop(),
+                                TcpOption::nop(),
+                                TcpOption::timestamp(u32::MAX, u32::MIN),
+                                TcpOption::sack_perm(),
+                            ];
                         }
-                        
+
                         let packet_bytes: Vec<u8> = tcp_packet_builder.build();
-                        
+
                         match socket.send_to(&packet_bytes, dst_socket_addr).await {
                             Ok(_) => {}
                             Err(_) => {}
@@ -88,7 +94,11 @@ async fn send_tcp_syn_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, 
     fut_host.await;
 }
 
-async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+async fn send_icmp_echo_packets(
+    socket: &AsyncSocket,
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>,
+) {
     let fut_host = stream::iter(scan_setting.targets.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency,
         |target| {
@@ -97,24 +107,23 @@ async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting
                 match scan_setting.src_ip {
                     IpAddr::V4(src_ipv4) => match target.ip_addr {
                         IpAddr::V4(dst_ipv4) => {
-                            let mut icmp_packet_builder = IcmpPacketBuilder::new(
-                                src_ipv4,
-                                dst_ipv4,
-                            );
-                            icmp_packet_builder.icmp_type = xenet::packet::icmp::IcmpType::EchoRequest;
+                            let mut icmp_packet_builder =
+                                IcmpPacketBuilder::new(src_ipv4, dst_ipv4);
+                            icmp_packet_builder.icmp_type =
+                                xenet::packet::icmp::IcmpType::EchoRequest;
                             let packet_bytes: Vec<u8> = icmp_packet_builder.build();
-                            
+
                             match socket.send_to(&packet_bytes, dst_socket_addr).await {
                                 Ok(_) => {}
                                 Err(_) => {}
                             }
-                        },
-                        IpAddr::V6(_) => {},
+                        }
+                        IpAddr::V6(_) => {}
                     },
                     IpAddr::V6(src_ipv6) => match target.ip_addr {
-                        IpAddr::V4(_) => {},
+                        IpAddr::V4(_) => {}
                         IpAddr::V6(dst_ipv6) => {
-                            let icmpv6_packet_builder = Icmpv6PacketBuilder{
+                            let icmpv6_packet_builder = Icmpv6PacketBuilder {
                                 src_ip: src_ipv6,
                                 dst_ip: dst_ipv6,
                                 icmpv6_type: xenet::packet::icmpv6::Icmpv6Type::EchoRequest,
@@ -126,7 +135,7 @@ async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting
                                 Ok(_) => {}
                                 Err(_) => {}
                             }
-                        },
+                        }
                     },
                 }
                 match ptx.lock() {
@@ -143,7 +152,11 @@ async fn send_icmp_echo_packets(socket: &AsyncSocket, scan_setting: &ScanSetting
     fut_host.await;
 }
 
-async fn send_udp_ping_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+async fn send_udp_ping_packets(
+    socket: &AsyncSocket,
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>,
+) {
     let fut_host = stream::iter(scan_setting.targets.clone()).for_each_concurrent(
         scan_setting.hosts_concurrency,
         |target| async move {
@@ -153,7 +166,7 @@ async fn send_udp_ping_packets(socket: &AsyncSocket, scan_setting: &ScanSetting,
                 dst_socket_addr,
             );
             let packet_bytes: Vec<u8> = udp_packet_builder.build();
-            
+
             match socket.send_to(&packet_bytes, dst_socket_addr).await {
                 Ok(_) => {}
                 Err(_) => {}
@@ -239,7 +252,11 @@ async fn send_tcp_connect_requests(
         .await;
 }
 
-async fn send_ping_packets(socket: &AsyncSocket, scan_setting: &ScanSetting, ptx: &Arc<Mutex<Sender<SocketAddr>>>) {
+async fn send_ping_packets(
+    socket: &AsyncSocket,
+    scan_setting: &ScanSetting,
+    ptx: &Arc<Mutex<Sender<SocketAddr>>>,
+) {
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
             send_icmp_echo_packets(socket, scan_setting, ptx).await;
@@ -264,32 +281,30 @@ pub(crate) async fn scan_hosts(
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
 ) -> ScanResult {
     let socket = match scan_setting.scan_type {
-        ScanType::IcmpPingScan => {
-            match scan_setting.src_ip {
-                IpAddr::V4(_) => {
-                    let socket_option = SocketOption {
-                        ip_version: IpVersion::V4,
-                        socket_type: SocketType::Raw,
-                        protocol: Some(IpNextLevelProtocol::Icmp),
-                        timeout: None,
-                        ttl: None,
-                        non_blocking: true,
-                    };
-                    AsyncSocket::new(socket_option).unwrap()
-                }
-                IpAddr::V6(_) => {
-                    let socket_option = SocketOption {
-                        ip_version: IpVersion::V6,
-                        socket_type: SocketType::Raw,
-                        protocol: Some(IpNextLevelProtocol::Icmpv6),
-                        timeout: None,
-                        ttl: None,
-                        non_blocking: true,
-                    };
-                    AsyncSocket::new(socket_option).unwrap()
-                }
+        ScanType::IcmpPingScan => match scan_setting.src_ip {
+            IpAddr::V4(_) => {
+                let socket_option = SocketOption {
+                    ip_version: IpVersion::V4,
+                    socket_type: SocketType::Raw,
+                    protocol: Some(IpNextLevelProtocol::Icmp),
+                    timeout: None,
+                    ttl: None,
+                    non_blocking: true,
+                };
+                AsyncSocket::new(socket_option).unwrap()
             }
-        }
+            IpAddr::V6(_) => {
+                let socket_option = SocketOption {
+                    ip_version: IpVersion::V6,
+                    socket_type: SocketType::Raw,
+                    protocol: Some(IpNextLevelProtocol::Icmpv6),
+                    timeout: None,
+                    ttl: None,
+                    non_blocking: true,
+                };
+                AsyncSocket::new(socket_option).unwrap()
+            }
+        },
         ScanType::TcpPingScan => {
             let socket_option = SocketOption {
                 ip_version: if scan_setting.src_ip.is_ipv4() {
@@ -346,11 +361,17 @@ pub(crate) async fn scan_hosts(
     }
     match scan_setting.scan_type {
         ScanType::IcmpPingScan => {
-            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
-            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
+            capture_options
+                .ip_protocols
+                .insert(IpNextLevelProtocol::Icmp);
+            capture_options
+                .ip_protocols
+                .insert(IpNextLevelProtocol::Icmpv6);
         }
         ScanType::TcpPingScan => {
-            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
+            capture_options
+                .ip_protocols
+                .insert(IpNextLevelProtocol::Tcp);
             for target in scan_setting.targets.clone() {
                 for port in target.get_ports() {
                     capture_options.src_ports.insert(port);
@@ -358,9 +379,15 @@ pub(crate) async fn scan_hosts(
             }
         }
         ScanType::UdpPingScan => {
-            capture_options.ip_protocols.insert(IpNextLevelProtocol::Udp);
-            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmp);
-            capture_options.ip_protocols.insert(IpNextLevelProtocol::Icmpv6);
+            capture_options
+                .ip_protocols
+                .insert(IpNextLevelProtocol::Udp);
+            capture_options
+                .ip_protocols
+                .insert(IpNextLevelProtocol::Icmp);
+            capture_options
+                .ip_protocols
+                .insert(IpNextLevelProtocol::Icmpv6);
         }
         _ => {}
     }
@@ -376,8 +403,9 @@ pub(crate) async fn scan_hosts(
             receive_packets.lock().unwrap().push(p);
         }
     };
-    let lisner_handle: futures::future::RemoteHandle<()> = executor.spawn_with_handle(future).unwrap();
-    
+    let lisner_handle: futures::future::RemoteHandle<()> =
+        executor.spawn_with_handle(future).unwrap();
+
     // Wait for listener to start (need fix for better way)
     thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
 
@@ -410,16 +438,16 @@ pub(crate) async fn scan_hosts(
                             status: PortStatus::Open,
                         };
                         ports.push(port_info);
-                    }else if tcp_packet.flags == TcpFlags::RST | TcpFlags::ACK {
+                    } else if tcp_packet.flags == TcpFlags::RST | TcpFlags::ACK {
                         let port_info: PortInfo = PortInfo {
                             port: tcp_packet.source,
                             status: PortStatus::Closed,
                         };
                         ports.push(port_info);
-                    }else {
+                    } else {
                         continue;
                     }
-                }else{
+                } else {
                     continue;
                 }
             }
@@ -433,18 +461,26 @@ pub(crate) async fn scan_hosts(
         let host_info: HostInfo = if let Some(ipv4_packet) = &p.ipv4_header {
             HostInfo {
                 ip_addr: IpAddr::V4(ipv4_packet.source),
-                host_name: scan_setting.ip_map.get(&IpAddr::V4(ipv4_packet.source)).unwrap_or(&String::new()).clone(),
+                host_name: scan_setting
+                    .ip_map
+                    .get(&IpAddr::V4(ipv4_packet.source))
+                    .unwrap_or(&String::new())
+                    .clone(),
                 ttl: ipv4_packet.ttl,
                 ports: ports,
             }
-        }else if let Some(ipv6_packet) = &p.ipv6_header {
+        } else if let Some(ipv6_packet) = &p.ipv6_header {
             HostInfo {
                 ip_addr: IpAddr::V6(ipv6_packet.source),
-                host_name: scan_setting.ip_map.get(&IpAddr::V6(ipv6_packet.source)).unwrap_or(&String::new()).clone(),
+                host_name: scan_setting
+                    .ip_map
+                    .get(&IpAddr::V6(ipv6_packet.source))
+                    .unwrap_or(&String::new())
+                    .clone(),
                 ttl: ipv6_packet.hop_limit,
                 ports: ports,
             }
-        }else{
+        } else {
             continue;
         };
         if !result.hosts.contains(&host_info) {
@@ -532,10 +568,14 @@ pub(crate) async fn scan_ports(
     }
     match scan_setting.scan_type {
         ScanType::TcpSynScan => {
-            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
+            capture_options
+                .ip_protocols
+                .insert(IpNextLevelProtocol::Tcp);
         }
         ScanType::TcpConnectScan => {
-            capture_options.ip_protocols.insert(IpNextLevelProtocol::Tcp);
+            capture_options
+                .ip_protocols
+                .insert(IpNextLevelProtocol::Tcp);
         }
         _ => {}
     }
@@ -551,7 +591,8 @@ pub(crate) async fn scan_ports(
             receive_packets.lock().unwrap().push(p);
         }
     };
-    let lisner_handle: futures::future::RemoteHandle<()> = executor.spawn_with_handle(future).unwrap();
+    let lisner_handle: futures::future::RemoteHandle<()> =
+        executor.spawn_with_handle(future).unwrap();
 
     // Wait for listener to start (need fix for better way)
     thread::sleep(Duration::from_millis(LISTENER_WAIT_TIME_MILLIS));
@@ -582,23 +623,29 @@ pub(crate) async fn scan_ports(
         let ip_addr: IpAddr = {
             if let Some(ipv4_packet) = &p.ipv4_header {
                 if let Some(tcp_packet) = &p.tcp_header {
-                    if socket_set.contains(&SocketAddr::new(IpAddr::V4(ipv4_packet.source), tcp_packet.source)) {
+                    if socket_set.contains(&SocketAddr::new(
+                        IpAddr::V4(ipv4_packet.source),
+                        tcp_packet.source,
+                    )) {
                         continue;
                     }
-                }else{
+                } else {
                     continue;
                 }
-                IpAddr::V4(ipv4_packet.source) 
-            }else if let Some(ipv6_packet) = &p.ipv6_header {
+                IpAddr::V4(ipv4_packet.source)
+            } else if let Some(ipv6_packet) = &p.ipv6_header {
                 if let Some(tcp_packet) = &p.tcp_header {
-                    if socket_set.contains(&SocketAddr::new(IpAddr::V6(ipv6_packet.source), tcp_packet.source)) {
+                    if socket_set.contains(&SocketAddr::new(
+                        IpAddr::V6(ipv6_packet.source),
+                        tcp_packet.source,
+                    )) {
                         continue;
                     }
-                }else {
+                } else {
                     continue;
                 }
                 IpAddr::V6(ipv6_packet.source)
-            }else {
+            } else {
                 continue;
             }
         };
@@ -608,34 +655,37 @@ pub(crate) async fn scan_ports(
                     port: tcp_packet.source,
                     status: PortStatus::Open,
                 }
-            }else if tcp_packet.flags == TcpFlags::RST | TcpFlags::ACK {
+            } else if tcp_packet.flags == TcpFlags::RST | TcpFlags::ACK {
                 PortInfo {
                     port: tcp_packet.source,
                     status: PortStatus::Closed,
                 }
-            }else {
+            } else {
                 continue;
             }
-        }else{
+        } else {
             continue;
         };
         let mut exists: bool = false;
-        for host in result.hosts.iter_mut()
-        {
+        for host in result.hosts.iter_mut() {
             if host.ip_addr == ip_addr {
                 host.ports.push(port_info);
-                exists = true;     
+                exists = true;
             }
         }
         if !exists {
             let host_info: HostInfo = HostInfo {
                 ip_addr: ip_addr,
-                host_name: scan_setting.ip_map.get(&ip_addr).unwrap_or(&String::new()).clone(),
+                host_name: scan_setting
+                    .ip_map
+                    .get(&ip_addr)
+                    .unwrap_or(&String::new())
+                    .clone(),
                 ttl: if let Some(ipv4_packet) = &p.ipv4_header {
                     ipv4_packet.ttl
-                }else if let Some(ipv6_packet) = &p.ipv6_header {
+                } else if let Some(ipv6_packet) = &p.ipv6_header {
                     ipv6_packet.hop_limit
-                }else{
+                } else {
                     0
                 },
                 ports: vec![port_info],

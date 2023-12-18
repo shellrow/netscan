@@ -1,6 +1,6 @@
-use xenet::net::mac::MacAddr;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
+use xenet::net::mac::MacAddr;
 use xenet::packet::tcp::TcpOption;
 
 /// Listener thread wait time (milliseconds)
@@ -96,7 +96,7 @@ pub struct ProbeSetting {
     pub src_port: u16,
     /// Probe Target
     pub probe_target: ProbeTarget,
-    /// Probe Types 
+    /// Probe Types
     pub probe_types: Vec<ProbeType>,
     /// Timeout setting    
     pub timeout: Duration,

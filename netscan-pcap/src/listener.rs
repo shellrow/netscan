@@ -1,6 +1,6 @@
-use crate::PacketFrame;
 use crate::capture::start_capture;
 use crate::PacketCaptureOptions;
+use crate::PacketFrame;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 

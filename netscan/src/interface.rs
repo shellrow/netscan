@@ -1,6 +1,6 @@
-use xenet::net::mac::MacAddr;
-use xenet::net::interface::Interface;
 use std::net::{IpAddr, Ipv6Addr};
+use xenet::net::interface::Interface;
+use xenet::net::mac::MacAddr;
 
 fn is_global_ipv6(ipv6_addr: &Ipv6Addr) -> bool {
     !(ipv6_addr.is_unspecified()

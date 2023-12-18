@@ -54,13 +54,21 @@ fn main() {
         Err(e) => panic!("Error creating scanner: {}", e),
     };
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111));
-    host_scanner.scan_setting.add_target(HostInfo::new_with_ip_addr(dst_ip));
+    host_scanner
+        .scan_setting
+        .add_target(HostInfo::new_with_ip_addr(dst_ip));
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1001));
-    host_scanner.scan_setting.add_target(HostInfo::new_with_ip_addr(dst_ip));
+    host_scanner
+        .scan_setting
+        .add_target(HostInfo::new_with_ip_addr(dst_ip));
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888));
-    host_scanner.scan_setting.add_target(HostInfo::new_with_ip_addr(dst_ip));
+    host_scanner
+        .scan_setting
+        .add_target(HostInfo::new_with_ip_addr(dst_ip));
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8844));
-    host_scanner.scan_setting.add_target(HostInfo::new_with_ip_addr(dst_ip));
+    host_scanner
+        .scan_setting
+        .add_target(HostInfo::new_with_ip_addr(dst_ip));
     // Set options
     host_scanner
         .scan_setting

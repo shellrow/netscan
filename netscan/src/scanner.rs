@@ -30,21 +30,30 @@ impl HostScanner {
     ///
     /// Initialized with default value based on the specified IP address
     pub fn new(src_ip: IpAddr) -> Result<HostScanner, String> {
-        let network_interface = if let Some(network_interface) = interface::get_interface_by_ip(src_ip) {
-            network_interface
-        }else {
-            return Err(String::from(
-                "Failed to create Scanner. Network Interface not found.",
-            ));
-        };
+        let network_interface =
+            if let Some(network_interface) = interface::get_interface_by_ip(src_ip) {
+                network_interface
+            } else {
+                return Err(String::from(
+                    "Failed to create Scanner. Network Interface not found.",
+                ));
+            };
         let use_tun = network_interface.is_tun();
         let loopback = network_interface.is_loopback();
         let (tx, rx) = channel();
         let scan_setting: ScanSetting = ScanSetting {
             if_index: network_interface.index,
             if_name: network_interface.name,
-            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
-            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                network_interface.mac_addr.unwrap_or(MacAddr::zero())
+            },
+            dst_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                interface::get_default_gateway_macaddr()
+            },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
@@ -71,22 +80,34 @@ impl HostScanner {
     ///
     /// Initialized with default value based on the specified Interface Index
     pub fn new_with_index(if_index: u32) -> Result<HostScanner, String> {
-        let network_interface = if let Some(network_interface) = interface::get_interface_by_index(if_index) {
-            network_interface
-        }else {
-            return Err(String::from(
-                "Failed to create Scanner. Network Interface not found.",
-            ));
-        };
-        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let network_interface =
+            if let Some(network_interface) = interface::get_interface_by_index(if_index) {
+                network_interface
+            } else {
+                return Err(String::from(
+                    "Failed to create Scanner. Network Interface not found.",
+                ));
+            };
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(
+            interface::get_interface_ipv6(&network_interface)
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
+        );
         let use_tun = network_interface.is_tun();
         let loopback = network_interface.is_loopback();
         let (tx, rx) = channel();
         let scan_setting: ScanSetting = ScanSetting {
             if_index: network_interface.index,
             if_name: network_interface.name,
-            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
-            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                network_interface.mac_addr.unwrap_or(MacAddr::zero())
+            },
+            dst_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                interface::get_default_gateway_macaddr()
+            },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
@@ -113,22 +134,34 @@ impl HostScanner {
     ///
     /// Initialized with default value based on the specified Interface Name
     pub fn new_with_name(if_name: String) -> Result<HostScanner, String> {
-        let network_interface = if let Some(network_interface) = interface::get_interface_by_name(if_name) {
-            network_interface
-        }else {
-            return Err(String::from(
-                "Failed to create Scanner. Network Interface not found.",
-            ));
-        };
-        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let network_interface =
+            if let Some(network_interface) = interface::get_interface_by_name(if_name) {
+                network_interface
+            } else {
+                return Err(String::from(
+                    "Failed to create Scanner. Network Interface not found.",
+                ));
+            };
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(
+            interface::get_interface_ipv6(&network_interface)
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
+        );
         let use_tun = network_interface.is_tun();
         let loopback = network_interface.is_loopback();
         let (tx, rx) = channel();
         let scan_setting: ScanSetting = ScanSetting {
             if_index: network_interface.index,
             if_name: network_interface.name,
-            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
-            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                network_interface.mac_addr.unwrap_or(MacAddr::zero())
+            },
+            dst_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                interface::get_default_gateway_macaddr()
+            },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
@@ -224,21 +257,30 @@ impl PortScanner {
     ///
     /// Initialized with default value based on the specified IP address
     pub fn new(src_ip: IpAddr) -> Result<PortScanner, String> {
-        let network_interface = if let Some(network_interface) = interface::get_interface_by_ip(src_ip) {
-            network_interface
-        }else {
-            return Err(String::from(
-                "Failed to create Scanner. Network Interface not found.",
-            ));
-        };
+        let network_interface =
+            if let Some(network_interface) = interface::get_interface_by_ip(src_ip) {
+                network_interface
+            } else {
+                return Err(String::from(
+                    "Failed to create Scanner. Network Interface not found.",
+                ));
+            };
         let use_tun = network_interface.is_tun();
         let loopback = network_interface.is_loopback();
         let (tx, rx) = channel();
         let scan_setting = ScanSetting {
             if_index: network_interface.index,
             if_name: network_interface.name,
-            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
-            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                network_interface.mac_addr.unwrap_or(MacAddr::zero())
+            },
+            dst_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                interface::get_default_gateway_macaddr()
+            },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
@@ -265,22 +307,34 @@ impl PortScanner {
     ///
     /// Initialized with default value based on the specified Interface Index
     pub fn new_with_index(if_index: u32) -> Result<PortScanner, String> {
-        let network_interface = if let Some(network_interface) = interface::get_interface_by_index(if_index) {
-            network_interface
-        }else {
-            return Err(String::from(
-                "Failed to create Scanner. Network Interface not found.",
-            ));
-        };
+        let network_interface =
+            if let Some(network_interface) = interface::get_interface_by_index(if_index) {
+                network_interface
+            } else {
+                return Err(String::from(
+                    "Failed to create Scanner. Network Interface not found.",
+                ));
+            };
         let use_tun = network_interface.is_tun();
         let loopback = network_interface.is_loopback();
-        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(
+            interface::get_interface_ipv6(&network_interface)
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
+        );
         let (tx, rx) = channel();
         let scan_setting = ScanSetting {
             if_index: network_interface.index,
             if_name: network_interface.name,
-            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
-            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                network_interface.mac_addr.unwrap_or(MacAddr::zero())
+            },
+            dst_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                interface::get_default_gateway_macaddr()
+            },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],
@@ -307,22 +361,34 @@ impl PortScanner {
     ///
     /// Initialized with default value based on the specified Interface Name
     pub fn new_with_name(if_name: String) -> Result<PortScanner, String> {
-        let network_interface = if let Some(network_interface) = interface::get_interface_by_name(if_name) {
-            network_interface
-        }else {
-            return Err(String::from(
-                "Failed to create Scanner. Network Interface not found.",
-            ));
-        };
+        let network_interface =
+            if let Some(network_interface) = interface::get_interface_by_name(if_name) {
+                network_interface
+            } else {
+                return Err(String::from(
+                    "Failed to create Scanner. Network Interface not found.",
+                ));
+            };
         let use_tun = network_interface.is_tun();
         let loopback = network_interface.is_loopback();
-        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(interface::get_interface_ipv6(&network_interface).unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)));
+        let src_ip = interface::get_interface_ipv4(&network_interface).unwrap_or(
+            interface::get_interface_ipv6(&network_interface)
+                .unwrap_or(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED)),
+        );
         let (tx, rx) = channel();
         let scan_setting = ScanSetting {
             if_index: network_interface.index,
             if_name: network_interface.name,
-            src_mac: if use_tun { MacAddr::zero() } else { network_interface.mac_addr.unwrap_or(MacAddr::zero()) },
-            dst_mac: if use_tun { MacAddr::zero() } else { interface::get_default_gateway_macaddr() },
+            src_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                network_interface.mac_addr.unwrap_or(MacAddr::zero())
+            },
+            dst_mac: if use_tun {
+                MacAddr::zero()
+            } else {
+                interface::get_default_gateway_macaddr()
+            },
             src_ip: src_ip,
             src_port: DEFAULT_SRC_PORT,
             targets: vec![],

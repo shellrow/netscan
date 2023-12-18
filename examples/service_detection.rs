@@ -2,8 +2,8 @@ use default_net;
 use dns_lookup;
 use netscan::host::{HostInfo, PortStatus};
 use netscan::scanner::PortScanner;
-use netscan::service::setting::ProbeSetting;
 use netscan::service::detector::ServiceDetector;
+use netscan::service::setting::ProbeSetting;
 use netscan::setting::ScanType;
 use std::net::IpAddr;
 use std::time::Duration;
@@ -54,7 +54,11 @@ fn main() {
                 println!("{}: {:?}", port_info.port, port_info.status);
             }
         }
-        let probe_setting: ProbeSetting = ProbeSetting::default(host_info.ip_addr, "scanme.nmap.org".to_string(), host_info.get_open_ports());
+        let probe_setting: ProbeSetting = ProbeSetting::default(
+            host_info.ip_addr,
+            "scanme.nmap.org".to_string(),
+            host_info.get_open_ports(),
+        );
         let service_detector = ServiceDetector::new(probe_setting);
         let service_result = service_detector.detect();
         for (port, probe_result) in &service_result {

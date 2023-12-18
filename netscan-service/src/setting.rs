@@ -1,5 +1,9 @@
 use crate::payload::{PayloadBuilder, PayloadInfo};
-use std::{collections::HashMap, time::Duration, net::{IpAddr, Ipv4Addr}};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, Ipv4Addr},
+    time::Duration,
+};
 
 /// Probe setting for service detection
 #[derive(Clone, Debug)]
@@ -18,8 +22,8 @@ pub struct ProbeSetting {
     ///
     /// Default value is false, which means validation is enabled.
     pub accept_invalid_certs: bool,
-    /// Payloads for specified ports. 
-    /// 
+    /// Payloads for specified ports.
+    ///
     /// If not set, default null probe will be used. (No payload, just open TCP connection and read response)
     pub payload_map: HashMap<u16, PayloadInfo>,
     /// Concurrent connection limit for service detection
