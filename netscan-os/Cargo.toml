@@ -1,6 +1,6 @@
 [package]
 name = "netscan-os"
-version = "0.24.0"
+version = "0.25.0"
 authors = ["shellrow <shellrow@protonmail.com>"]
 edition = "2021"
 description = "TCP/IP stack fingerprinting library for netscan"
@@ -15,4 +15,4 @@ rayon = "1.8"
 rand = "0.8"
 default-net = "0.21"
 xenet = "0.4"
-netscan-pcap = { path = "../netscan-pcap", version = "0.24.0" }
+netscan-pcap = { path = "../netscan-pcap", version = "0.25.0" }
