@@ -1,9 +1,9 @@
+mod builder;
 mod fingerprinter;
+mod interface;
 mod result;
 mod send;
 mod setting;
-mod interface;
-mod builder;
 
 pub use fingerprinter::*;
 pub use result::*;

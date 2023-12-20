@@ -1,6 +1,6 @@
-use xenet::net::mac::MacAddr;
-use xenet::net::interface::Interface;
 use std::net::{IpAddr, Ipv6Addr};
+use xenet::net::interface::Interface;
+use xenet::net::mac::MacAddr;
 
 fn is_global_ipv6(ipv6_addr: &Ipv6Addr) -> bool {
     !(ipv6_addr.is_unspecified()
@@ -83,15 +83,9 @@ pub(crate) fn get_interface_ipv6(iface: &Interface) -> Option<IpAddr> {
     return None;
 }
 
-#[cfg(target_os = "windows")]
 pub fn get_default_gateway_macaddr() -> MacAddr {
     match xenet::net::gateway::get_default_gateway() {
         Ok(gateway) => gateway.mac_addr,
         Err(_) => MacAddr::zero(),
     }
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn get_default_gateway_macaddr() -> MacAddr {
-    MacAddr::zero()
 }

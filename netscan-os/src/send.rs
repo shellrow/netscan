@@ -1,13 +1,10 @@
-use std::thread;
-use crate::setting::{ProbeSetting, ProbeType, TcpProbeKind};
 use crate::builder;
-use xenet::packet::tcp::TcpFlags;
+use crate::setting::{ProbeSetting, ProbeType, TcpProbeKind};
+use std::thread;
 use xenet::datalink::DataLinkSender;
+use xenet::packet::tcp::TcpFlags;
 
-pub(crate) fn send_packets(
-    sender: &mut Box<dyn DataLinkSender>,
-    probe_setting: &ProbeSetting
-) {
+pub(crate) fn send_packets(sender: &mut Box<dyn DataLinkSender>, probe_setting: &ProbeSetting) {
     let mut tcp_syn_count: usize = 0;
     for probe_type in probe_setting.probe_types.clone() {
         match probe_type {
@@ -59,7 +56,11 @@ pub(crate) fn send_packets(
             }
             ProbeType::TcpProbe => {
                 for tcp_probe_kind in TcpProbeKind::VALUES.iter().copied() {
-                    let packet: Vec<u8> = builder::build_tcp_probe_packet(probe_setting, probe_type, Some(tcp_probe_kind));
+                    let packet: Vec<u8> = builder::build_tcp_probe_packet(
+                        probe_setting,
+                        probe_type,
+                        Some(tcp_probe_kind),
+                    );
                     match sender.send(&packet) {
                         Some(_) => {}
                         None => {}
@@ -67,7 +68,8 @@ pub(crate) fn send_packets(
                     tcp_syn_count -= 1;
                     if tcp_syn_count > 0 {
                         thread::sleep(probe_setting.wait_time);
-                        let ack_packet: Vec<u8> = builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
+                        let ack_packet: Vec<u8> =
+                            builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
                         match sender.send(&ack_packet) {
                             Some(_) => {}
                             None => {}
@@ -76,7 +78,8 @@ pub(crate) fn send_packets(
                 }
             }
             ProbeType::TcpSynAckProbe => {
-                let packet: Vec<u8> = builder::build_tcp_probe_packet(probe_setting, probe_type, None);
+                let packet: Vec<u8> =
+                    builder::build_tcp_probe_packet(probe_setting, probe_type, None);
                 match sender.send(&packet) {
                     Some(_) => {}
                     None => {}
@@ -84,7 +87,8 @@ pub(crate) fn send_packets(
                 tcp_syn_count -= 1;
                 if tcp_syn_count > 0 {
                     thread::sleep(probe_setting.wait_time);
-                    let ack_packet: Vec<u8> = builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
+                    let ack_packet: Vec<u8> =
+                        builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
                     match sender.send(&ack_packet) {
                         Some(_) => {}
                         None => {}
@@ -92,14 +96,16 @@ pub(crate) fn send_packets(
                 }
             }
             ProbeType::TcpRstAckProbe => {
-                let packet: Vec<u8> = builder::build_tcp_probe_packet(probe_setting, probe_type, None);
+                let packet: Vec<u8> =
+                    builder::build_tcp_probe_packet(probe_setting, probe_type, None);
                 match sender.send(&packet) {
                     Some(_) => {}
                     None => {}
                 }
             }
             ProbeType::TcpEcnProbe => {
-                let packet: Vec<u8> = builder::build_tcp_probe_packet(probe_setting, probe_type, None);
+                let packet: Vec<u8> =
+                    builder::build_tcp_probe_packet(probe_setting, probe_type, None);
                 match sender.send(&packet) {
                     Some(_) => {}
                     None => {}
@@ -107,7 +113,8 @@ pub(crate) fn send_packets(
                 tcp_syn_count -= 1;
                 if tcp_syn_count > 0 {
                     thread::sleep(probe_setting.wait_time);
-                    let ack_packet: Vec<u8> = builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
+                    let ack_packet: Vec<u8> =
+                        builder::build_tcp_control_packet(probe_setting, TcpFlags::RST);
                     match sender.send(&ack_packet) {
                         Some(_) => {}
                         None => {}

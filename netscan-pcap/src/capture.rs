@@ -1,17 +1,17 @@
-use xenet::net::interface::Interface;
-use xenet::packet::ethernet::EtherType;
-use xenet::packet::ip::IpNextLevelProtocol;
-use xenet::packet::frame::Frame;
-use xenet::packet::frame::ParseOption;
 use crate::PacketCaptureOptions;
 use crate::PacketFrame;
 use std::net::IpAddr;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
+use xenet::net::interface::Interface;
+use xenet::packet::ethernet::EtherType;
+use xenet::packet::frame::Frame;
+use xenet::packet::frame::ParseOption;
+use xenet::packet::ip::IpNextLevelProtocol;
 
 /// Start packet capture
-pub(crate) fn start_capture (
+pub(crate) fn start_capture(
     capture_options: PacketCaptureOptions,
     msg_tx: &Arc<Mutex<Sender<PacketFrame>>>,
     stop: &Arc<Mutex<bool>>,
@@ -19,9 +19,7 @@ pub(crate) fn start_capture (
     let interfaces = xenet::net::interface::get_interfaces();
     let interface = interfaces
         .into_iter()
-        .filter(|interface: &Interface| {
-            interface.index == capture_options.interface_index
-        })
+        .filter(|interface: &Interface| interface.index == capture_options.interface_index)
         .next()
         .expect("Failed to get Interface");
     let config = xenet::datalink::Config {
@@ -59,13 +57,11 @@ pub(crate) fn start_capture (
                 if filter_packet(&frame, &capture_options) {
                     let packet_frame = PacketFrame::from_xenet_frame(frame);
                     match msg_tx.lock() {
-                        Ok(msg_tx) => {
-                            match msg_tx.send(packet_frame.clone()) {
-                                Ok(_) => {},
-                                Err(_) => {},
-                            }
-                        }
-                        Err(_) => {},
+                        Ok(msg_tx) => match msg_tx.send(packet_frame.clone()) {
+                            Ok(_) => {}
+                            Err(_) => {}
+                        },
+                        Err(_) => {}
                     }
                     if capture_options.store {
                         match packets.lock() {
@@ -74,12 +70,12 @@ pub(crate) fn start_capture (
                                     packets.push(packet_frame.clone());
                                 }
                             }
-                            Err(_) => {},
+                            Err(_) => {}
                         }
                     }
                 }
             }
-            Err(_) => {},
+            Err(_) => {}
         }
         match stop.lock() {
             Ok(stop) => {
@@ -87,16 +83,14 @@ pub(crate) fn start_capture (
                     break;
                 }
             }
-            Err(_) => {},
+            Err(_) => {}
         }
         if Instant::now().duration_since(start_time) > capture_options.duration {
             break;
         }
     }
     let packets: Vec<PacketFrame> = match packets.lock() {
-        Ok(packets) => {
-            packets.clone()
-        }
+        Ok(packets) => packets.clone(),
         Err(_) => {
             return Vec::new();
         }
@@ -112,14 +106,22 @@ fn filter_packet(frame: &Frame, capture_options: &PacketCaptureOptions) -> bool 
             }
         }
         if let Some(arp_header) = &datalink.arp {
-            if !filter_host(IpAddr::V4(arp_header.sender_proto_addr), IpAddr::V4(arp_header.target_proto_addr), capture_options) {
-                return false;   
+            if !filter_host(
+                IpAddr::V4(arp_header.sender_proto_addr),
+                IpAddr::V4(arp_header.target_proto_addr),
+                capture_options,
+            ) {
+                return false;
             }
         }
     }
     if let Some(ip) = &frame.ip {
         if let Some(ipv4_header) = &ip.ipv4 {
-            if !filter_host(IpAddr::V4(ipv4_header.source), IpAddr::V4(ipv4_header.destination), capture_options) {
+            if !filter_host(
+                IpAddr::V4(ipv4_header.source),
+                IpAddr::V4(ipv4_header.destination),
+                capture_options,
+            ) {
                 return false;
             }
             if !filter_ip_protocol(ipv4_header.next_level_protocol, capture_options) {
@@ -127,7 +129,11 @@ fn filter_packet(frame: &Frame, capture_options: &PacketCaptureOptions) -> bool 
             }
         }
         if let Some(ipv6_header) = &ip.ipv6 {
-            if !filter_host(IpAddr::V6(ipv6_header.source), IpAddr::V6(ipv6_header.destination), capture_options) {
+            if !filter_host(
+                IpAddr::V6(ipv6_header.source),
+                IpAddr::V6(ipv6_header.destination),
+                capture_options,
+            ) {
                 return false;
             }
             if !filter_ip_protocol(ipv6_header.next_header, capture_options) {

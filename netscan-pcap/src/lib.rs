@@ -1,21 +1,21 @@
 mod capture;
 pub mod listener;
 
-pub use xenet::net::mac::MacAddr;
-pub use xenet::packet;
-use xenet::packet::ethernet::EtherType;
-use xenet::packet::ip::IpNextLevelProtocol;
-use xenet::packet::ethernet::EthernetHeader;
-use xenet::packet::arp::ArpHeader;
-use xenet::packet::ipv4::Ipv4Header;
-use xenet::packet::ipv6::Ipv6Header;
-use xenet::packet::icmp::IcmpHeader;
-use xenet::packet::icmpv6::Icmpv6Header;
-use xenet::packet::tcp::TcpHeader;
-use xenet::packet::udp::UdpHeader;
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::time::Duration;
+pub use xenet::net::mac::MacAddr;
+pub use xenet::packet;
+use xenet::packet::arp::ArpHeader;
+use xenet::packet::ethernet::EtherType;
+use xenet::packet::ethernet::EthernetHeader;
+use xenet::packet::icmp::IcmpHeader;
+use xenet::packet::icmpv6::Icmpv6Header;
+use xenet::packet::ip::IpNextLevelProtocol;
+use xenet::packet::ipv4::Ipv4Header;
+use xenet::packet::ipv6::Ipv6Header;
+use xenet::packet::tcp::TcpHeader;
+use xenet::packet::udp::UdpHeader;
 
 /// Packet capture options
 #[derive(Clone, Debug)]
@@ -48,13 +48,10 @@ pub struct PacketCaptureOptions {
     /// Store limit
     pub store_limit: u32,
     /// Receive undefined packets
-    #[allow(dead_code)]
     pub receive_undefined: bool,
     /// Use TUN interface
-    #[allow(dead_code)]
-    pub use_tun: bool,
+    pub tunnel: bool,
     /// Loopback interface
-    #[allow(dead_code)]
     pub loopback: bool,
 }
 

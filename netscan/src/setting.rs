@@ -1,8 +1,8 @@
+use crate::host::HostInfo;
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
 use xenet::net::mac::MacAddr;
-use crate::host::HostInfo;
 
 pub(crate) const DEFAULT_SRC_PORT: u16 = 53443;
 pub(crate) const DEFAULT_HOSTS_CONCURRENCY: usize = 50;
@@ -48,8 +48,9 @@ pub struct ScanSetting {
     pub timeout: Duration,
     pub wait_time: Duration,
     pub send_rate: Duration,
-    pub use_tun: bool,
+    pub tunnel: bool,
     pub loopback: bool,
+    pub minimize_packet: bool,
 }
 
 impl ScanSetting {
@@ -69,8 +70,9 @@ impl ScanSetting {
             timeout: Duration::from_secs(30),
             wait_time: Duration::from_millis(200),
             send_rate: Duration::from_millis(0),
-            use_tun: false,
+            tunnel: false,
             loopback: false,
+            minimize_packet: false,
         }
     }
     /// Set source IP address
