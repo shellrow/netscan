@@ -20,7 +20,7 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.25"
+netscan = "0.26"
 ```
 
 ## Example
@@ -42,16 +42,17 @@ For more details see [Examples][examples-url]
 - macOS
 - Windows
 
-## Note for Windows users
-To build on Windows, follow the instructions below.
-> ### Windows
-> * You must use a version of Rust which uses the MSVC toolchain
-> * You must have [npcap](https://nmap.org/npcap/) or [WinPcap](https://www.winpcap.org/) installed
->   (If using npcap, make sure to install with the "Install Npcap in WinPcap API-compatible Mode")
-> * You must place `Packet.lib` from the [Npcap SDK](https://npcap.com/guide/npcap-devguide.html) or [WinPcap Developers pack](https://www.winpcap.org/devel.htm)
->   in a directory named `lib`, in the root of this repository. Alternatively, you can use any of the
->   locations listed in the `%LIB%`/`$Env:LIB` environment variables. For the 64 bit toolchain it is
->   in `<SDK>/Lib/x64/Packet.lib`, for the 32 bit toolchain, it is in `<SDK>/Lib/Packet.lib`.
-
-## Additional Notes
+## Privileges
 This library requires the ability to create raw sockets.  Execute with administrator privileges.  
+
+## Note for Windows Users
+If you are using Windows, please consider the following points before building and running:
+
+- Npcap or WinPcap Installation:
+    - Ensure that you have [Npcap](https://npcap.com/#download) or WinPcap installed on your system.
+    - If using Npcap, make sure to install it with the "Install Npcap in WinPcap API-compatible Mode" option.
+- Build Dependencies:
+    - Place the Packet.lib file from the [Npcap SDK](https://npcap.com/#download) or WinPcap Developers pack in a directory named lib at the root of this repository.
+    - You can use any of the locations listed in the %LIB% or $Env:LIB environment variables.
+    - For the 64-bit toolchain, the Packet.lib is located in <SDK>/Lib/x64/Packet.lib.
+    - For the 32-bit toolchain, the Packet.lib is located in <SDK>/Lib/Packet.lib.
