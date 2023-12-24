@@ -1,7 +1,7 @@
 use std::net::{IpAddr, SocketAddr};
 
 use super::setting::{ProbeSetting, ProbeType, TcpProbeKind};
-use xenet::packet::ethernet::{EtherType, ETHERNET_HEADER_LEN};
+use xenet::packet::ethernet::EtherType;
 use xenet::packet::ip::IpNextLevelProtocol;
 use xenet::packet::tcp::{TcpFlags, TcpOption};
 use xenet::util::packet_builder::icmp::IcmpPacketBuilder;
@@ -115,7 +115,7 @@ pub(crate) fn build_tcp_probe_packet(
     }
     packet_builder.set_tcp(tcp_packet_builder);
     if probe_setting.tunnel {
-        packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
+        packet_builder.ip_packet()
     } else {
         packet_builder.packet()
     }
@@ -162,7 +162,7 @@ pub(crate) fn build_tcp_control_packet(probe_setting: &ProbeSetting, tcp_flags: 
     tcp_packet_builder.flags = tcp_flags;
     packet_builder.set_tcp(tcp_packet_builder);
     if probe_setting.tunnel {
-        packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
+        packet_builder.ip_packet()
     } else {
         packet_builder.packet()
     }
@@ -204,7 +204,7 @@ pub(crate) fn build_udp_probe_packet(probe_setting: &ProbeSetting) -> Vec<u8> {
     );
     packet_builder.set_udp(udp_packet_builder);
     if probe_setting.tunnel {
-        packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
+        packet_builder.ip_packet()
     } else {
         packet_builder.packet()
     }
@@ -280,7 +280,7 @@ pub(crate) fn build_icmp_probe_packet(
         },
     }
     if probe_setting.tunnel {
-        packet_builder.packet()[ETHERNET_HEADER_LEN..].to_vec()
+        packet_builder.ip_packet()
     } else {
         packet_builder.packet()
     }

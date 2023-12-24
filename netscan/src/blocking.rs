@@ -82,7 +82,7 @@ fn send_tcp_syn_packets(
             ];
             packet_builder.set_tcp(tcp_packet_builder);
 
-            let packet_bytes: Vec<u8> = packet_builder.packet();
+            let packet_bytes: Vec<u8> = if scan_setting.tunnel { packet_builder.ip_packet() } else { packet_builder.packet() };
 
             match sender.send(&packet_bytes) {
                 Some(_) => {}
@@ -152,7 +152,7 @@ fn send_tcp_syn_packets_min(
             ];
             packet_builder.set_tcp(tcp_packet_builder);
 
-            let packet_bytes: Vec<u8> = packet_builder.packet();
+            let packet_bytes: Vec<u8> = if scan_setting.tunnel { packet_builder.ip_packet() } else { packet_builder.packet() };
 
             match sender.send(&packet_bytes) {
                 Some(_) => {}
@@ -218,7 +218,7 @@ fn send_icmp_echo_packets(
             },
         }
 
-        let packet_bytes: Vec<u8> = packet_builder.packet();
+        let packet_bytes: Vec<u8> = if scan_setting.tunnel { packet_builder.ip_packet() } else { packet_builder.packet() };
 
         match sender.send(&packet_bytes) {
             Some(_) => {}
@@ -273,7 +273,7 @@ fn send_udp_ping_packets(
         );
         packet_builder.set_udp(udp_packet_builder);
 
-        let packet_bytes: Vec<u8> = packet_builder.packet();
+        let packet_bytes: Vec<u8> = if scan_setting.tunnel { packet_builder.ip_packet() } else { packet_builder.packet() };
 
         match sender.send(&packet_bytes) {
             Some(_) => {}
