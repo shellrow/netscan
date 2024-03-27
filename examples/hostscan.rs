@@ -1,41 +1,31 @@
 use ipnet::Ipv4Net;
-use netscan::host::HostInfo;
-use netscan::scanner::HostScanner;
-use netscan::setting::ScanType;
+use netscan::host::Host;
+use netscan::scan::scanner::HostScanner;
+use netscan::scan::setting::{HostScanSetting, HostScanType};
 use std::net::{IpAddr, Ipv4Addr};
 use std::thread;
 use std::time::Duration;
 
 fn main() {
-    let interface = default_net::get_default_interface().unwrap();
-    let mut host_scanner = match HostScanner::new(IpAddr::V4(interface.ipv4[0].addr)) {
-        Ok(scanner) => scanner,
-        Err(e) => panic!("Error creating scanner: {}", e),
-    };
+    let interface = netdev::get_default_interface().unwrap();
+    let mut scan_setting: HostScanSetting = HostScanSetting::default()
+    .set_if_index(interface.index)
+    .set_scan_type(HostScanType::IcmpPingScan)
+    .set_timeout(Duration::from_millis(10000))
+    .set_wait_time(Duration::from_millis(500));
     let src_ip: Ipv4Addr = interface.ipv4[0].addr;
     let net: Ipv4Net = Ipv4Net::new(src_ip, 24).unwrap();
     let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();
     let hosts: Vec<Ipv4Addr> = nw_addr.hosts().collect();
     // Add scan target
     for host in hosts {
-        let dst: HostInfo = HostInfo::new_with_ip_addr(IpAddr::V4(host));
-        host_scanner.scan_setting.add_target(dst);
+        let dst: Host = Host::new(IpAddr::V4(host), String::new());
+        scan_setting.add_target(dst);
     }
-    // Set options
-    host_scanner
-        .scan_setting
-        .set_scan_type(ScanType::IcmpPingScan);
-    host_scanner
-        .scan_setting
-        .set_timeout(Duration::from_millis(10000));
-    host_scanner
-        .scan_setting
-        .set_wait_time(Duration::from_millis(500));
-    //host_scanner.set_send_rate(Duration::from_millis(1));
-
+    let host_scanner: HostScanner = HostScanner::new(scan_setting);
     let rx = host_scanner.get_progress_receiver();
     // Run scan
-    let handle = thread::spawn(move || host_scanner.sync_scan());
+    let handle = thread::spawn(move || host_scanner.scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);

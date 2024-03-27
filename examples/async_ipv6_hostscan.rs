@@ -1,47 +1,30 @@
-use async_io;
-use netscan::host::HostInfo;
-use netscan::scanner::HostScanner;
-use netscan::setting::ScanType;
+use netscan::host::Host;
+use netscan::scan::scanner::HostScanner;
+use netscan::scan::setting::{HostScanSetting, HostScanType};
 use std::net::{IpAddr, Ipv6Addr};
 use std::thread;
 use std::time::Duration;
 
 fn main() {
-    let interface = default_net::get_default_interface().unwrap();
-    let mut host_scanner = match HostScanner::new(IpAddr::V6(interface.ipv6[0].addr)) {
-        Ok(scanner) => scanner,
-        Err(e) => panic!("Error creating scanner: {}", e),
-    };
+    let interface = netdev::get_default_interface().unwrap();
+    let mut scan_setting: HostScanSetting = HostScanSetting::default()
+    .set_if_index(interface.index)
+    .set_scan_type(HostScanType::IcmpPingScan)
+    .set_timeout(Duration::from_millis(10000))
+    .set_wait_time(Duration::from_millis(500))
+    .set_async_scan(true);
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111));
-    host_scanner
-        .scan_setting
-        .add_target(HostInfo::new_with_ip_addr(dst_ip));
+    scan_setting.add_target(Host::new(dst_ip,String::new()));
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1001));
-    host_scanner
-        .scan_setting
-        .add_target(HostInfo::new_with_ip_addr(dst_ip));
+    scan_setting.add_target(Host::new(dst_ip,String::new()));
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8888));
-    host_scanner
-        .scan_setting
-        .add_target(HostInfo::new_with_ip_addr(dst_ip));
+    scan_setting.add_target(Host::new(dst_ip,String::new()));
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2001, 0x4860, 0x4860, 0, 0, 0, 0, 0x8844));
-    host_scanner
-        .scan_setting
-        .add_target(HostInfo::new_with_ip_addr(dst_ip));
-    // Set options
-    host_scanner
-        .scan_setting
-        .set_scan_type(ScanType::IcmpPingScan);
-    host_scanner
-        .scan_setting
-        .set_timeout(Duration::from_millis(10000));
-    host_scanner
-        .scan_setting
-        .set_wait_time(Duration::from_millis(500));
-
+    scan_setting.add_target(Host::new(dst_ip,String::new()));
+    let host_scanner = HostScanner::new(scan_setting);
     let rx = host_scanner.get_progress_receiver();
     // Run scan
-    let handle = thread::spawn(move || async_io::block_on(async { host_scanner.scan().await }));
+    let handle = thread::spawn(move || host_scanner.scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);
