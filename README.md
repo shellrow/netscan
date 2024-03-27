@@ -20,22 +20,11 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.26"
+netscan = "0.27"
 ```
 
 ## Example
 See [Examples][examples-url]
-
-## Feature flags
-The following feature flags can be used to enable/disable specific features.
-#### `--feature service`
-Enable service detection.      
-#### `--feature os`
-Enable TCP/IP Stack Fingerprinting.  
-#### `--feature full`
-Enable all of the above.
-
-For more details see [Examples][examples-url]
 
 ## Supported platform
 - Linux

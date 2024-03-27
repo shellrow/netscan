@@ -1,8 +1,64 @@
-[workspace]
-resolver = "2"
-members = [
-    "netscan",
-    "netscan-pcap",
-    "netscan-service",
-    "netscan-os"
-]
+[package]
+name = "netscan"
+version = "0.27.0"
+authors = ["shellrow <shellrow@foctet.com>"]
+edition = "2021"
+description = "Cross-platform network scan library"
+repository = "https://github.com/shellrow/netscan"
+readme = "README.md"
+keywords = ["network","security","scan"]
+categories = ["network-programming"]
+license = "MIT"
+
+[lib]
+name = "netscan"
+
+[dependencies]
+netdev = "0.24"
+nex = "0.7"
+async-io = "2.3"
+futures-lite = "2.2"
+futures = {version = "0.3", features = ["executor", "thread-pool"]}
+tokio = "1"
+hickory-resolver = "0.24"
+phf = { version = "0.11", features = ["macros"] }
+rand = "0.8"
+
+[dev-dependencies]
+ipnet = "2.7"
+
+[[example]]
+name = "portscan"
+path = "examples/portscan.rs"
+
+[[example]]
+name = "ipv6_portscan"
+path = "examples/ipv6_portscan.rs"
+
+[[example]]
+name = "hostscan"
+path = "examples/hostscan.rs"
+
+[[example]]
+name = "ipv6_hostscan"
+path = "examples/ipv6_hostscan.rs"
+
+[[example]]
+name = "async_portscan"
+path = "examples/async_portscan.rs"
+
+[[example]]
+name = "async_ipv6_portscan"
+path = "examples/async_ipv6_portscan.rs"
+
+[[example]]
+name = "async_hostscan"
+path = "examples/async_hostscan.rs"
+
+[[example]]
+name = "async_ipv6_hostscan"
+path = "examples/async_ipv6_hostscan.rs"
+
+[[example]]
+name = "service_detection"
+path = "examples/service_detection.rs"
