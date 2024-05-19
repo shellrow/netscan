@@ -14,10 +14,10 @@ license = "MIT"
 name = "netscan"
 
 [dependencies]
-netdev = "0.24"
-nex = "0.7"
+netdev = "0.26"
+nex = { version = "0.10", features = ["tls"] }
 async-io = "2.3"
-futures-lite = "2.2"
+futures-lite = "2.3"
 futures = {version = "0.3", features = ["executor", "thread-pool"]}
 tokio = "1"
 hickory-resolver = "0.24"
