@@ -12,6 +12,15 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::thread;
 
+#[cfg(not(target_os = "windows"))]
+const DEFAULT_TIMEOUT: Duration = Duration::from_millis(200);
+#[cfg(not(target_os = "windows"))]
+const DEFAULT_TIMEOUT_GLOBAL: Duration = Duration::from_millis(1000);
+#[cfg(target_os = "windows")]
+const DEFAULT_TIMEOUT: Duration = Duration::from_millis(20);
+#[cfg(target_os = "windows")]
+const DEFAULT_TIMEOUT_GLOBAL: Duration = Duration::from_millis(1000);
+
 pub fn lookup_host_name(host_name: &str) -> Option<IpAddr> {
     let ip_vec: Vec<IpAddr> = resolve_domain(host_name.to_string());
     let mut ipv6_vec: Vec<IpAddr> = vec![];
@@ -105,9 +114,9 @@ fn resolve_ip(ip_addr: &IpAddr) -> Vec<String> {
     let mut names: Vec<String> = vec![];
     let mut system_conf = hickory_resolver::system_conf::read_system_conf().unwrap();
     if crate::ip::is_global_addr(ip_addr) {
-        system_conf.1.timeout = Duration::from_millis(1000);
+        system_conf.1.timeout = DEFAULT_TIMEOUT_GLOBAL;
     } else {
-        system_conf.1.timeout = Duration::from_millis(200);
+        system_conf.1.timeout = DEFAULT_TIMEOUT;
     }
     let resolver = Resolver::new(system_conf.0, system_conf.1).unwrap();
     match resolver.reverse_lookup(*ip_addr) {
@@ -197,9 +206,9 @@ async fn resolve_ip_async(ip_addr: String) -> Vec<String> {
     let mut names: Vec<String> = vec![];
     let mut system_conf = hickory_resolver::system_conf::read_system_conf().unwrap();
     if crate::ip::is_global_addr(&ip_addr) {
-        system_conf.1.timeout = Duration::from_millis(1000);
+        system_conf.1.timeout = DEFAULT_TIMEOUT_GLOBAL;
     } else {
-        system_conf.1.timeout = Duration::from_millis(200);
+        system_conf.1.timeout = DEFAULT_TIMEOUT;
     }
     let resolver = AsyncResolver::tokio(system_conf.0, system_conf.1);
     match resolver.reverse_lookup(ip_addr).await {
