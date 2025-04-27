@@ -9,8 +9,10 @@ fn main() {
     // Get default interface
     let interface = netdev::get_default_interface().unwrap();
     // Add target
-    let dst_ip: IpAddr = netscan::dns::lookup_host_name("scanme.nmap.org").expect("Error resolving host");
-    let dst: Host = Host::new(dst_ip, String::from("scanme.nmap.org")).with_ports(vec![22, 80, 443, 5000, 8080]);
+    let dst_ip: IpAddr =
+        netscan::dns::lookup_host_name("scanme.nmap.org").expect("Error resolving host");
+    let dst: Host = Host::new(dst_ip, String::from("scanme.nmap.org"))
+        .with_ports(vec![22, 80, 443, 5000, 8080]);
     //let dst: Host = Host::new(dst_ip, String::from("scanme.nmap.org")).with_port_range(1, 1000);
     let scan_setting = PortScanSetting::default()
         .set_if_index(interface.index)

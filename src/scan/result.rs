@@ -2,8 +2,8 @@ use netdev::mac::MacAddr;
 use netdev::Interface;
 use nex::packet::tcp::TcpFlags;
 
-use crate::packet::frame::PacketFrame;
 use crate::host::{Host, Port, PortStatus};
+use crate::packet::frame::PacketFrame;
 use std::collections::HashSet;
 use std::net::{IpAddr, SocketAddr};
 use std::time::Duration;
@@ -80,7 +80,9 @@ impl ScanResult {
             if let Some(ipv4_packet) = &fingerprint.ipv4_header {
                 if ipv4_packet.source == ip_addr {
                     if let Some(tcp_packet) = &fingerprint.tcp_header {
-                        if tcp_packet.source == port && tcp_packet.flags == TcpFlags::SYN | TcpFlags::ACK {
+                        if tcp_packet.source == port
+                            && tcp_packet.flags == TcpFlags::SYN | TcpFlags::ACK
+                        {
                             return Some(fingerprint.clone());
                         }
                     }
@@ -88,7 +90,9 @@ impl ScanResult {
             } else if let Some(ipv6_packet) = &fingerprint.ipv6_header {
                 if ipv6_packet.source == ip_addr {
                     if let Some(tcp_packet) = &fingerprint.tcp_header {
-                        if tcp_packet.source == port && tcp_packet.flags == TcpFlags::SYN | TcpFlags::ACK {
+                        if tcp_packet.source == port
+                            && tcp_packet.flags == TcpFlags::SYN | TcpFlags::ACK
+                        {
                             return Some(fingerprint.clone());
                         }
                     }
@@ -173,7 +177,10 @@ pub enum ServiceProbeError {
     CustomError(String),
 }
 
-pub (crate) fn parse_hostscan_result(packets: Vec<PacketFrame>, scan_setting: HostScanSetting) -> ScanResult {
+pub(crate) fn parse_hostscan_result(
+    packets: Vec<PacketFrame>,
+    scan_setting: HostScanSetting,
+) -> ScanResult {
     let mut result: ScanResult = ScanResult::new();
     let iface: Interface = match crate::interface::get_interface_by_index(scan_setting.if_index) {
         Some(iface) => iface,
@@ -240,7 +247,11 @@ pub (crate) fn parse_hostscan_result(packets: Vec<PacketFrame>, scan_setting: Ho
                     .unwrap_or(&String::new())
                     .clone(),
                 ports: ports,
-                mac_addr: if iface_ips.contains(&IpAddr::V4(ipv4_packet.source)) {iface.mac_addr.unwrap_or(MacAddr::zero())} else { mac_addr },
+                mac_addr: if iface_ips.contains(&IpAddr::V4(ipv4_packet.source)) {
+                    iface.mac_addr.unwrap_or(MacAddr::zero())
+                } else {
+                    mac_addr
+                },
                 ttl: ipv4_packet.ttl,
             }
         } else if let Some(ipv6_packet) = &p.ipv6_header {
@@ -252,7 +263,11 @@ pub (crate) fn parse_hostscan_result(packets: Vec<PacketFrame>, scan_setting: Ho
                     .unwrap_or(&String::new())
                     .clone(),
                 ports: ports,
-                mac_addr: if iface_ips.contains(&IpAddr::V6(ipv6_packet.source)) {iface.mac_addr.unwrap_or(MacAddr::zero())} else { mac_addr },
+                mac_addr: if iface_ips.contains(&IpAddr::V6(ipv6_packet.source)) {
+                    iface.mac_addr.unwrap_or(MacAddr::zero())
+                } else {
+                    mac_addr
+                },
                 ttl: ipv6_packet.hop_limit,
             }
         } else {
@@ -266,7 +281,10 @@ pub (crate) fn parse_hostscan_result(packets: Vec<PacketFrame>, scan_setting: Ho
     return result;
 }
 
-pub (crate) fn parse_portscan_result(packets: Vec<PacketFrame>, scan_setting: PortScanSetting) -> ScanResult {
+pub(crate) fn parse_portscan_result(
+    packets: Vec<PacketFrame>,
+    scan_setting: PortScanSetting,
+) -> ScanResult {
     let mut result: ScanResult = ScanResult::new();
     let mut socket_set: HashSet<SocketAddr> = HashSet::new();
     let iface: Interface = match crate::interface::get_interface_by_index(scan_setting.if_index) {

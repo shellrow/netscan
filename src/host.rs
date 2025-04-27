@@ -1,6 +1,6 @@
-use std::net::IpAddr;
-use netdev::mac::MacAddr;
 use crate::dns;
+use netdev::mac::MacAddr;
+use std::net::IpAddr;
 
 /// Status of the scanned port
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -1,12 +1,12 @@
 use nex::packet::arp::ArpHeader;
 use nex::packet::ethernet::EthernetHeader;
+use nex::packet::frame::Frame;
 use nex::packet::icmp::IcmpHeader;
 use nex::packet::icmpv6::Icmpv6Header;
 use nex::packet::ipv4::Ipv4Header;
 use nex::packet::ipv6::Ipv6Header;
 use nex::packet::tcp::TcpHeader;
 use nex::packet::udp::UdpHeader;
-use nex::packet::frame::Frame;
 
 /// Packet Frame. Contains all the possible packet types
 #[derive(Clone, Debug)]

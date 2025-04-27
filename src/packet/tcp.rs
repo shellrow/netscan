@@ -1,15 +1,12 @@
-use std::net::{IpAddr, SocketAddr};
+use crate::packet::setting::PacketBuildSetting;
 use nex::packet::ethernet::EtherType;
 use nex::packet::ip::IpNextLevelProtocol;
 use nex::packet::tcp::{TcpFlags, TcpOption};
 use nex::util::packet_builder::{
-    builder::PacketBuilder, 
-    ethernet::EthernetPacketBuilder,
-    ipv4::Ipv4PacketBuilder, 
-    ipv6::Ipv6PacketBuilder,
-    tcp::TcpPacketBuilder,
+    builder::PacketBuilder, ethernet::EthernetPacketBuilder, ipv4::Ipv4PacketBuilder,
+    ipv6::Ipv6PacketBuilder, tcp::TcpPacketBuilder,
 };
-use crate::packet::setting::PacketBuildSetting;
+use std::net::{IpAddr, SocketAddr};
 
 /// Build TCP SYN packet with default options
 pub fn build_tcp_syn_packet(setting: PacketBuildSetting) -> Vec<u8> {
