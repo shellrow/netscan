@@ -1,9 +1,9 @@
+use crate::host::Host;
+use crate::scan::setting::{HostScanSetting, PortScanSetting};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex};
-use crate::scan::setting::{PortScanSetting, HostScanSetting};
-use crate::host::Host;
 
 use super::async_io;
 use super::blocking;
@@ -104,7 +104,7 @@ impl ServiceDetector {
     /// Create new ServiceDetector
     pub fn new(setting: ServiceProbeSetting) -> Self {
         let (tx, rx) = channel();
-        Self { 
+        Self {
             setting,
             tx: Arc::new(Mutex::new(tx)),
             rx: Arc::new(Mutex::new(rx)),

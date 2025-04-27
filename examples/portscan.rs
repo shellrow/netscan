@@ -8,7 +8,8 @@ use std::time::Duration;
 fn main() {
     let interface = netdev::get_default_interface().unwrap();
     // Add scan target
-    let dst_ip: IpAddr = netscan::dns::lookup_host_name("scanme.nmap.org").expect("Error resolving host");
+    let dst_ip: IpAddr =
+        netscan::dns::lookup_host_name("scanme.nmap.org").expect("Error resolving host");
     let dst: Host = Host::new(dst_ip, String::new()).with_ports(vec![22, 80, 443, 5000, 8080]);
     let scan_setting = PortScanSetting::default()
         .set_if_index(interface.index)
@@ -21,7 +22,7 @@ fn main() {
 
     let rx = port_scanner.get_progress_receiver();
     // Run scan
-    let handle = thread::spawn(move || { port_scanner.scan()});
+    let handle = thread::spawn(move || port_scanner.scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);

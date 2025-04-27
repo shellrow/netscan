@@ -1,5 +1,5 @@
-use std::net::{IpAddr, Ipv4Addr};
 use netdev::mac::MacAddr;
+use std::net::{IpAddr, Ipv4Addr};
 
 #[derive(Clone, Debug)]
 pub struct PacketBuildSetting {

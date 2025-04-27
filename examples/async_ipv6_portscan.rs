@@ -9,8 +9,7 @@ fn main() {
     let interface = netdev::get_default_interface().unwrap();
     // Add scan target
     let dst_ip: IpAddr = IpAddr::V6(Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111));
-    let dst: Host =
-        Host::new(dst_ip, String::new()).with_ports(vec![22, 80, 443, 5000, 8080]);
+    let dst: Host = Host::new(dst_ip, String::new()).with_ports(vec![22, 80, 443, 5000, 8080]);
     //let dst: HostInfo = HostInfo::new_with_ip_addr(dst_ip).with_port_range(1, 1000);
     let scan_setting = PortScanSetting::default()
         .set_if_index(interface.index)
@@ -24,7 +23,7 @@ fn main() {
 
     let rx = port_scanner.get_progress_receiver();
     // Run scan
-    let handle = thread::spawn(move || { port_scanner.scan() });
+    let handle = thread::spawn(move || port_scanner.scan());
     // Print progress
     while let Ok(_socket_addr) = rx.lock().unwrap().recv() {
         //println!("Check: {}", socket_addr);

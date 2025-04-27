@@ -1,14 +1,14 @@
 use std::net::IpAddr;
 //use std::sync::mpsc::Sender;
-use std::sync::{Arc, Mutex};
-use std::collections::HashSet;
-use std::time::Instant;
-use std::time::Duration;
+use crate::packet::frame::PacketFrame;
 use nex::datalink::RawReceiver;
-use nex::packet::{ip::IpNextLevelProtocol, ethernet::EtherType};
 use nex::packet::frame::Frame;
 use nex::packet::frame::ParseOption;
-use crate::packet::frame::PacketFrame;
+use nex::packet::{ethernet::EtherType, ip::IpNextLevelProtocol};
+use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use std::time::Instant;
 
 /// Packet capture options
 #[derive(Debug, Clone)]
@@ -48,7 +48,10 @@ pub fn start_capture(
         match rx.next() {
             Ok(packet) => {
                 let mut parse_option: ParseOption = ParseOption::default();
-                if capture_options.tunnel || (cfg!(any(target_os = "macos", target_os = "ios")) && capture_options.loopback) {
+                if capture_options.tunnel
+                    || (cfg!(any(target_os = "macos", target_os = "ios"))
+                        && capture_options.loopback)
+                {
                     let payload_offset;
                     if capture_options.loopback {
                         payload_offset = 14;

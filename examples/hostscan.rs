@@ -9,10 +9,10 @@ use std::time::Duration;
 fn main() {
     let interface = netdev::get_default_interface().unwrap();
     let mut scan_setting: HostScanSetting = HostScanSetting::default()
-    .set_if_index(interface.index)
-    .set_scan_type(HostScanType::IcmpPingScan)
-    .set_timeout(Duration::from_millis(10000))
-    .set_wait_time(Duration::from_millis(500));
+        .set_if_index(interface.index)
+        .set_scan_type(HostScanType::IcmpPingScan)
+        .set_timeout(Duration::from_millis(10000))
+        .set_wait_time(Duration::from_millis(500));
     let src_ip: Ipv4Addr = interface.ipv4[0].addr();
     let net: Ipv4Net = Ipv4Net::new(src_ip, 24).unwrap();
     let nw_addr = Ipv4Net::new(net.network(), 24).unwrap();

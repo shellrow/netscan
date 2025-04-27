@@ -1,4 +1,3 @@
-use std::net::IpAddr;
 use nex::packet::ethernet::EtherType;
 use nex::packet::icmp::IcmpType;
 use nex::packet::icmpv6::Icmpv6Type;
@@ -9,6 +8,7 @@ use nex::util::packet_builder::icmp::IcmpPacketBuilder;
 use nex::util::packet_builder::icmpv6::Icmpv6PacketBuilder;
 use nex::util::packet_builder::ipv4::Ipv4PacketBuilder;
 use nex::util::packet_builder::ipv6::Ipv6PacketBuilder;
+use std::net::IpAddr;
 
 use crate::packet::setting::PacketBuildSetting;
 
@@ -83,14 +83,10 @@ pub fn build_ip_next_icmp_packet(setting: PacketBuildSetting) -> Vec<u8> {
                 icmp_packet_builder.icmp_type = IcmpType::EchoRequest;
                 icmp_packet_builder.build()
             }
-            IpAddr::V6(_) => {
-                Vec::new()
-            }
+            IpAddr::V6(_) => Vec::new(),
         },
         IpAddr::V6(dst_ipv6) => match setting.src_ip {
-            IpAddr::V4(_) => {
-                Vec::new()
-            }
+            IpAddr::V4(_) => Vec::new(),
             IpAddr::V6(src_ipv6) => {
                 let mut icmpv6_packet_builder = Icmpv6PacketBuilder::new(src_ipv6, dst_ipv6);
                 icmpv6_packet_builder.icmpv6_type = Icmpv6Type::EchoRequest;

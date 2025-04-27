@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use std::time::Duration;
-use std::net::{IpAddr, Ipv4Addr};
-use rand::seq::SliceRandom;
-use crate::scan::payload::PayloadBuilder;
 use crate::host::Host;
 use crate::protocol::Protocol;
+use crate::scan::payload::PayloadBuilder;
+use rand::seq::SliceRandom;
+use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr};
+use std::time::Duration;
 
 use crate::config::{DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
 
@@ -348,8 +348,11 @@ impl ServiceProbeSetting {
     /// Set Destination Host Name. If IP address is not set, it will be resolved from the hostname.
     pub fn with_hostname(&mut self, hostname: String) -> &mut Self {
         self.hostname = hostname;
-        if self.ip_addr == IpAddr::V4(Ipv4Addr::LOCALHOST) || self.ip_addr == IpAddr::V4(Ipv4Addr::UNSPECIFIED)
-        || self.ip_addr == IpAddr::V6(std::net::Ipv6Addr::LOCALHOST) || self.ip_addr == IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED) {
+        if self.ip_addr == IpAddr::V4(Ipv4Addr::LOCALHOST)
+            || self.ip_addr == IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+            || self.ip_addr == IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)
+            || self.ip_addr == IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED)
+        {
             if let Some(ip_addr) = crate::dns::lookup_host_name(&self.hostname) {
                 self.ip_addr = ip_addr;
             }

@@ -1,6 +1,6 @@
+use netdev::interface::Interface;
 use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use netdev::interface::Interface;
 
 pub fn get_interface_by_index(index: u32) -> Option<Interface> {
     for iface in netdev::interface::get_interfaces() {
