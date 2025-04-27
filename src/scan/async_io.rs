@@ -247,9 +247,6 @@ pub (crate) async fn scan_hosts(scan_setting: HostScanSetting, ptx: &Arc<Mutex<S
         ether_types: HashSet::new(),
         ip_protocols: HashSet::new(),
         capture_timeout: scan_setting.timeout,
-        read_timeout: scan_setting.wait_time,
-        promiscuous: false,
-        receive_undefined: false,
         tunnel: interface.is_tun(),
         loopback: interface.is_loopback(),
     };
@@ -388,9 +385,6 @@ pub (crate) async fn scan_ports(scan_setting: PortScanSetting, ptx: &Arc<Mutex<S
         ether_types: HashSet::new(),
         ip_protocols: HashSet::new(),
         capture_timeout: scan_setting.timeout,
-        read_timeout: scan_setting.wait_time,
-        promiscuous: false,
-        receive_undefined: false,
         tunnel: interface.is_tun(),
         loopback: interface.is_loopback(),
     };

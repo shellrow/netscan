@@ -10,6 +10,7 @@ pub struct PacketBuildSetting {
     pub src_port: u16,
     pub dst_port: u16,
     pub hop_limit: u8,
+    #[allow(dead_code)]
     pub payload: Vec<u8>,
     pub ip_packet: bool,
 }

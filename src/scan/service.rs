@@ -1,14 +1,11 @@
-use std::net::{IpAddr, SocketAddr, TcpStream};
+use std::net::{IpAddr, SocketAddr};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use std::io::{Read, Write};
-use async_io::{Async, Timer};
-use futures_lite::{AsyncWriteExt, AsyncReadExt};
-use futures_lite::future::FutureExt;
+use tokio::net::TcpStream;
 use futures::stream::{self, StreamExt};
-use nex::socket::tls::socket::rustls;
-use nex::socket::tls::TlsClient;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_rustls::TlsConnector;
 use super::payload::{PayloadInfo, PayloadType};
 use super::result::{ServiceProbeError, ServiceProbeResult};
 use super::setting::ServiceProbeSetting;
@@ -40,37 +37,37 @@ fn parse_http_header(res_bytes: &Vec<u8>) -> Option<String> {
 /// Read to end and return response as Vec<u8>
 /// This ignore io::Error on read_to_end because it is expected when reading response.
 /// If no response is received, and io::Error is occurred, return Err.
-async fn read_response_timeout(tcp_stream: &mut Async<TcpStream>, timeout: Duration) -> std::io::Result<Vec<u8>> {
-    let mut io_error: std::io::Error =
-        std::io::Error::new(std::io::ErrorKind::Other, "No response");
-    let mut response: Vec<u8> = Vec::new();
-    match tcp_stream.read_to_end(&mut response).or(async {
-        Timer::after(timeout).await;
-        Err(std::io::ErrorKind::TimedOut.into())
-    }).await {
-        Ok(_) => {}
-        Err(e) => {
-            io_error = e;
+async fn read_response_timeout(tcp_stream: &mut TcpStream, timeout_duration: Duration) -> std::io::Result<Vec<u8>> {
+    let mut response = Vec::new();
+    let mut buf = [0u8; 1024];
+
+    loop {
+        match tokio::time::timeout(timeout_duration, tcp_stream.read(&mut buf)).await {
+            Ok(Ok(0)) => break,
+            Ok(Ok(n)) => {
+                response.extend_from_slice(&buf[..n]);
+                break;
+            }
+            Ok(Err(e)) => return Err(e),
+            Err(_) => break,
         }
     }
-    if response.len() == 0 {
-        return Err(io_error);
+
+    if response.is_empty() {
+        Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "No response"))
     } else {
         Ok(response)
     }
 }
 
-pub async fn async_tcp_connect_timeout(
-    addr: &SocketAddr,
-    timeout: Duration,
-) -> std::io::Result<Async::<TcpStream>> {
-    let stream = Async::<TcpStream>::connect(*addr)
-        .or(async {
-            Timer::after(timeout).await;
-            Err(std::io::ErrorKind::TimedOut.into())
-        })
-        .await?;
-    Ok(stream)
+fn set_read_timeout(tcp_stream: TcpStream, timeout: Duration) -> std::io::Result<TcpStream> {
+    // Convert to std::net::TcpStream
+    let std_tcp_stream = tcp_stream.into_std()?;
+    // Set read timeout
+    std_tcp_stream.set_read_timeout(Some(timeout))?;
+    // Convert back to tokio TcpStream
+    let tokio_tcp_stream = TcpStream::from_std(std_tcp_stream)?;
+    Ok(tokio_tcp_stream)
 }
 
 async fn probe_port(ip_addr:IpAddr, hostname: String, port: u16, payload_info: Option<PayloadInfo>, timeout: Duration) -> ServiceProbeResult {
@@ -79,11 +76,22 @@ async fn probe_port(ip_addr:IpAddr, hostname: String, port: u16, payload_info: O
         None => String::new(),
     };
     let socket_addr: SocketAddr = SocketAddr::new(ip_addr, port);
-    let mut tcp_stream = async_tcp_connect_timeout(&socket_addr, timeout).await.unwrap();
-    match tcp_stream.write_with(|inner| inner.set_read_timeout(Some(timeout))).await {
-        Ok(_) => {},
+    let tcp_stream = match tokio::time::timeout(timeout, TcpStream::connect(socket_addr)).await {
+        Ok(connect_result) => {
+            match connect_result {
+                Ok(tcp_stream) => tcp_stream,
+                Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
+            }
+        },
+        Err(elapsed) => {
+            return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(elapsed.to_string()))
+        }
+    };
+    // Set read timeout 
+    let mut tcp_stream = match set_read_timeout(tcp_stream, timeout) {
+        Ok(tcp_stream) => tcp_stream,
         Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
-    }
+    };
     if let Some(payload) = payload_info {
         match payload.payload_type {
             PayloadType::Http => {
@@ -110,30 +118,34 @@ async fn probe_port(ip_addr:IpAddr, hostname: String, port: u16, payload_info: O
                 }
             },
             PayloadType::Https => {
-                let native_certs = nex::socket::tls::certs::get_native_certs().unwrap();
+                let native_certs = crate::tls::cert::get_native_certs().unwrap();
                 let config = rustls::ClientConfig::builder()
                     .with_root_certificates(native_certs)
                     .with_no_client_auth();
-                let tcp_stream_inner = match tcp_stream.into_inner() {
-                    Ok(tcp_stream_inner) => tcp_stream_inner,
+                let tls_connector = TlsConnector::from(Arc::new(config));
+                let name = match rustls_pki_types::ServerName::try_from(hostname) {
+                    Ok(name) => name,
                     Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
                 };
-                match tcp_stream_inner.set_nonblocking(false) {
-                    Ok(_) => {},
-                    Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
-                }
-                let mut tls_client = match TlsClient::new(hostname.to_string(), tcp_stream_inner, config) {
-                    Ok(tls_client) => tls_client,
-                    Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
+                let mut tls_stream = match tokio::time::timeout(timeout, tls_connector.connect(name, tcp_stream)).await{
+                    Ok(connect_result) => {
+                        match connect_result {
+                            Ok(tls_stream) => tls_stream,
+                            Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
+                        }
+                    },
+                    Err(elapsed) => {
+                        return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(elapsed.to_string()))
+                    }
                 };
-                match tls_client.write_all(&payload.payload) {
+                match tls_stream.write_all(&payload.payload).await {
                     Ok(_) => {
-                        match tls_client.flush() {
+                        match tls_stream.flush().await {
                             Ok(_) => {},
                             Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::WriteError(e.to_string()))
                         }
                         let mut buf: Vec<u8> = Vec::new();
-                        match tls_client.read_to_end(&mut buf) {
+                        match tls_stream.read_to_end(&mut buf).await {
                             Ok(_) => {
                                 let mut result = ServiceProbeResult::new(port, service_name, buf.clone());
                                 result.service_detail = parse_http_header(&buf);
@@ -173,30 +185,34 @@ async fn probe_port(ip_addr:IpAddr, hostname: String, port: u16, payload_info: O
                 }
             },
             PayloadType::CommonTls => {
-                let native_certs = nex::socket::tls::certs::get_native_certs().unwrap();
+                let native_certs = crate::tls::cert::get_native_certs().unwrap();
                 let config = rustls::ClientConfig::builder()
                     .with_root_certificates(native_certs)
                     .with_no_client_auth();
-                let tcp_stream_inner = match tcp_stream.into_inner() {
-                    Ok(tcp_stream_inner) => tcp_stream_inner,
+                let tls_connector = TlsConnector::from(Arc::new(config));
+                let name = match rustls_pki_types::ServerName::try_from(hostname) {
+                    Ok(name) => name,
                     Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
                 };
-                match tcp_stream_inner.set_nonblocking(false) {
-                    Ok(_) => {},
-                    Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
-                }
-                let mut tls_client = match TlsClient::new(hostname.to_string(), tcp_stream_inner, config) {
-                    Ok(tls_client) => tls_client,
-                    Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
+                let mut tls_stream = match tokio::time::timeout(timeout, tls_connector.connect(name, tcp_stream)).await{
+                    Ok(connect_result) => {
+                        match connect_result {
+                            Ok(tls_stream) => tls_stream,
+                            Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(e.to_string()))
+                        }
+                    },
+                    Err(elapsed) => {
+                        return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::ConnectionError(elapsed.to_string()))
+                    }
                 };
-                match tls_client.write_all(&payload.payload) {
+                match tls_stream.write_all(&payload.payload).await {
                     Ok(_) => {
-                        match tls_client.flush() {
+                        match tls_stream.flush().await {
                             Ok(_) => {},
                             Err(e) => return ServiceProbeResult::with_error(port, service_name, ServiceProbeError::WriteError(e.to_string()))
                         }
                         let mut buf: Vec<u8> = Vec::new();
-                        match tls_client.read_to_end(&mut buf) {
+                        match tls_stream.read_to_end(&mut buf).await {
                             Ok(_) => {
                                 let mut result = ServiceProbeResult::new(port, service_name, buf.clone());
                                 result.service_detail = Some(String::from_utf8(buf).unwrap_or(String::new()).to_string());

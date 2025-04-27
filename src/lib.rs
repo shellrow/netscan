@@ -8,3 +8,4 @@ pub mod protocol;
 pub mod scan;
 pub(crate) mod ip;
 pub mod dns;
+pub mod tls;

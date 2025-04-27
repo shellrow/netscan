@@ -14,12 +14,18 @@ license = "MIT"
 name = "netscan"
 
 [dependencies]
-netdev = "0.26"
-nex = { version = "0.10", features = ["tls"] }
-async-io = "2.3"
-futures-lite = "2.3"
+anyhow = { version = "1" }
+netdev = "0.34"
+nex = { version = "0.19.1" }
+async-io = "2.4"
+futures-lite = "2.6"
 futures = {version = "0.3", features = ["executor", "thread-pool"]}
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+rustls-native-certs = "0.7"
+rustls-pemfile = "2.1"
+rustls-pki-types = "1.8"
 tokio = "1"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring"]} 
 hickory-resolver = "0.24"
 phf = { version = "0.11", features = ["macros"] }
 rand = "0.8"

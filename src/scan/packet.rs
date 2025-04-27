@@ -17,20 +17,20 @@ pub (crate) fn build_hostscan_packet(interface: &Interface, target_host: &Host, 
     match target_host.ip_addr {
         IpAddr::V4(ipv4_addr) => {
             interface.ipv4.iter().for_each(|ipv4| {
-                build_setting.src_ip = IpAddr::V4(ipv4.addr);
+                build_setting.src_ip = IpAddr::V4(ipv4.addr());
             });
             build_setting.dst_ip = IpAddr::V4(ipv4_addr);
         },
         IpAddr::V6(ipv6_addr) => {
             if is_global_ipv6(&ipv6_addr) {
                 interface.ipv6.iter().for_each(|ipv6| {
-                    if is_global_ipv6(&ipv6.addr) {
-                        build_setting.src_ip = IpAddr::V6(ipv6.addr);
+                    if is_global_ipv6(&ipv6.addr()) {
+                        build_setting.src_ip = IpAddr::V6(ipv6.addr());
                     }
                 });
             }else {
                 interface.ipv6.iter().for_each(|ipv6| {
-                    build_setting.src_ip = IpAddr::V6(ipv6.addr);
+                    build_setting.src_ip = IpAddr::V6(ipv6.addr());
                 });
             }
             build_setting.dst_ip = IpAddr::V6(ipv6_addr);
@@ -69,20 +69,20 @@ pub (crate) fn build_hostscan_ip_next_packet(interface: &Interface, target_host:
     match target_host.ip_addr {
         IpAddr::V4(ipv4_addr) => {
             interface.ipv4.iter().for_each(|ipv4| {
-                build_setting.src_ip = IpAddr::V4(ipv4.addr);
+                build_setting.src_ip = IpAddr::V4(ipv4.addr());
             });
             build_setting.dst_ip = IpAddr::V4(ipv4_addr);
         },
         IpAddr::V6(ipv6_addr) => {
             if is_global_ipv6(&ipv6_addr) {
                 interface.ipv6.iter().for_each(|ipv6| {
-                    if is_global_ipv6(&ipv6.addr) {
-                        build_setting.src_ip = IpAddr::V6(ipv6.addr);
+                    if is_global_ipv6(&ipv6.addr()) {
+                        build_setting.src_ip = IpAddr::V6(ipv6.addr());
                     }
                 });
             }else {
                 interface.ipv6.iter().for_each(|ipv6| {
-                    build_setting.src_ip = IpAddr::V6(ipv6.addr);
+                    build_setting.src_ip = IpAddr::V6(ipv6.addr());
                 });
             }
             build_setting.dst_ip = IpAddr::V6(ipv6_addr);
@@ -121,20 +121,20 @@ pub (crate) fn build_portscan_packet(interface: &Interface, target_ip_addr: IpAd
     match target_ip_addr {
         IpAddr::V4(ipv4_addr) => {
             interface.ipv4.iter().for_each(|ipv4| {
-                build_setting.src_ip = IpAddr::V4(ipv4.addr);
+                build_setting.src_ip = IpAddr::V4(ipv4.addr());
             });
             build_setting.dst_ip = IpAddr::V4(ipv4_addr);
         },
         IpAddr::V6(ipv6_addr) => {
             if is_global_ipv6(&ipv6_addr) {
                 interface.ipv6.iter().for_each(|ipv6| {
-                    if is_global_ipv6(&ipv6.addr) {
-                        build_setting.src_ip = IpAddr::V6(ipv6.addr);
+                    if is_global_ipv6(&ipv6.addr()) {
+                        build_setting.src_ip = IpAddr::V6(ipv6.addr());
                     }
                 });
             }else {
                 interface.ipv6.iter().for_each(|ipv6| {
-                    build_setting.src_ip = IpAddr::V6(ipv6.addr);
+                    build_setting.src_ip = IpAddr::V6(ipv6.addr());
                 });
             }
             build_setting.dst_ip = IpAddr::V6(ipv6_addr);
@@ -160,20 +160,20 @@ pub (crate) fn build_portscan_ip_next_packet(interface: &Interface, target_ip_ad
     match target_ip_addr {
         IpAddr::V4(ipv4_addr) => {
             interface.ipv4.iter().for_each(|ipv4| {
-                build_setting.src_ip = IpAddr::V4(ipv4.addr);
+                build_setting.src_ip = IpAddr::V4(ipv4.addr());
             });
             build_setting.dst_ip = IpAddr::V4(ipv4_addr);
         },
         IpAddr::V6(ipv6_addr) => {
             if is_global_ipv6(&ipv6_addr) {
                 interface.ipv6.iter().for_each(|ipv6| {
-                    if is_global_ipv6(&ipv6.addr) {
-                        build_setting.src_ip = IpAddr::V6(ipv6.addr);
+                    if is_global_ipv6(&ipv6.addr()) {
+                        build_setting.src_ip = IpAddr::V6(ipv6.addr());
                     }
                 });
             }else {
                 interface.ipv6.iter().for_each(|ipv6| {
-                    build_setting.src_ip = IpAddr::V6(ipv6.addr);
+                    build_setting.src_ip = IpAddr::V6(ipv6.addr());
                 });
             }
             build_setting.dst_ip = IpAddr::V6(ipv6_addr);

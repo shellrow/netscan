@@ -1,11 +1,10 @@
-pub mod setting;
 use std::net::IpAddr;
 //use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use std::time::Instant;
 use std::time::Duration;
-use nex::datalink::FrameReceiver;
+use nex::datalink::RawReceiver;
 use nex::packet::{ip::IpNextLevelProtocol, ethernet::EtherType};
 use nex::packet::frame::Frame;
 use nex::packet::frame::ParseOption;
@@ -15,6 +14,7 @@ use crate::packet::frame::PacketFrame;
 #[derive(Debug, Clone)]
 pub struct PacketCaptureOptions {
     /// Interface index
+    #[allow(dead_code)]
     pub interface_index: u32,
     /// Source IP addresses to filter. If empty, all source IP addresses will be captured
     pub src_ips: HashSet<IpAddr>,
@@ -30,12 +30,6 @@ pub struct PacketCaptureOptions {
     pub ip_protocols: HashSet<IpNextLevelProtocol>,
     /// Capture duration limit
     pub capture_timeout: Duration,
-    /// Read Timeout for read next packet (Linux, BPF only)
-    pub read_timeout: Duration,
-    /// Capture in promiscuous mode
-    pub promiscuous: bool,
-    /// Receive undefined packets
-    pub receive_undefined: bool,
     /// Use TUN interface
     pub tunnel: bool,
     /// Loopback interface
@@ -44,7 +38,7 @@ pub struct PacketCaptureOptions {
 
 /// Start packet capture
 pub fn start_capture(
-    rx: &mut Box<dyn FrameReceiver>,
+    rx: &mut Box<dyn RawReceiver>,
     capture_options: PacketCaptureOptions,
     stop: &Arc<Mutex<bool>>,
 ) -> Vec<PacketFrame> {
