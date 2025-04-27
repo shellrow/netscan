@@ -1,7 +1,7 @@
 [package]
 name = "netscan"
 version = "0.29.0"
-authors = ["shellrow <shellrow@foctet.com>"]
+authors = ["shellrow <shellrow@fortnium.com>"]
 edition = "2021"
 description = "Cross-platform network scan library"
 repository = "https://github.com/shellrow/netscan"
