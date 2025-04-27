@@ -1,6 +1,6 @@
 [package]
 name = "netscan"
-version = "0.28.0"
+version = "0.29.0"
 authors = ["shellrow <shellrow@foctet.com>"]
 edition = "2021"
 description = "Cross-platform network scan library"
