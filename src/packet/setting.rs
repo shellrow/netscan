@@ -1,4 +1,4 @@
-use netdev::mac::MacAddr;
+use netdev::MacAddr;
 use std::net::{IpAddr, Ipv4Addr};
 
 #[derive(Clone, Debug)]

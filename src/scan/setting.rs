@@ -3,7 +3,9 @@ use crate::protocol::Protocol;
 use crate::scan::payload::PayloadBuilder;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 use std::time::Duration;
 
 use crate::config::{DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
@@ -21,7 +23,7 @@ pub enum ScanType {
  */
 
 /// Port Scan Type
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum PortScanType {
     /// Default fast port scan type.
     ///
@@ -35,16 +37,30 @@ pub enum PortScanType {
 
 impl PortScanType {
     pub fn from_str(scan_type: &str) -> PortScanType {
-        match scan_type {
-            "SYN" | "TCP-SYN" | "TCP_SYN" => PortScanType::TcpSynScan,
-            "CONNECT" | "TCP-CONNECT" | "TCP_CONNECT" => PortScanType::TcpConnectScan,
-            _ => PortScanType::TcpSynScan,
-        }
+        scan_type.parse().unwrap_or(PortScanType::TcpSynScan)
     }
     pub fn to_str(&self) -> &str {
         match self {
             PortScanType::TcpSynScan => "TCP-SYN",
             PortScanType::TcpConnectScan => "TCP-CONNECT",
+        }
+    }
+}
+
+impl fmt::Display for PortScanType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+impl FromStr for PortScanType {
+    type Err = ();
+
+    fn from_str(scan_type: &str) -> Result<Self, Self::Err> {
+        match scan_type {
+            "SYN" | "TCP-SYN" | "TCP_SYN" => Ok(PortScanType::TcpSynScan),
+            "CONNECT" | "TCP-CONNECT" | "TCP_CONNECT" => Ok(PortScanType::TcpConnectScan),
+            _ => Err(()),
         }
     }
 }
@@ -85,6 +101,46 @@ impl Default for PortScanSetting {
 }
 
 impl PortScanSetting {
+    pub fn with_if_index(self, if_index: u32) -> Self {
+        self.set_if_index(if_index)
+    }
+    pub fn with_target(self, target: Host) -> Self {
+        self.add_target(target)
+    }
+    pub fn with_targets(self, targets: Vec<Host>) -> Self {
+        self.set_targets(targets)
+    }
+    pub fn with_protocol(self, protocol: Protocol) -> Self {
+        self.set_protocol(protocol)
+    }
+    pub fn with_scan_type(self, scan_type: PortScanType) -> Self {
+        self.set_scan_type(scan_type)
+    }
+    pub fn with_concurrency(self, concurrency: usize) -> Self {
+        self.set_concurrency(concurrency)
+    }
+    pub fn with_timeout(self, timeout: Duration) -> Self {
+        self.set_timeout(timeout)
+    }
+    pub fn with_wait_time(self, wait_time: Duration) -> Self {
+        self.set_wait_time(wait_time)
+    }
+    pub fn with_send_rate(self, send_rate: Duration) -> Self {
+        self.set_send_rate(send_rate)
+    }
+    pub fn with_randomize(self, randomize: bool) -> Self {
+        self.set_randomize(randomize)
+    }
+    pub fn with_minimize_packet(self, minimize_packet: bool) -> Self {
+        self.set_minimize_packet(minimize_packet)
+    }
+    pub fn with_dns_map(self, dns_map: HashMap<IpAddr, String>) -> Self {
+        self.set_dns_map(dns_map)
+    }
+    pub fn with_async_scan(self, async_scan: bool) -> Self {
+        self.set_async_scan(async_scan)
+    }
+
     // support builder pattern for all fields
     pub fn set_if_index(mut self, if_index: u32) -> Self {
         self.if_index = if_index;
@@ -150,7 +206,7 @@ impl PortScanSetting {
 }
 
 /// Host Scan Type
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum HostScanType {
     /// Default host scan type.
     ///
@@ -167,18 +223,32 @@ pub enum HostScanType {
 
 impl HostScanType {
     pub fn from_str(scan_type: &str) -> HostScanType {
-        match scan_type {
-            "ICMP" | "ICMP-PING" | "ICMP_PING" => HostScanType::IcmpPingScan,
-            "TCP" | "TCP-PING" | "TCP_PING" => HostScanType::TcpPingScan,
-            "UDP" | "UDP-PING" | "UDP_PING" => HostScanType::UdpPingScan,
-            _ => HostScanType::IcmpPingScan,
-        }
+        scan_type.parse().unwrap_or(HostScanType::IcmpPingScan)
     }
     pub fn to_str(&self) -> &str {
         match self {
             HostScanType::IcmpPingScan => "ICMP-PING",
             HostScanType::TcpPingScan => "TCP-PING",
             HostScanType::UdpPingScan => "UDP-PING",
+        }
+    }
+}
+
+impl fmt::Display for HostScanType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+impl FromStr for HostScanType {
+    type Err = ();
+
+    fn from_str(scan_type: &str) -> Result<Self, Self::Err> {
+        match scan_type {
+            "ICMP" | "ICMP-PING" | "ICMP_PING" => Ok(HostScanType::IcmpPingScan),
+            "TCP" | "TCP-PING" | "TCP_PING" => Ok(HostScanType::TcpPingScan),
+            "UDP" | "UDP-PING" | "UDP_PING" => Ok(HostScanType::UdpPingScan),
+            _ => Err(()),
         }
     }
 }
@@ -219,6 +289,43 @@ impl Default for HostScanSetting {
 }
 
 impl HostScanSetting {
+    pub fn with_if_index(self, if_index: u32) -> Self {
+        self.set_if_index(if_index)
+    }
+    pub fn with_targets(self, targets: Vec<Host>) -> Self {
+        self.set_targets(targets)
+    }
+    pub fn with_protocol(self, protocol: Protocol) -> Self {
+        self.set_protocol(protocol)
+    }
+    pub fn with_scan_type(self, scan_type: HostScanType) -> Self {
+        self.set_scan_type(scan_type)
+    }
+    pub fn with_concurrency(self, concurrency: usize) -> Self {
+        self.set_concurrency(concurrency)
+    }
+    pub fn with_timeout(self, timeout: Duration) -> Self {
+        self.set_timeout(timeout)
+    }
+    pub fn with_wait_time(self, wait_time: Duration) -> Self {
+        self.set_wait_time(wait_time)
+    }
+    pub fn with_send_rate(self, send_rate: Duration) -> Self {
+        self.set_send_rate(send_rate)
+    }
+    pub fn with_randomize(self, randomize: bool) -> Self {
+        self.set_randomize(randomize)
+    }
+    pub fn with_minimize_packet(self, minimize_packet: bool) -> Self {
+        self.set_minimize_packet(minimize_packet)
+    }
+    pub fn with_dns_map(self, dns_map: HashMap<IpAddr, String>) -> Self {
+        self.set_dns_map(dns_map)
+    }
+    pub fn with_async_scan(self, async_scan: bool) -> Self {
+        self.set_async_scan(async_scan)
+    }
+
     // support builder pattern for all fields
     pub fn set_if_index(mut self, if_index: u32) -> Self {
         self.if_index = if_index;
@@ -339,6 +446,45 @@ impl ServiceProbeSetting {
             payload_map: payload_map,
             concurrent_limit: 10,
         }
+    }
+    /// Builder-style variant of `with_ip_addr` for chaining from owned values.
+    pub fn with_target_ip(mut self, ip_addr: IpAddr) -> Self {
+        self.ip_addr = ip_addr;
+        self
+    }
+    /// Builder-style variant of `with_hostname` for chaining from owned values.
+    pub fn with_target_hostname(mut self, hostname: String) -> Self {
+        self.hostname = hostname;
+        if self.ip_addr == IpAddr::V4(Ipv4Addr::LOCALHOST)
+            || self.ip_addr == IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+            || self.ip_addr == IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)
+            || self.ip_addr == IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED)
+        {
+            if let Some(ip_addr) = crate::dns::lookup_host_name(&self.hostname) {
+                self.ip_addr = ip_addr;
+            }
+        }
+        self
+    }
+    /// Builder-style setter for target ports.
+    pub fn with_ports(mut self, ports: Vec<u16>) -> Self {
+        self.ports = ports;
+        self
+    }
+    /// Builder-style setter for connect timeout.
+    pub fn with_connect_timeout(mut self, connect_timeout: Duration) -> Self {
+        self.connect_timeout = connect_timeout;
+        self
+    }
+    /// Builder-style setter for read timeout.
+    pub fn with_read_timeout(mut self, read_timeout: Duration) -> Self {
+        self.read_timeout = read_timeout;
+        self
+    }
+    /// Builder-style setter for concurrent probe limit.
+    pub fn with_concurrent_limit(mut self, concurrent_limit: usize) -> Self {
+        self.concurrent_limit = concurrent_limit;
+        self
     }
     /// Set Destination IP address
     pub fn with_ip_addr(&mut self, ip_addr: IpAddr) -> &mut Self {

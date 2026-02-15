@@ -2,12 +2,13 @@ use crate::host::Host;
 use crate::scan::setting::{HostScanSetting, PortScanSetting};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
+use tokio::runtime::{Builder, Runtime};
 
 use super::async_io;
 use super::blocking;
-use super::result::{ScanResult, ServiceProbeResult};
+use super::result::{ScanError, ScanResult, ServiceProbeResult};
 use super::setting::ServiceProbeSetting;
 
 /// Host Scanner
@@ -22,6 +23,14 @@ pub struct HostScanner {
 }
 
 impl HostScanner {
+    fn runtime() -> Runtime {
+        Builder::new_multi_thread()
+            .enable_io()
+            .enable_time()
+            .build()
+            .expect("failed to initialize tokio runtime")
+    }
+
     /// Create new HostScanner
     pub fn new(scan_setting: HostScanSetting) -> Self {
         let (tx, rx) = channel();
@@ -35,14 +44,26 @@ impl HostScanner {
     pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<Host>>> {
         self.rx.clone()
     }
-    // Scan hosts
-    pub fn scan(&self) -> ScanResult {
+    /// Scan hosts asynchronously.
+    pub async fn scan_async(&self) -> ScanResult {
         if self.scan_setting.async_scan {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(async_io::scan_hosts(self.scan_setting.clone(), &self.tx))
+            async_io::scan_hosts(self.scan_setting.clone(), &self.tx).await
         } else {
-            blocking::scan_hosts(self.scan_setting.clone(), &self.tx)
+            let setting = self.scan_setting.clone();
+            let tx = self.tx.clone();
+            match tokio::task::spawn_blocking(move || blocking::scan_hosts(setting, &tx)).await {
+                Ok(result) => result,
+                Err(e) => ScanResult::error(ScanError::RuntimeError(format!(
+                    "blocking scan task join error: {}",
+                    e
+                ))),
+            }
         }
+    }
+
+    /// Scan hosts using an internal Tokio runtime.
+    pub fn scan(&self) -> ScanResult {
+        Self::runtime().block_on(self.scan_async())
     }
 }
 
@@ -58,6 +79,14 @@ pub struct PortScanner {
 }
 
 impl PortScanner {
+    fn runtime() -> Runtime {
+        Builder::new_multi_thread()
+            .enable_io()
+            .enable_time()
+            .build()
+            .expect("failed to initialize tokio runtime")
+    }
+
     /// Create new PortScanner
     pub fn new(scan_setting: PortScanSetting) -> Self {
         let (tx, rx) = channel();
@@ -71,21 +100,35 @@ impl PortScanner {
     pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<SocketAddr>>> {
         self.rx.clone()
     }
-    /// Scan ports
-    pub fn scan(&self) -> ScanResult {
+    /// Scan ports asynchronously.
+    pub async fn scan_async(&self) -> ScanResult {
         match self.scan_setting.scan_type {
             crate::scan::setting::PortScanType::TcpSynScan => {
                 if self.scan_setting.async_scan {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async_io::scan_ports(self.scan_setting.clone(), &self.tx))
+                    async_io::scan_ports(self.scan_setting.clone(), &self.tx).await
                 } else {
-                    blocking::scan_ports(self.scan_setting.clone(), &self.tx)
+                    let setting = self.scan_setting.clone();
+                    let tx = self.tx.clone();
+                    match tokio::task::spawn_blocking(move || blocking::scan_ports(setting, &tx))
+                        .await
+                    {
+                        Ok(result) => result,
+                        Err(e) => ScanResult::error(ScanError::RuntimeError(format!(
+                            "blocking scan task join error: {}",
+                            e
+                        ))),
+                    }
                 }
             }
             crate::scan::setting::PortScanType::TcpConnectScan => {
-                async_io::run_connect_scan(self.scan_setting.clone(), &self.tx)
+                async_io::run_connect_scan(self.scan_setting.clone(), &self.tx).await
             }
         }
+    }
+
+    /// Scan ports using an internal Tokio runtime.
+    pub fn scan(&self) -> ScanResult {
+        Self::runtime().block_on(self.scan_async())
     }
 }
 
@@ -101,6 +144,14 @@ pub struct ServiceDetector {
 }
 
 impl ServiceDetector {
+    fn runtime() -> Runtime {
+        Builder::new_multi_thread()
+            .enable_io()
+            .enable_time()
+            .build()
+            .expect("failed to initialize tokio runtime")
+    }
+
     /// Create new ServiceDetector
     pub fn new(setting: ServiceProbeSetting) -> Self {
         let (tx, rx) = channel();
@@ -114,9 +165,13 @@ impl ServiceDetector {
     pub fn get_progress_receiver(&self) -> Arc<Mutex<Receiver<SocketAddr>>> {
         self.rx.clone()
     }
-    /// Run service detection
+    /// Run service detection asynchronously.
+    pub async fn run_async(&self) -> HashMap<u16, ServiceProbeResult> {
+        super::service::run_service_probe(&self.setting, &self.tx).await
+    }
+
+    /// Run service detection using an internal Tokio runtime.
     pub fn run(&self) -> HashMap<u16, ServiceProbeResult> {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(super::service::run_service_probe(&self.setting, &self.tx))
+        Self::runtime().block_on(self.run_async())
     }
 }

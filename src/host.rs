@@ -1,5 +1,5 @@
 use crate::dns;
-use netdev::mac::MacAddr;
+use netdev::MacAddr;
 use std::net::IpAddr;
 
 /// Status of the scanned port

@@ -1,97 +1,97 @@
+use bytes::Bytes;
+use nex::packet::builder::ethernet::EthernetPacketBuilder;
+use nex::packet::builder::icmp::IcmpPacketBuilder;
+use nex::packet::builder::icmpv6::Icmpv6PacketBuilder;
+use nex::packet::builder::ipv4::Ipv4PacketBuilder;
+use nex::packet::builder::ipv6::Ipv6PacketBuilder;
 use nex::packet::ethernet::EtherType;
+use nex::packet::icmp;
 use nex::packet::icmp::IcmpType;
+use nex::packet::icmpv6;
 use nex::packet::icmpv6::Icmpv6Type;
-use nex::packet::ip::IpNextLevelProtocol;
-use nex::util::packet_builder::builder::PacketBuilder;
-use nex::util::packet_builder::ethernet::EthernetPacketBuilder;
-use nex::util::packet_builder::icmp::IcmpPacketBuilder;
-use nex::util::packet_builder::icmpv6::Icmpv6PacketBuilder;
-use nex::util::packet_builder::ipv4::Ipv4PacketBuilder;
-use nex::util::packet_builder::ipv6::Ipv6PacketBuilder;
+use nex::packet::ip::IpNextProtocol;
+use nex::packet::ipv4::Ipv4Flags;
 use std::net::IpAddr;
 
 use crate::packet::setting::PacketBuildSetting;
 
-/// Build ICMP packet. Supports both ICMPv4 and ICMPv6
-pub fn build_icmp_packet(setting: PacketBuildSetting) -> Vec<u8> {
-    let mut packet_builder = PacketBuilder::new();
+fn wrap_transport_packet(setting: &PacketBuildSetting, transport_bytes: Bytes) -> Vec<u8> {
+    let ip_bytes = match (setting.src_ip, setting.dst_ip) {
+        (IpAddr::V4(src_ipv4), IpAddr::V4(dst_ipv4)) => Ipv4PacketBuilder::new()
+            .source(src_ipv4)
+            .destination(dst_ipv4)
+            .ttl(setting.hop_limit)
+            .protocol(IpNextProtocol::Icmp)
+            .flags(Ipv4Flags::DontFragment)
+            .payload(transport_bytes)
+            .to_bytes(),
+        (IpAddr::V6(src_ipv6), IpAddr::V6(dst_ipv6)) => Ipv6PacketBuilder::new()
+            .source(src_ipv6)
+            .destination(dst_ipv6)
+            .hop_limit(setting.hop_limit)
+            .next_header(IpNextProtocol::Icmpv6)
+            .payload(transport_bytes)
+            .to_bytes(),
+        _ => return Vec::new(),
+    };
 
-    // Ethernet Header
-    let ethernet_packet_builder = EthernetPacketBuilder {
-        src_mac: setting.src_mac,
-        dst_mac: setting.dst_mac,
-        ether_type: match setting.dst_ip {
+    if setting.ip_packet {
+        return ip_bytes.to_vec();
+    }
+
+    EthernetPacketBuilder::new()
+        .source(setting.src_mac)
+        .destination(setting.dst_mac)
+        .ethertype(match setting.dst_ip {
             IpAddr::V4(_) => EtherType::Ipv4,
             IpAddr::V6(_) => EtherType::Ipv6,
-        },
-    };
-    packet_builder.set_ethernet(ethernet_packet_builder);
-
-    // IP Header
-    match setting.dst_ip {
-        IpAddr::V4(dst_ipv4) => match setting.src_ip {
-            IpAddr::V4(src_ipv4) => {
-                let mut ipv4_packet_builder =
-                    Ipv4PacketBuilder::new(src_ipv4, dst_ipv4, IpNextLevelProtocol::Icmp);
-                ipv4_packet_builder.ttl = Some(setting.hop_limit);
-                packet_builder.set_ipv4(ipv4_packet_builder);
-            }
-            IpAddr::V6(_) => {}
-        },
-        IpAddr::V6(dst_ipv6) => match setting.src_ip {
-            IpAddr::V4(_) => {}
-            IpAddr::V6(src_ipv4) => {
-                let mut ipv6_packet_builder =
-                    Ipv6PacketBuilder::new(src_ipv4, dst_ipv6, IpNextLevelProtocol::Icmpv6);
-                ipv6_packet_builder.hop_limit = Some(setting.hop_limit);
-                packet_builder.set_ipv6(ipv6_packet_builder);
-            }
-        },
-    }
-    // ICMP Header
-    match setting.dst_ip {
-        IpAddr::V4(dst_ipv4) => match setting.src_ip {
-            IpAddr::V4(src_ipv4) => {
-                let mut icmp_packet_builder = IcmpPacketBuilder::new(src_ipv4, dst_ipv4);
-                icmp_packet_builder.icmp_type = IcmpType::EchoRequest;
-                packet_builder.set_icmp(icmp_packet_builder);
-            }
-            IpAddr::V6(_) => {}
-        },
-        IpAddr::V6(dst_ipv6) => match setting.src_ip {
-            IpAddr::V4(_) => {}
-            IpAddr::V6(src_ipv6) => {
-                let mut icmpv6_packet_builder = Icmpv6PacketBuilder::new(src_ipv6, dst_ipv6);
-                icmpv6_packet_builder.icmpv6_type = Icmpv6Type::EchoRequest;
-                packet_builder.set_icmpv6(icmpv6_packet_builder);
-            }
-        },
-    }
-    if setting.ip_packet {
-        packet_builder.ip_packet()
-    } else {
-        packet_builder.packet()
-    }
+        })
+        .payload(ip_bytes)
+        .to_bytes()
+        .to_vec()
 }
 
+/// Build ICMP packet. Supports both ICMPv4 and ICMPv6
+pub fn build_icmp_packet(setting: PacketBuildSetting) -> Vec<u8> {
+    let icmp_bytes = match (setting.src_ip, setting.dst_ip) {
+        (IpAddr::V4(src_ipv4), IpAddr::V4(dst_ipv4)) => IcmpPacketBuilder::new(src_ipv4, dst_ipv4)
+            .icmp_type(IcmpType::EchoRequest)
+            .icmp_code(icmp::echo_request::IcmpCodes::NoCode)
+            .echo_fields(0x1234, 0x1)
+            .payload(Bytes::from_static(b"hello"))
+            .to_bytes(),
+        (IpAddr::V6(src_ipv6), IpAddr::V6(dst_ipv6)) => {
+            Icmpv6PacketBuilder::new(src_ipv6, dst_ipv6)
+                .icmpv6_type(Icmpv6Type::EchoRequest)
+                .icmpv6_code(icmpv6::echo_request::Icmpv6Codes::NoCode)
+                .echo_fields(0x1234, 0x1)
+                .payload(Bytes::from_static(b"hello"))
+                .to_bytes()
+        }
+        _ => return Vec::new(),
+    };
+    wrap_transport_packet(&setting, icmp_bytes)
+}
+
+#[allow(dead_code)]
 pub fn build_ip_next_icmp_packet(setting: PacketBuildSetting) -> Vec<u8> {
-    // ICMP Header
-    match setting.dst_ip {
-        IpAddr::V4(dst_ipv4) => match setting.src_ip {
-            IpAddr::V4(src_ipv4) => {
-                let mut icmp_packet_builder = IcmpPacketBuilder::new(src_ipv4, dst_ipv4);
-                icmp_packet_builder.icmp_type = IcmpType::EchoRequest;
-                icmp_packet_builder.build()
-            }
-            IpAddr::V6(_) => Vec::new(),
-        },
-        IpAddr::V6(dst_ipv6) => match setting.src_ip {
-            IpAddr::V4(_) => Vec::new(),
-            IpAddr::V6(src_ipv6) => {
-                let mut icmpv6_packet_builder = Icmpv6PacketBuilder::new(src_ipv6, dst_ipv6);
-                icmpv6_packet_builder.icmpv6_type = Icmpv6Type::EchoRequest;
-                icmpv6_packet_builder.build()
-            }
-        },
+    match (setting.src_ip, setting.dst_ip) {
+        (IpAddr::V4(src_ipv4), IpAddr::V4(dst_ipv4)) => IcmpPacketBuilder::new(src_ipv4, dst_ipv4)
+            .icmp_type(IcmpType::EchoRequest)
+            .icmp_code(icmp::echo_request::IcmpCodes::NoCode)
+            .echo_fields(0x1234, 0x1)
+            .payload(Bytes::from_static(b"hello"))
+            .to_bytes()
+            .to_vec(),
+        (IpAddr::V6(src_ipv6), IpAddr::V6(dst_ipv6)) => {
+            Icmpv6PacketBuilder::new(src_ipv6, dst_ipv6)
+                .icmpv6_type(Icmpv6Type::EchoRequest)
+                .icmpv6_code(icmpv6::echo_request::Icmpv6Codes::NoCode)
+                .echo_fields(0x1234, 0x1)
+                .payload(Bytes::from_static(b"hello"))
+                .to_bytes()
+                .to_vec()
+        }
+        _ => Vec::new(),
     }
 }

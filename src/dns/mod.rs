@@ -1,16 +1,16 @@
-use std::net::IpAddr;
-use std::time::Duration;
-
-#[cfg(not(any(unix, target_os = "windows")))]
-use hickory_resolver::config::{ResolverConfig, ResolverOpts};
-use hickory_resolver::Resolver;
-
-use futures::stream::{self, StreamExt};
-
-use hickory_resolver::AsyncResolver;
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::str::FromStr;
 use std::thread;
+use std::time::Duration;
+
+use futures::stream::{self, StreamExt};
+use hickory_resolver::TokioResolver;
+
+#[cfg(not(any(unix, target_os = "windows")))]
+use hickory_resolver::config::ResolverConfig;
+#[cfg(not(any(unix, target_os = "windows")))]
+use hickory_resolver::name_server::TokioConnectionProvider;
 
 #[cfg(not(target_os = "windows"))]
 const DEFAULT_TIMEOUT: Duration = Duration::from_millis(200);
@@ -20,6 +20,24 @@ const DEFAULT_TIMEOUT_GLOBAL: Duration = Duration::from_millis(1000);
 const DEFAULT_TIMEOUT: Duration = Duration::from_millis(20);
 #[cfg(target_os = "windows")]
 const DEFAULT_TIMEOUT_GLOBAL: Duration = Duration::from_millis(1000);
+
+#[cfg(any(unix, target_os = "windows"))]
+fn get_resolver() -> Option<TokioResolver> {
+    TokioResolver::builder_tokio()
+        .ok()
+        .map(|resolver| resolver.build())
+}
+
+#[cfg(not(any(unix, target_os = "windows")))]
+fn get_resolver() -> Option<TokioResolver> {
+    Some(
+        TokioResolver::builder_with_config(
+            ResolverConfig::default(),
+            TokioConnectionProvider::default(),
+        )
+        .build(),
+    )
+}
 
 pub fn lookup_host_name(host_name: &str) -> Option<IpAddr> {
     let ip_vec: Vec<IpAddr> = resolve_domain(host_name.to_string());
@@ -34,8 +52,8 @@ pub fn lookup_host_name(host_name: &str) -> Option<IpAddr> {
             }
         }
     }
-    if ipv6_vec.len() > 0 {
-        return Some(ipv6_vec[0]);
+    if !ipv6_vec.is_empty() {
+        Some(ipv6_vec[0])
     } else {
         None
     }
@@ -54,8 +72,8 @@ pub async fn lookup_host_name_async(host_name: String) -> Option<IpAddr> {
             }
         }
     }
-    if ipv6_vec.len() > 0 {
-        return Some(ipv6_vec[0]);
+    if !ipv6_vec.is_empty() {
+        Some(ipv6_vec[0])
     } else {
         None
     }
@@ -63,206 +81,81 @@ pub async fn lookup_host_name_async(host_name: String) -> Option<IpAddr> {
 
 pub fn lookup_ip_addr(ip_addr: &IpAddr) -> Option<String> {
     let names: Vec<String> = resolve_ip(ip_addr);
-    if names.len() > 0 {
-        return Some(names[0].clone());
+    if !names.is_empty() {
+        Some(names[0].clone())
     } else {
-        return None;
+        None
     }
 }
 
 pub async fn lookup_ip_addr_async(ip_addr: String) -> String {
     let ips: Vec<String> = resolve_ip_async(ip_addr).await;
-    if ips.len() > 0 {
-        return ips[0].clone();
+    if !ips.is_empty() {
+        ips[0].clone()
     } else {
-        return String::new();
+        String::new()
     }
 }
 
-#[cfg(any(unix, target_os = "windows"))]
 fn resolve_domain(host_name: String) -> Vec<IpAddr> {
-    let mut ips: Vec<IpAddr> = vec![];
-    let resolver = Resolver::from_system_conf().unwrap();
-    match resolver.lookup_ip(host_name) {
-        Ok(lip) => {
-            for ip in lip.iter() {
-                ips.push(ip);
-            }
-        }
-        Err(_) => {}
-    }
-    ips
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return Vec::new(),
+    };
+    rt.block_on(resolve_domain_async(host_name))
 }
 
-#[cfg(not(any(unix, target_os = "windows")))]
-fn resolve_domain(host_name: String) -> Vec<IpAddr> {
-    let mut ips: Vec<IpAddr> = vec![];
-    let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
-    match resolver.lookup_ip(host_name) {
-        Ok(lip) => {
-            for ip in lip.iter() {
-                ips.push(ip);
-            }
-        }
-        Err(_) => {}
-    }
-    ips
-}
-
-#[cfg(any(unix, target_os = "windows"))]
 fn resolve_ip(ip_addr: &IpAddr) -> Vec<String> {
-    let mut names: Vec<String> = vec![];
-    let mut system_conf = hickory_resolver::system_conf::read_system_conf().unwrap();
-    if crate::ip::is_global_addr(ip_addr) {
-        system_conf.1.timeout = DEFAULT_TIMEOUT_GLOBAL;
-    } else {
-        system_conf.1.timeout = DEFAULT_TIMEOUT;
-    }
-    let resolver = Resolver::new(system_conf.0, system_conf.1).unwrap();
-    match resolver.reverse_lookup(*ip_addr) {
-        Ok(rlookup) => {
-            for record in rlookup.as_lookup().record_iter() {
-                match record.data() {
-                    Some(data) => {
-                        let name = data.to_string();
-                        if name.ends_with(".") {
-                            names.push(name[0..name.len() - 1].to_string());
-                        } else {
-                            names.push(name);
-                        }
-                    }
-                    None => {}
-                }
-            }
-            names
-        }
-        Err(_) => {
-            return names;
-        }
-    }
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return Vec::new(),
+    };
+    rt.block_on(resolve_ip_async(ip_addr.to_string()))
 }
 
-#[cfg(not(any(unix, target_os = "windows")))]
-fn resolve_ip(ip_addr: IpAddr) -> Vec<String> {
-    let mut names: Vec<String> = vec![];
-    let resolver = Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
-    match resolver.reverse_lookup(ip_addr) {
-        Ok(rlookup) => {
-            for record in rlookup.as_lookup().record_iter() {
-                match record.data() {
-                    Some(data) => {
-                        let name = data.to_string();
-                        if name.ends_with(".") {
-                            names.push(name[0..name.len() - 1].to_string());
-                        } else {
-                            names.push(name);
-                        }
-                    }
-                    None => {}
-                }
-            }
-            names
-        }
-        Err(_) => {
-            return names;
-        }
-    }
-}
-
-#[cfg(any(unix, target_os = "windows"))]
 async fn resolve_domain_async(host_name: String) -> Vec<IpAddr> {
     let mut ips: Vec<IpAddr> = vec![];
-    let resolver = AsyncResolver::tokio_from_system_conf().unwrap();
-    match resolver.lookup_ip(host_name).await {
-        Ok(lip) => {
-            for ip in lip.iter() {
-                ips.push(ip);
-            }
+    let Some(resolver) = get_resolver() else {
+        return ips;
+    };
+
+    if let Ok(lip) = resolver.lookup_ip(host_name).await {
+        for ip in lip.iter() {
+            ips.push(ip);
         }
-        Err(_) => {}
     }
     ips
 }
 
-#[cfg(not(any(unix, target_os = "windows")))]
-async fn resolve_domain_async(host_name: String) -> Vec<IpAddr> {
-    let mut ips: Vec<IpAddr> = vec![];
-    let resolver =
-        AsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default()).unwrap();
-    match resolver.lookup_ip(host_name).await {
-        Ok(lip) => {
-            for ip in lip.iter() {
-                ips.push(ip);
-            }
-        }
-        Err(_) => {}
-    }
-    ips
-}
-
-#[cfg(any(unix, target_os = "windows"))]
 async fn resolve_ip_async(ip_addr: String) -> Vec<String> {
-    let ip_addr: IpAddr = IpAddr::from_str(ip_addr.as_str()).unwrap();
+    let ip_addr: IpAddr = match IpAddr::from_str(ip_addr.as_str()) {
+        Ok(ip) => ip,
+        Err(_) => return Vec::new(),
+    };
     let mut names: Vec<String> = vec![];
-    let mut system_conf = hickory_resolver::system_conf::read_system_conf().unwrap();
-    if crate::ip::is_global_addr(&ip_addr) {
-        system_conf.1.timeout = DEFAULT_TIMEOUT_GLOBAL;
+    let Some(resolver) = get_resolver() else {
+        return names;
+    };
+
+    let timeout = if crate::ip::is_global_addr(&ip_addr) {
+        DEFAULT_TIMEOUT_GLOBAL
     } else {
-        system_conf.1.timeout = DEFAULT_TIMEOUT;
-    }
-    let resolver = AsyncResolver::tokio(system_conf.0, system_conf.1);
-    match resolver.reverse_lookup(ip_addr).await {
-        Ok(rlookup) => {
-            for record in rlookup.as_lookup().record_iter() {
-                match record.data() {
-                    Some(data) => {
-                        let name = data.to_string();
-                        if name.ends_with(".") {
-                            names.push(name[0..name.len() - 1].to_string());
-                        } else {
-                            names.push(name);
-                        }
-                    }
-                    None => {}
-                }
-            }
-            names
-        }
-        Err(_) => {
-            return names;
-        }
-    }
-}
+        DEFAULT_TIMEOUT
+    };
 
-#[cfg(not(any(unix, target_os = "windows")))]
-async fn resolve_ip_async(ip_addr: String) -> Vec<String> {
-    let mut names: Vec<String> = vec![];
-    let resolver =
-        AsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default()).unwrap();
-    match resolver
-        .reverse_lookup(IpAddr::from_str(ip_addr.as_str()).unwrap())
-        .await
-    {
-        Ok(rlookup) => {
-            for record in rlookup.as_lookup().record_iter() {
-                match record.data() {
-                    Some(data) => {
-                        let name = data.to_string();
-                        if name.ends_with(".") {
-                            names.push(name[0..name.len() - 1].to_string());
-                        } else {
-                            names.push(name);
-                        }
-                    }
-                    None => {}
-                }
+    let lookup_result = tokio::time::timeout(timeout, resolver.reverse_lookup(ip_addr)).await;
+    if let Ok(Ok(rlookup)) = lookup_result {
+        for name in rlookup.iter() {
+            let s = name.to_string();
+            if let Some(trimmed) = s.strip_suffix('.') {
+                names.push(trimmed.to_string());
+            } else {
+                names.push(s);
             }
-            names
-        }
-        Err(_) => {
-            return names;
         }
     }
+
+    names
 }
 
 pub async fn lookup_ips_async(ips: Vec<IpAddr>) -> HashMap<IpAddr, String> {

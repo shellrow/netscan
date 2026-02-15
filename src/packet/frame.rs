@@ -53,7 +53,7 @@ impl PacketFrame {
             packet_frame.tcp_header = transport.tcp.clone();
             packet_frame.udp_header = transport.udp.clone();
         }
-        packet_frame.payload = frame.payload.clone();
+        packet_frame.payload = frame.payload.to_vec();
         packet_frame
     }
 }

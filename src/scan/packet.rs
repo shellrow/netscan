@@ -61,6 +61,7 @@ pub(crate) fn build_hostscan_packet(
     }
 }
 
+#[allow(dead_code)]
 pub(crate) fn build_hostscan_ip_next_packet(
     interface: &Interface,
     target_host: &Host,
@@ -159,6 +160,7 @@ pub(crate) fn build_portscan_packet(
     crate::packet::tcp::build_tcp_syn_packet(build_setting)
 }
 
+#[allow(dead_code)]
 pub(crate) fn build_portscan_ip_next_packet(
     interface: &Interface,
     target_ip_addr: IpAddr,

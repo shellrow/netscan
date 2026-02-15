@@ -20,7 +20,7 @@ with the aim of being lightweight and fast.
 Add `netscan` to your dependencies  
 ```toml:Cargo.toml
 [dependencies]
-netscan = "0.29"
+netscan = "0.30"
 ```
 
 ## Example
@@ -32,7 +32,7 @@ See [Examples][examples-url]
 - Windows
 
 ## Privileges
-This library requires the ability to create raw sockets.  Execute with administrator privileges.  
+This library requires the ability to create raw sockets. Execute with administrator privileges.  
 
 ## Note for Windows Users
 If you are using Windows, please consider the following points before building and running:
