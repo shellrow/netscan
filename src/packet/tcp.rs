@@ -1,86 +1,85 @@
 use crate::packet::setting::PacketBuildSetting;
+use bytes::Bytes;
+use nex::packet::builder::ethernet::EthernetPacketBuilder;
+use nex::packet::builder::ipv4::Ipv4PacketBuilder;
+use nex::packet::builder::ipv6::Ipv6PacketBuilder;
+use nex::packet::builder::tcp::TcpPacketBuilder;
 use nex::packet::ethernet::EtherType;
-use nex::packet::ip::IpNextLevelProtocol;
-use nex::packet::tcp::{TcpFlags, TcpOption};
-use nex::util::packet_builder::{
-    builder::PacketBuilder, ethernet::EthernetPacketBuilder, ipv4::Ipv4PacketBuilder,
-    ipv6::Ipv6PacketBuilder, tcp::TcpPacketBuilder,
-};
-use std::net::{IpAddr, SocketAddr};
+use nex::packet::ip::IpNextProtocol;
+use nex::packet::tcp::{TcpFlags, TcpOptionPacket};
+use std::net::IpAddr;
+
+fn wrap_transport_packet(setting: &PacketBuildSetting, transport_bytes: Bytes) -> Vec<u8> {
+    let ip_bytes = match (setting.src_ip, setting.dst_ip) {
+        (IpAddr::V4(src_ipv4), IpAddr::V4(dst_ipv4)) => Ipv4PacketBuilder::new()
+            .source(src_ipv4)
+            .destination(dst_ipv4)
+            .ttl(setting.hop_limit)
+            .protocol(IpNextProtocol::Tcp)
+            .payload(transport_bytes)
+            .to_bytes(),
+        (IpAddr::V6(src_ipv6), IpAddr::V6(dst_ipv6)) => Ipv6PacketBuilder::new()
+            .source(src_ipv6)
+            .destination(dst_ipv6)
+            .hop_limit(setting.hop_limit)
+            .next_header(IpNextProtocol::Tcp)
+            .payload(transport_bytes)
+            .to_bytes(),
+        _ => return Vec::new(),
+    };
+
+    if setting.ip_packet {
+        return ip_bytes.to_vec();
+    }
+
+    EthernetPacketBuilder::new()
+        .source(setting.src_mac)
+        .destination(setting.dst_mac)
+        .ethertype(match setting.dst_ip {
+            IpAddr::V4(_) => EtherType::Ipv4,
+            IpAddr::V6(_) => EtherType::Ipv6,
+        })
+        .payload(ip_bytes)
+        .to_bytes()
+        .to_vec()
+}
 
 /// Build TCP SYN packet with default options
 pub fn build_tcp_syn_packet(setting: PacketBuildSetting) -> Vec<u8> {
-    let mut packet_builder = PacketBuilder::new();
-    let ethernet_packet_builder = EthernetPacketBuilder {
-        src_mac: setting.src_mac,
-        dst_mac: setting.dst_mac,
-        ether_type: match setting.dst_ip {
-            IpAddr::V4(_) => EtherType::Ipv4,
-            IpAddr::V6(_) => EtherType::Ipv6,
-        },
-    };
-    packet_builder.set_ethernet(ethernet_packet_builder);
-    match setting.src_ip {
-        IpAddr::V4(src_ipv4) => match setting.dst_ip {
-            IpAddr::V4(dst_ipv4) => {
-                let mut ipv4_packet_builder =
-                    Ipv4PacketBuilder::new(src_ipv4, dst_ipv4, IpNextLevelProtocol::Tcp);
-                ipv4_packet_builder.total_length = Some(64);
-                ipv4_packet_builder.ttl = Some(setting.hop_limit);
-                packet_builder.set_ipv4(ipv4_packet_builder);
-            }
-            IpAddr::V6(_) => {}
-        },
-        IpAddr::V6(src_ipv6) => match setting.dst_ip {
-            IpAddr::V4(_) => {}
-            IpAddr::V6(dst_ipv6) => {
-                let mut ipv6_packet_builder =
-                    Ipv6PacketBuilder::new(src_ipv6, dst_ipv6, IpNextLevelProtocol::Tcp);
-                ipv6_packet_builder.payload_length = Some(44);
-                ipv6_packet_builder.hop_limit = Some(setting.hop_limit);
-                packet_builder.set_ipv6(ipv6_packet_builder);
-            }
-        },
-    }
-    let mut tcp_packet_builder = TcpPacketBuilder::new(
-        SocketAddr::new(setting.src_ip, setting.src_port),
-        SocketAddr::new(setting.dst_ip, setting.dst_port),
-    );
-    tcp_packet_builder.flags = TcpFlags::SYN;
-    tcp_packet_builder.window = 65535;
-    tcp_packet_builder.options = vec![
-        TcpOption::mss(1460),
-        TcpOption::nop(),
-        TcpOption::wscale(6),
-        TcpOption::nop(),
-        TcpOption::nop(),
-        TcpOption::timestamp(u32::MAX, u32::MIN),
-        TcpOption::sack_perm(),
-    ];
-    packet_builder.set_tcp(tcp_packet_builder);
-
-    if setting.ip_packet {
-        packet_builder.ip_packet()
-    } else {
-        packet_builder.packet()
-    }
+    let tcp_bytes = TcpPacketBuilder::new(setting.src_ip, setting.dst_ip)
+        .source(setting.src_port)
+        .destination(setting.dst_port)
+        .flags(TcpFlags::SYN)
+        .window(65535)
+        .options(vec![
+            TcpOptionPacket::mss(1460),
+            TcpOptionPacket::nop(),
+            TcpOptionPacket::wscale(6),
+            TcpOptionPacket::nop(),
+            TcpOptionPacket::nop(),
+            TcpOptionPacket::timestamp(u32::MAX, u32::MIN),
+            TcpOptionPacket::sack_perm(),
+        ])
+        .to_bytes();
+    wrap_transport_packet(&setting, tcp_bytes)
 }
 
+#[allow(dead_code)]
 pub fn build_ip_next_tcp_syn_packet(setting: PacketBuildSetting) -> Vec<u8> {
-    let mut tcp_packet_builder = TcpPacketBuilder::new(
-        SocketAddr::new(setting.src_ip, setting.src_port),
-        SocketAddr::new(setting.dst_ip, setting.dst_port),
-    );
-    tcp_packet_builder.flags = TcpFlags::SYN;
-    tcp_packet_builder.window = 65535;
-    tcp_packet_builder.options = vec![
-        TcpOption::mss(1460),
-        TcpOption::nop(),
-        TcpOption::wscale(6),
-        TcpOption::nop(),
-        TcpOption::nop(),
-        TcpOption::timestamp(u32::MAX, u32::MIN),
-        TcpOption::sack_perm(),
-    ];
-    tcp_packet_builder.build()
+    TcpPacketBuilder::new(setting.src_ip, setting.dst_ip)
+        .source(setting.src_port)
+        .destination(setting.dst_port)
+        .flags(TcpFlags::SYN)
+        .window(65535)
+        .options(vec![
+            TcpOptionPacket::mss(1460),
+            TcpOptionPacket::nop(),
+            TcpOptionPacket::wscale(6),
+            TcpOptionPacket::nop(),
+            TcpOptionPacket::nop(),
+            TcpOptionPacket::timestamp(u32::MAX, u32::MIN),
+            TcpOptionPacket::sack_perm(),
+        ])
+        .to_bytes()
+        .to_vec()
 }

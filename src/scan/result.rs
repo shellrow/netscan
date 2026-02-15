@@ -1,5 +1,5 @@
-use netdev::mac::MacAddr;
 use netdev::Interface;
+use netdev::MacAddr;
 use nex::packet::tcp::TcpFlags;
 
 use crate::host::{Host, Port, PortStatus};

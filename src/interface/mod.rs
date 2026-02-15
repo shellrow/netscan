@@ -1,4 +1,4 @@
-use netdev::interface::Interface;
+use netdev::Interface;
 use std::collections::HashSet;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 

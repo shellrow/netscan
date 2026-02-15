@@ -5,7 +5,7 @@ use crate::pcap::PacketCaptureOptions;
 use crate::scan::setting::{HostScanSetting, PortScanSetting};
 use netdev::Interface;
 use nex::datalink::RawSender;
-use nex::packet::ip::IpNextLevelProtocol;
+use nex::packet::ip::IpNextProtocol;
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::sync::mpsc::Sender;
@@ -140,17 +140,11 @@ pub(crate) fn scan_hosts(
     }
     match scan_setting.scan_type {
         HostScanType::IcmpPingScan => {
-            capture_options
-                .ip_protocols
-                .insert(IpNextLevelProtocol::Icmp);
-            capture_options
-                .ip_protocols
-                .insert(IpNextLevelProtocol::Icmpv6);
+            capture_options.ip_protocols.insert(IpNextProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextProtocol::Icmpv6);
         }
         HostScanType::TcpPingScan => {
-            capture_options
-                .ip_protocols
-                .insert(IpNextLevelProtocol::Tcp);
+            capture_options.ip_protocols.insert(IpNextProtocol::Tcp);
             for target in scan_setting.targets.clone() {
                 for port in target.ports {
                     capture_options.src_ports.insert(port.number);
@@ -158,15 +152,9 @@ pub(crate) fn scan_hosts(
             }
         }
         HostScanType::UdpPingScan => {
-            capture_options
-                .ip_protocols
-                .insert(IpNextLevelProtocol::Udp);
-            capture_options
-                .ip_protocols
-                .insert(IpNextLevelProtocol::Icmp);
-            capture_options
-                .ip_protocols
-                .insert(IpNextLevelProtocol::Icmpv6);
+            capture_options.ip_protocols.insert(IpNextProtocol::Udp);
+            capture_options.ip_protocols.insert(IpNextProtocol::Icmp);
+            capture_options.ip_protocols.insert(IpNextProtocol::Icmpv6);
         }
     }
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
@@ -272,14 +260,10 @@ pub(crate) fn scan_ports(
     }
     match scan_setting.scan_type {
         PortScanType::TcpSynScan => {
-            capture_options
-                .ip_protocols
-                .insert(IpNextLevelProtocol::Tcp);
+            capture_options.ip_protocols.insert(IpNextProtocol::Tcp);
         }
         PortScanType::TcpConnectScan => {
-            capture_options
-                .ip_protocols
-                .insert(IpNextLevelProtocol::Tcp);
+            capture_options.ip_protocols.insert(IpNextProtocol::Tcp);
         }
     }
     let stop: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));

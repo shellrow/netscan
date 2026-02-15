@@ -4,7 +4,7 @@ use crate::packet::frame::PacketFrame;
 use nex::datalink::RawReceiver;
 use nex::packet::frame::Frame;
 use nex::packet::frame::ParseOption;
-use nex::packet::{ethernet::EtherType, ip::IpNextLevelProtocol};
+use nex::packet::{ethernet::EtherType, ip::IpNextProtocol};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -27,7 +27,7 @@ pub struct PacketCaptureOptions {
     /// Ether types to filter. If empty, all ether types will be captured
     pub ether_types: HashSet<EtherType>,
     /// IP protocols to filter. If empty, all IP protocols will be captured
-    pub ip_protocols: HashSet<IpNextLevelProtocol>,
+    pub ip_protocols: HashSet<IpNextProtocol>,
     /// Capture duration limit
     pub capture_timeout: Duration,
     /// Use TUN interface
@@ -61,14 +61,15 @@ pub fn start_capture(
                     parse_option.from_ip_packet = true;
                     parse_option.offset = payload_offset;
                 }
-                let frame: Frame = Frame::from_bytes(&packet, parse_option);
-                if filter_packet(&frame, &capture_options) {
-                    let packet_frame = PacketFrame::from_nex_frame(&frame);
-                    frames.push(packet_frame);
-                    /* match msg_tx.send(packet_frame) {
-                        Ok(_) => {}
-                        Err(_) => {}
-                    } */
+                if let Some(frame) = Frame::from_buf(&packet, parse_option) {
+                    if filter_packet(&frame, &capture_options) {
+                        let packet_frame = PacketFrame::from_nex_frame(&frame);
+                        frames.push(packet_frame);
+                        /* match msg_tx.send(packet_frame) {
+                            Ok(_) => {}
+                            Err(_) => {}
+                        } */
+                    }
                 }
             }
             Err(_) => {}
@@ -131,7 +132,7 @@ pub fn start_capture(
                     parse_option.from_ip_packet = true;
                     parse_option.offset = payload_offset;
                 }
-                let frame: Frame = Frame::from_bytes(&packet, parse_option);
+                let frame: Frame = Frame::from_buf(&packet, parse_option);
                 if filter_packet(&frame, &capture_options) {
                     let packet_frame = PacketFrame::from_nex_frame(&frame);
                     frames.push(packet_frame);
@@ -248,10 +249,7 @@ fn filter_ether_type(ether_type: EtherType, capture_options: &PacketCaptureOptio
     }
 }
 
-fn filter_ip_protocol(
-    protocol: IpNextLevelProtocol,
-    capture_options: &PacketCaptureOptions,
-) -> bool {
+fn filter_ip_protocol(protocol: IpNextProtocol, capture_options: &PacketCaptureOptions) -> bool {
     if capture_options.ip_protocols.len() == 0 || capture_options.ip_protocols.contains(&protocol) {
         return true;
     } else {
