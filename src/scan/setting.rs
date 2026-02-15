@@ -3,7 +3,9 @@ use crate::protocol::Protocol;
 use crate::scan::payload::PayloadBuilder;
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
+use std::fmt;
 use std::net::{IpAddr, Ipv4Addr};
+use std::str::FromStr;
 use std::time::Duration;
 
 use crate::config::{DEFAULT_HOSTS_CONCURRENCY, DEFAULT_PORTS_CONCURRENCY};
@@ -21,7 +23,7 @@ pub enum ScanType {
  */
 
 /// Port Scan Type
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum PortScanType {
     /// Default fast port scan type.
     ///
@@ -35,16 +37,30 @@ pub enum PortScanType {
 
 impl PortScanType {
     pub fn from_str(scan_type: &str) -> PortScanType {
-        match scan_type {
-            "SYN" | "TCP-SYN" | "TCP_SYN" => PortScanType::TcpSynScan,
-            "CONNECT" | "TCP-CONNECT" | "TCP_CONNECT" => PortScanType::TcpConnectScan,
-            _ => PortScanType::TcpSynScan,
-        }
+        scan_type.parse().unwrap_or(PortScanType::TcpSynScan)
     }
     pub fn to_str(&self) -> &str {
         match self {
             PortScanType::TcpSynScan => "TCP-SYN",
             PortScanType::TcpConnectScan => "TCP-CONNECT",
+        }
+    }
+}
+
+impl fmt::Display for PortScanType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+impl FromStr for PortScanType {
+    type Err = ();
+
+    fn from_str(scan_type: &str) -> Result<Self, Self::Err> {
+        match scan_type {
+            "SYN" | "TCP-SYN" | "TCP_SYN" => Ok(PortScanType::TcpSynScan),
+            "CONNECT" | "TCP-CONNECT" | "TCP_CONNECT" => Ok(PortScanType::TcpConnectScan),
+            _ => Err(()),
         }
     }
 }
@@ -150,7 +166,7 @@ impl PortScanSetting {
 }
 
 /// Host Scan Type
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum HostScanType {
     /// Default host scan type.
     ///
@@ -167,18 +183,32 @@ pub enum HostScanType {
 
 impl HostScanType {
     pub fn from_str(scan_type: &str) -> HostScanType {
-        match scan_type {
-            "ICMP" | "ICMP-PING" | "ICMP_PING" => HostScanType::IcmpPingScan,
-            "TCP" | "TCP-PING" | "TCP_PING" => HostScanType::TcpPingScan,
-            "UDP" | "UDP-PING" | "UDP_PING" => HostScanType::UdpPingScan,
-            _ => HostScanType::IcmpPingScan,
-        }
+        scan_type.parse().unwrap_or(HostScanType::IcmpPingScan)
     }
     pub fn to_str(&self) -> &str {
         match self {
             HostScanType::IcmpPingScan => "ICMP-PING",
             HostScanType::TcpPingScan => "TCP-PING",
             HostScanType::UdpPingScan => "UDP-PING",
+        }
+    }
+}
+
+impl fmt::Display for HostScanType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.to_str())
+    }
+}
+
+impl FromStr for HostScanType {
+    type Err = ();
+
+    fn from_str(scan_type: &str) -> Result<Self, Self::Err> {
+        match scan_type {
+            "ICMP" | "ICMP-PING" | "ICMP_PING" => Ok(HostScanType::IcmpPingScan),
+            "TCP" | "TCP-PING" | "TCP_PING" => Ok(HostScanType::TcpPingScan),
+            "UDP" | "UDP-PING" | "UDP_PING" => Ok(HostScanType::UdpPingScan),
+            _ => Err(()),
         }
     }
 }

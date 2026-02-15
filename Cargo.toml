@@ -17,14 +17,12 @@ name = "netscan"
 anyhow = { version = "1" }
 netdev = "0.40.0"
 nex = { version = "0.25.0" }
-async-io = "2.4"
-futures-lite = "2.6"
 futures = {version = "0.3", features = ["executor", "thread-pool"]}
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-native-certs = "0.7"
 rustls-pemfile = "2.1"
 rustls-pki-types = "1.8"
-tokio = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net", "io-util"] }
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring"]} 
 hickory-resolver = "0.25"
 phf = { version = "0.11", features = ["macros"] }

@@ -121,40 +121,33 @@ pub async fn try_connect_ports(
     }
 }
 
-pub fn run_connect_scan(
+pub async fn run_connect_scan(
     scan_setting: PortScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
 ) -> ScanResult {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let result = rt.block_on(async {
-        let start_time = std::time::Instant::now();
-        let mut tasks = vec![];
-        for target in scan_setting.targets {
-            let ptx = ptx.clone();
-            tasks.push(tokio::spawn(async move {
-                let host =
-                    try_connect_ports(target, scan_setting.concurrency, scan_setting.timeout, &ptx)
-                        .await;
-                host
-            }));
-        }
-        let mut hosts: Vec<Host> = vec![];
-        for task in tasks {
-            match task.await {
-                Ok(host) => {
-                    hosts.push(host);
-                }
-                Err(e) => {
-                    println!("error: {}", e);
-                }
+    let start_time = std::time::Instant::now();
+    let mut tasks = vec![];
+    for target in scan_setting.targets {
+        let ptx = ptx.clone();
+        tasks.push(tokio::spawn(async move {
+            try_connect_ports(target, scan_setting.concurrency, scan_setting.timeout, &ptx).await
+        }));
+    }
+    let mut hosts: Vec<Host> = vec![];
+    for task in tasks {
+        match task.await {
+            Ok(host) => {
+                hosts.push(host);
+            }
+            Err(e) => {
+                println!("error: {}", e);
             }
         }
-        let mut result = ScanResult::new();
-        result.hosts = hosts;
-        result.scan_time = start_time.elapsed();
-        result.scan_status = crate::scan::result::ScanStatus::Done;
-        result
-    });
+    }
+    let mut result = ScanResult::new();
+    result.hosts = hosts;
+    result.scan_time = start_time.elapsed();
+    result.scan_status = crate::scan::result::ScanStatus::Done;
     result
 }
 
