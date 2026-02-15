@@ -1,4 +1,4 @@
-use phf::{phf_map, Map};
+use phf::{Map, phf_map};
 
 pub(crate) static PORT_SERVICE_MAP: Map<u16, &'static str> = phf_map! {
     1u16 => "tcpmux",

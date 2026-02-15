@@ -15,7 +15,7 @@ use std::time::Duration;
 
 use super::packet::{build_hostscan_packet, build_portscan_packet};
 use super::result::{
-    parse_hostscan_result, parse_portscan_result, ScanError, ScanResult, ScanStatus,
+    ScanError, ScanResult, ScanStatus, parse_hostscan_result, parse_portscan_result,
 };
 use super::setting::{HostScanType, PortScanType};
 

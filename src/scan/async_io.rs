@@ -1,7 +1,7 @@
 use futures::future::poll_fn;
 use futures::stream::{self, StreamExt};
 use netdev::Interface;
-use nex::datalink::async_io::{async_channel, AsyncChannel, AsyncRawSender};
+use nex::datalink::async_io::{AsyncChannel, AsyncRawSender, async_channel};
 use nex::socket::tcp::AsyncTcpSocket;
 use std::net::SocketAddr;
 use std::sync::mpsc::{self, Sender};
@@ -21,7 +21,7 @@ use nex::packet::ip::IpNextProtocol;
 use std::collections::HashSet;
 use tokio::time::sleep;
 
-use super::result::{parse_hostscan_result, parse_portscan_result, ScanError, ScanStatus};
+use super::result::{ScanError, ScanStatus, parse_hostscan_result, parse_portscan_result};
 use super::setting::{HostScanType, PortScanType};
 
 pub(crate) async fn send_portscan_packets(

@@ -92,7 +92,7 @@ async fn probe_port(
                         port,
                         service_name,
                         ServiceProbeError::ConnectionError(e.to_string()),
-                    )
+                    );
                 }
             },
             Err(elapsed) => {
@@ -100,7 +100,7 @@ async fn probe_port(
                     port,
                     service_name,
                     ServiceProbeError::ConnectionError(elapsed.to_string()),
-                )
+                );
             }
         };
     if let Some(payload) = payload_info {
@@ -114,7 +114,7 @@ async fn probe_port(
                                 port,
                                 service_name,
                                 ServiceProbeError::WriteError(e.to_string()),
-                            )
+                            );
                         }
                     }
                     match read_response_timeout(&mut tcp_stream, read_timeout).await {
@@ -129,7 +129,7 @@ async fn probe_port(
                                 port,
                                 service_name,
                                 ServiceProbeError::ReadError(e.to_string()),
-                            )
+                            );
                         }
                     }
                 }
@@ -138,7 +138,7 @@ async fn probe_port(
                         port,
                         service_name,
                         ServiceProbeError::WriteError(e.to_string()),
-                    )
+                    );
                 }
             },
             PayloadType::Https => {
@@ -156,7 +156,7 @@ async fn probe_port(
                             port,
                             service_name,
                             ServiceProbeError::ConnectionError(e.to_string()),
-                        )
+                        );
                     }
                 };
                 let mut tls_stream = match tokio::time::timeout(
@@ -172,7 +172,7 @@ async fn probe_port(
                                 port,
                                 service_name,
                                 ServiceProbeError::ConnectionError(e.to_string()),
-                            )
+                            );
                         }
                     },
                     Err(elapsed) => {
@@ -180,7 +180,7 @@ async fn probe_port(
                             port,
                             service_name,
                             ServiceProbeError::ConnectionError(elapsed.to_string()),
-                        )
+                        );
                     }
                 };
                 match tls_stream.write_all(&payload.payload).await {
@@ -192,7 +192,7 @@ async fn probe_port(
                                     port,
                                     service_name,
                                     ServiceProbeError::WriteError(e.to_string()),
-                                )
+                                );
                             }
                         }
                         match read_response_timeout(&mut tls_stream, read_timeout).await {
@@ -207,7 +207,7 @@ async fn probe_port(
                                     port,
                                     service_name,
                                     ServiceProbeError::ReadError(e.to_string()),
-                                )
+                                );
                             }
                         }
                     }
@@ -216,7 +216,7 @@ async fn probe_port(
                             port,
                             service_name,
                             ServiceProbeError::WriteError(e.to_string()),
-                        )
+                        );
                     }
                 }
             }
@@ -229,7 +229,7 @@ async fn probe_port(
                                 port,
                                 service_name,
                                 ServiceProbeError::WriteError(e.to_string()),
-                            )
+                            );
                         }
                     }
                     match read_response_timeout(&mut tcp_stream, read_timeout).await {
@@ -248,7 +248,7 @@ async fn probe_port(
                                 port,
                                 service_name,
                                 ServiceProbeError::ReadError(e.to_string()),
-                            )
+                            );
                         }
                     }
                 }
@@ -257,7 +257,7 @@ async fn probe_port(
                         port,
                         service_name,
                         ServiceProbeError::WriteError(e.to_string()),
-                    )
+                    );
                 }
             },
             PayloadType::CommonTls => {
@@ -275,7 +275,7 @@ async fn probe_port(
                             port,
                             service_name,
                             ServiceProbeError::ConnectionError(e.to_string()),
-                        )
+                        );
                     }
                 };
                 let mut tls_stream = match tokio::time::timeout(
@@ -291,7 +291,7 @@ async fn probe_port(
                                 port,
                                 service_name,
                                 ServiceProbeError::ConnectionError(e.to_string()),
-                            )
+                            );
                         }
                     },
                     Err(elapsed) => {
@@ -299,7 +299,7 @@ async fn probe_port(
                             port,
                             service_name,
                             ServiceProbeError::ConnectionError(elapsed.to_string()),
-                        )
+                        );
                     }
                 };
                 match tls_stream.write_all(&payload.payload).await {
@@ -311,7 +311,7 @@ async fn probe_port(
                                     port,
                                     service_name,
                                     ServiceProbeError::WriteError(e.to_string()),
-                                )
+                                );
                             }
                         }
                         match read_response_timeout(&mut tls_stream, read_timeout).await {
@@ -328,7 +328,7 @@ async fn probe_port(
                                     port,
                                     service_name,
                                     ServiceProbeError::ReadError(e.to_string()),
-                                )
+                                );
                             }
                         }
                     }
@@ -337,7 +337,7 @@ async fn probe_port(
                             port,
                             service_name,
                             ServiceProbeError::WriteError(e.to_string()),
-                        )
+                        );
                     }
                 }
             }
@@ -356,7 +356,7 @@ async fn probe_port(
                         port,
                         service_name,
                         ServiceProbeError::ReadError(e.to_string()),
-                    )
+                    );
                 }
             },
         }
@@ -376,7 +376,7 @@ async fn probe_port(
                     port,
                     service_name,
                     ServiceProbeError::ReadError(e.to_string()),
-                )
+                );
             }
         }
     }

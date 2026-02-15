@@ -2,7 +2,7 @@
 name = "netscan"
 version = "0.29.0"
 authors = ["shellrow <shellrow@fortnium.com>"]
-edition = "2021"
+edition = "2024"
 description = "Cross-platform network scan library"
 repository = "https://github.com/shellrow/netscan"
 readme = "README.md"

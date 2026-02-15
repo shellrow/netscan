@@ -2,7 +2,7 @@ use crate::host::Host;
 use crate::scan::setting::{HostScanSetting, PortScanSetting};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use tokio::runtime::{Builder, Runtime};
 
