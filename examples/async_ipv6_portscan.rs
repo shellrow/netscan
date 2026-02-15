@@ -11,13 +11,13 @@ async fn main() {
     let dst: Host = Host::new(dst_ip, String::new()).with_ports(vec![22, 80, 443, 5000, 8080]);
 
     let scan_setting = PortScanSetting::default()
-        .set_if_index(interface.index)
-        .set_scan_type(PortScanType::TcpSynScan)
+        .with_if_index(interface.index)
+        .with_scan_type(PortScanType::TcpSynScan)
         .add_target(dst)
-        .set_timeout(Duration::from_millis(10000))
-        .set_wait_time(Duration::from_millis(500))
-        .set_send_rate(Duration::from_millis(0))
-        .set_async_scan(true);
+        .with_timeout(Duration::from_millis(10000))
+        .with_wait_time(Duration::from_millis(500))
+        .with_send_rate(Duration::from_millis(0))
+        .with_async_scan(true);
 
     let result = PortScanner::new(scan_setting).scan_async().await;
 

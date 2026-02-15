@@ -10,12 +10,36 @@ use std::time::Duration;
 
 use super::setting::{HostScanSetting, HostScanType, PortScanSetting};
 
+/// Error details for scan task failures.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ScanError {
+    InterfaceNotFound,
+    UnhandledChannelType,
+    UnhandledAsyncChannelType,
+    ChannelCreationFailed(String),
+    AsyncChannelCreationFailed(String),
+    RuntimeError(String),
+    Message(String),
+}
+
+impl From<String> for ScanError {
+    fn from(value: String) -> Self {
+        ScanError::Message(value)
+    }
+}
+
+impl From<&str> for ScanError {
+    fn from(value: &str) -> Self {
+        ScanError::Message(value.to_string())
+    }
+}
+
 /// Status of scan task
 #[derive(Clone, Debug, PartialEq)]
 pub enum ScanStatus {
     Done,
     Timeout,
-    Error(String),
+    Error(ScanError),
 }
 
 /// Result of scan
@@ -40,11 +64,11 @@ impl ScanResult {
             fingerprints: vec![],
         }
     }
-    pub fn error(message: String) -> ScanResult {
+    pub fn error<E: Into<ScanError>>(error: E) -> ScanResult {
         ScanResult {
             hosts: vec![],
             scan_time: Duration::from_millis(0),
-            scan_status: ScanStatus::Error(message),
+            scan_status: ScanStatus::Error(error.into()),
             fingerprints: vec![],
         }
     }
@@ -184,7 +208,7 @@ pub(crate) fn parse_hostscan_result(
     let mut result: ScanResult = ScanResult::new();
     let iface: Interface = match crate::interface::get_interface_by_index(scan_setting.if_index) {
         Some(iface) => iface,
-        None => return ScanResult::error("Interface not found".to_string()),
+        None => return ScanResult::error(ScanError::InterfaceNotFound),
     };
     let iface_ips: HashSet<IpAddr> = crate::interface::get_local_ips(scan_setting.if_index);
     for p in packets {
@@ -289,7 +313,7 @@ pub(crate) fn parse_portscan_result(
     let mut socket_set: HashSet<SocketAddr> = HashSet::new();
     let iface: Interface = match crate::interface::get_interface_by_index(scan_setting.if_index) {
         Some(iface) => iface,
-        None => return ScanResult::error("Interface not found".to_string()),
+        None => return ScanResult::error(ScanError::InterfaceNotFound),
     };
     for p in packets {
         if p.ipv4_header.is_none() && p.ipv6_header.is_none() {

@@ -8,7 +8,7 @@ use tokio::runtime::{Builder, Runtime};
 
 use super::async_io;
 use super::blocking;
-use super::result::{ScanResult, ServiceProbeResult};
+use super::result::{ScanError, ScanResult, ServiceProbeResult};
 use super::setting::ServiceProbeSetting;
 
 /// Host Scanner
@@ -53,7 +53,10 @@ impl HostScanner {
             let tx = self.tx.clone();
             match tokio::task::spawn_blocking(move || blocking::scan_hosts(setting, &tx)).await {
                 Ok(result) => result,
-                Err(e) => ScanResult::error(format!("blocking scan task join error: {}", e)),
+                Err(e) => ScanResult::error(ScanError::RuntimeError(format!(
+                    "blocking scan task join error: {}",
+                    e
+                ))),
             }
         }
     }
@@ -110,9 +113,10 @@ impl PortScanner {
                         .await
                     {
                         Ok(result) => result,
-                        Err(e) => {
-                            ScanResult::error(format!("blocking scan task join error: {}", e))
-                        }
+                        Err(e) => ScanResult::error(ScanError::RuntimeError(format!(
+                            "blocking scan task join error: {}",
+                            e
+                        ))),
                     }
                 }
             }

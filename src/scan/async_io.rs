@@ -19,9 +19,9 @@ use crate::packet::frame::PacketFrame;
 use crate::pcap::PacketCaptureOptions;
 use nex::packet::ip::IpNextProtocol;
 use std::collections::HashSet;
-use std::thread;
+use tokio::time::sleep;
 
-use super::result::{parse_hostscan_result, parse_portscan_result, ScanStatus};
+use super::result::{parse_hostscan_result, parse_portscan_result, ScanError, ScanStatus};
 use super::setting::{HostScanType, PortScanType};
 
 pub(crate) async fn send_portscan_packets(
@@ -30,13 +30,17 @@ pub(crate) async fn send_portscan_packets(
     scan_setting: &PortScanSetting,
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
 ) {
-    for dst in scan_setting.targets.clone() {
-        for port in dst.get_ports() {
-            let dst_socket_addr: SocketAddr = SocketAddr::new(dst.ip_addr, port);
-            let packet_bytes: Vec<u8> = build_portscan_packet(interface, dst.ip_addr, port, false);
+    for dst in &scan_setting.targets {
+        for port in &dst.ports {
+            let dst_socket_addr: SocketAddr = SocketAddr::new(dst.ip_addr, port.number);
+            let packet_bytes: Vec<u8> =
+                build_portscan_packet(interface, dst.ip_addr, port.number, false);
             let _ = poll_fn(|cx| tx.poll_send(cx, &packet_bytes)).await;
             if let Ok(lr) = ptx.lock() {
                 let _ = lr.send(dst_socket_addr);
+            }
+            if !scan_setting.send_rate.is_zero() {
+                sleep(scan_setting.send_rate).await;
             }
         }
     }
@@ -48,11 +52,14 @@ pub(crate) async fn send_hostscan_packets(
     scan_setting: &HostScanSetting,
     ptx: &Arc<Mutex<Sender<Host>>>,
 ) {
-    for dst in scan_setting.targets.clone() {
+    for dst in &scan_setting.targets {
         let packet_bytes = build_hostscan_packet(interface, &dst, &scan_setting.scan_type, false);
         let _ = poll_fn(|cx| tx.poll_send(cx, &packet_bytes)).await;
         if let Ok(lr) = ptx.lock() {
-            let _ = lr.send(dst);
+            let _ = lr.send(dst.clone());
+        }
+        if !scan_setting.send_rate.is_zero() {
+            sleep(scan_setting.send_rate).await;
         }
     }
 }
@@ -157,7 +164,7 @@ pub(crate) async fn scan_hosts(
 ) -> ScanResult {
     let interface = match crate::interface::get_interface_by_index(scan_setting.if_index) {
         Some(interface) => interface,
-        None => return ScanResult::new(),
+        None => return ScanResult::error(ScanError::InterfaceNotFound),
     };
     // Create sender
     let config = nex::datalink::Config {
@@ -172,13 +179,13 @@ pub(crate) async fn scan_hosts(
     };
     let (mut _tx, mut rx) = match nex::datalink::channel(&interface, config) {
         Ok(nex::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => return ScanResult::error("Unhandled channel type".to_string()),
-        Err(e) => return ScanResult::error(format!("Failed to create channel: {}", e)),
+        Ok(_) => return ScanResult::error(ScanError::UnhandledChannelType),
+        Err(e) => return ScanResult::error(ScanError::ChannelCreationFailed(e.to_string())),
     };
     let mut async_tx = match async_channel(&interface, config) {
         Ok(AsyncChannel::Ethernet(tx, _)) => tx,
-        Ok(_) => return ScanResult::error("Unhandled async channel type".to_string()),
-        Err(e) => return ScanResult::error(format!("Failed to create async channel: {}", e)),
+        Ok(_) => return ScanResult::error(ScanError::UnhandledAsyncChannelType),
+        Err(e) => return ScanResult::error(ScanError::AsyncChannelCreationFailed(e.to_string())),
     };
     let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
         interface_index: interface.index,
@@ -192,7 +199,7 @@ pub(crate) async fn scan_hosts(
         tunnel: interface.is_tun(),
         loopback: interface.is_loopback(),
     };
-    for target in scan_setting.targets.clone() {
+    for target in &scan_setting.targets {
         capture_options.src_ips.insert(target.ip_addr);
     }
     match scan_setting.scan_type {
@@ -202,9 +209,9 @@ pub(crate) async fn scan_hosts(
         }
         HostScanType::TcpPingScan => {
             capture_options.ip_protocols.insert(IpNextProtocol::Tcp);
-            for target in scan_setting.targets.clone() {
-                for port in target.get_ports() {
-                    capture_options.src_ports.insert(port);
+            for target in &scan_setting.targets {
+                for port in &target.ports {
+                    capture_options.src_ports.insert(port.number);
                 }
             }
         }
@@ -218,8 +225,7 @@ pub(crate) async fn scan_hosts(
     let stop_handle = Arc::clone(&stop);
     let packets: Arc<Mutex<Vec<PacketFrame>>> = Arc::new(Mutex::new(vec![]));
     let receive_packets: Arc<Mutex<Vec<PacketFrame>>> = Arc::clone(&packets);
-    // Spawn pcap thread
-    let pcap_handler = thread::spawn(move || {
+    let pcap_handler = tokio::task::spawn_blocking(move || {
         let packets: Vec<PacketFrame> =
             crate::pcap::start_capture(&mut rx, capture_options, &stop_handle);
         match receive_packets.lock() {
@@ -234,12 +240,11 @@ pub(crate) async fn scan_hosts(
         }
     });
 
-    // Wait for listener to start (need fix for better way)
-    thread::sleep(Duration::from_millis(PCAP_WAIT_TIME_MILLIS));
+    sleep(Duration::from_millis(PCAP_WAIT_TIME_MILLIS)).await;
     let start_time = std::time::Instant::now();
     // Send probe packets
     send_hostscan_packets(&interface, &mut async_tx, &scan_setting, ptx).await;
-    thread::sleep(scan_setting.wait_time);
+    sleep(scan_setting.wait_time).await;
     // Stop pcap
     match stop.lock() {
         Ok(mut stop) => {
@@ -249,11 +254,10 @@ pub(crate) async fn scan_hosts(
             eprintln!("Failed to lock stop: {}", e);
         }
     }
-    // Wait for listener to stop
-    match pcap_handler.join() {
+    match pcap_handler.await {
         Ok(_) => {}
         Err(e) => {
-            eprintln!("Failed to join pcap_handler: {:?}", e);
+            eprintln!("Failed to await pcap_handler: {:?}", e);
         }
     }
 
@@ -277,7 +281,7 @@ pub(crate) async fn scan_ports(
 ) -> ScanResult {
     let interface = match crate::interface::get_interface_by_index(scan_setting.if_index) {
         Some(interface) => interface,
-        None => return ScanResult::new(),
+        None => return ScanResult::error(ScanError::InterfaceNotFound),
     };
     // Create sender
     let config = nex::datalink::Config {
@@ -292,13 +296,13 @@ pub(crate) async fn scan_ports(
     };
     let (mut _tx, mut rx) = match nex::datalink::channel(&interface, config) {
         Ok(nex::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => return ScanResult::error("Unhandled channel type".to_string()),
-        Err(e) => return ScanResult::error(format!("Failed to create channel: {}", e)),
+        Ok(_) => return ScanResult::error(ScanError::UnhandledChannelType),
+        Err(e) => return ScanResult::error(ScanError::ChannelCreationFailed(e.to_string())),
     };
     let mut async_tx = match async_channel(&interface, config) {
         Ok(AsyncChannel::Ethernet(tx, _)) => tx,
-        Ok(_) => return ScanResult::error("Unhandled async channel type".to_string()),
-        Err(e) => return ScanResult::error(format!("Failed to create async channel: {}", e)),
+        Ok(_) => return ScanResult::error(ScanError::UnhandledAsyncChannelType),
+        Err(e) => return ScanResult::error(ScanError::AsyncChannelCreationFailed(e.to_string())),
     };
     let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
         interface_index: interface.index,
@@ -312,7 +316,7 @@ pub(crate) async fn scan_ports(
         tunnel: interface.is_tun(),
         loopback: interface.is_loopback(),
     };
-    for target in scan_setting.targets.clone() {
+    for target in &scan_setting.targets {
         capture_options.src_ips.insert(target.ip_addr);
         capture_options.src_ports.extend(target.get_ports());
     }
@@ -328,8 +332,7 @@ pub(crate) async fn scan_ports(
     let stop_handle = Arc::clone(&stop);
     let packets: Arc<Mutex<Vec<PacketFrame>>> = Arc::new(Mutex::new(vec![]));
     let receive_packets: Arc<Mutex<Vec<PacketFrame>>> = Arc::clone(&packets);
-    // Spawn pcap thread
-    let pcap_handler = thread::spawn(move || {
+    let pcap_handler = tokio::task::spawn_blocking(move || {
         let packets: Vec<PacketFrame> =
             crate::pcap::start_capture(&mut rx, capture_options, &stop_handle);
         match receive_packets.lock() {
@@ -343,12 +346,11 @@ pub(crate) async fn scan_ports(
             }
         }
     });
-    // Wait for listener to start (need fix for better way)
-    thread::sleep(Duration::from_millis(PCAP_WAIT_TIME_MILLIS));
+    sleep(Duration::from_millis(PCAP_WAIT_TIME_MILLIS)).await;
     let start_time = std::time::Instant::now();
     // Send probe packets
     send_portscan_packets(&interface, &mut async_tx, &scan_setting, ptx).await;
-    thread::sleep(scan_setting.wait_time);
+    sleep(scan_setting.wait_time).await;
     // Stop pcap
     match stop.lock() {
         Ok(mut stop) => {
@@ -358,11 +360,10 @@ pub(crate) async fn scan_ports(
             eprintln!("Failed to lock stop: {}", e);
         }
     }
-    // Wait for listener to stop
-    match pcap_handler.join() {
+    match pcap_handler.await {
         Ok(_) => {}
         Err(e) => {
-            eprintln!("Failed to join pcap_handler: {:?}", e);
+            eprintln!("Failed to await pcap_handler: {:?}", e);
         }
     }
     let mut scan_result: ScanResult = ScanResult::new();

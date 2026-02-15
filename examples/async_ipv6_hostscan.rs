@@ -8,11 +8,11 @@ use std::time::Duration;
 async fn main() {
     let interface = netdev::get_default_interface().unwrap();
     let mut scan_setting: HostScanSetting = HostScanSetting::default()
-        .set_if_index(interface.index)
-        .set_scan_type(HostScanType::IcmpPingScan)
-        .set_timeout(Duration::from_millis(10000))
-        .set_wait_time(Duration::from_millis(500))
-        .set_async_scan(true);
+        .with_if_index(interface.index)
+        .with_scan_type(HostScanType::IcmpPingScan)
+        .with_timeout(Duration::from_millis(10000))
+        .with_wait_time(Duration::from_millis(500))
+        .with_async_scan(true);
 
     let targets = [
         IpAddr::V6(Ipv6Addr::new(0x2606, 0x4700, 0x4700, 0, 0, 0, 0, 0x1111)),

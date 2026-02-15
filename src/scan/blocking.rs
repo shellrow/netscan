@@ -14,32 +14,26 @@ use std::thread;
 use std::time::Duration;
 
 use super::packet::{build_hostscan_packet, build_portscan_packet};
-use super::result::{parse_hostscan_result, parse_portscan_result, ScanResult, ScanStatus};
+use super::result::{
+    parse_hostscan_result, parse_portscan_result, ScanError, ScanResult, ScanStatus,
+};
 use super::setting::{HostScanType, PortScanType};
 
 pub(crate) fn send_hostscan_packets(
     tx: &mut Box<dyn RawSender>,
     interface: &Interface,
-    targets: Vec<Host>,
+    targets: &[Host],
     ptx: &Arc<Mutex<Sender<Host>>>,
     scan_type: HostScanType,
+    send_rate: Duration,
 ) {
-    // Acquire message sender lock
-    let ptx_lock = match ptx.lock() {
-        Ok(ptx) => ptx,
-        Err(e) => {
-            eprintln!("Failed to lock ptx: {}", e);
-            return;
-        }
-    };
     for target in targets {
-        let packet = build_hostscan_packet(&interface, &target, &scan_type, false);
+        let packet = build_hostscan_packet(interface, target, &scan_type, false);
         match tx.send(&packet) {
             Some(_) => {
                 // Notify packet sent
-                match ptx_lock.send(target) {
-                    Ok(_) => {}
-                    Err(e) => {
+                if let Ok(lock) = ptx.lock() {
+                    if let Err(e) = lock.send(target.clone()) {
                         eprintln!("Failed to send message: {}", e);
                     }
                 }
@@ -48,38 +42,33 @@ pub(crate) fn send_hostscan_packets(
                 eprintln!("Failed to send packet");
             }
         }
+        if !send_rate.is_zero() {
+            thread::sleep(send_rate);
+        }
     }
-    // Drop message sender lock
-    drop(ptx_lock);
 }
 
 pub(crate) fn send_portscan_packets(
     tx: &mut Box<dyn RawSender>,
     interface: &Interface,
-    targets: Vec<Host>,
+    targets: &[Host],
     ptx: &Arc<Mutex<Sender<SocketAddr>>>,
     scan_type: PortScanType,
+    send_rate: Duration,
 ) {
-    // Acquire message sender lock
-    let ptx_lock = match ptx.lock() {
-        Ok(ptx) => ptx,
-        Err(e) => {
-            eprintln!("Failed to lock ptx: {}", e);
-            return;
-        }
-    };
     for target in targets {
         match scan_type {
             PortScanType::TcpSynScan => {
-                for port in target.ports {
+                for port in &target.ports {
                     let packet =
-                        build_portscan_packet(&interface, target.ip_addr, port.number, false);
+                        build_portscan_packet(interface, target.ip_addr, port.number, false);
                     match tx.send(&packet) {
                         Some(_) => {
                             // Notify packet sent
-                            match ptx_lock.send(SocketAddr::new(target.ip_addr, port.number)) {
-                                Ok(_) => {}
-                                Err(e) => {
+                            if let Ok(lock) = ptx.lock() {
+                                if let Err(e) =
+                                    lock.send(SocketAddr::new(target.ip_addr, port.number))
+                                {
                                     eprintln!("Failed to send message: {}", e);
                                 }
                             }
@@ -88,6 +77,9 @@ pub(crate) fn send_portscan_packets(
                             eprintln!("Failed to send packet");
                         }
                     }
+                    if !send_rate.is_zero() {
+                        thread::sleep(send_rate);
+                    }
                 }
             }
             PortScanType::TcpConnectScan => {
@@ -95,8 +87,6 @@ pub(crate) fn send_portscan_packets(
             }
         }
     }
-    // Drop message sender lock
-    drop(ptx_lock);
 }
 
 pub(crate) fn scan_hosts(
@@ -105,7 +95,7 @@ pub(crate) fn scan_hosts(
 ) -> ScanResult {
     let interface = match crate::interface::get_interface_by_index(scan_setting.if_index) {
         Some(interface) => interface,
-        None => return ScanResult::new(),
+        None => return ScanResult::error(ScanError::InterfaceNotFound),
     };
     // Create sender
     let config = nex::datalink::Config {
@@ -120,8 +110,8 @@ pub(crate) fn scan_hosts(
     };
     let (mut tx, mut rx) = match nex::datalink::channel(&interface, config) {
         Ok(nex::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => return ScanResult::error("Unhandled channel type".to_string()),
-        Err(e) => return ScanResult::error(format!("Failed to create channel: {}", e)),
+        Ok(_) => return ScanResult::error(ScanError::UnhandledChannelType),
+        Err(e) => return ScanResult::error(ScanError::ChannelCreationFailed(e.to_string())),
     };
     let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
         interface_index: interface.index,
@@ -183,9 +173,10 @@ pub(crate) fn scan_hosts(
     send_hostscan_packets(
         &mut tx,
         &interface,
-        scan_setting.targets.clone(),
+        &scan_setting.targets,
         ptx,
-        scan_setting.scan_type.clone(),
+        scan_setting.scan_type,
+        scan_setting.send_rate,
     );
     thread::sleep(scan_setting.wait_time);
     // Stop pcap
@@ -224,7 +215,7 @@ pub(crate) fn scan_ports(
 ) -> ScanResult {
     let interface = match crate::interface::get_interface_by_index(scan_setting.if_index) {
         Some(interface) => interface,
-        None => return ScanResult::new(),
+        None => return ScanResult::error(ScanError::InterfaceNotFound),
     };
     // Create sender
     let config = nex::datalink::Config {
@@ -239,8 +230,8 @@ pub(crate) fn scan_ports(
     };
     let (mut tx, mut rx) = match nex::datalink::channel(&interface, config) {
         Ok(nex::datalink::Channel::Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => return ScanResult::error("Unhandled channel type".to_string()),
-        Err(e) => return ScanResult::error(format!("Failed to create channel: {}", e)),
+        Ok(_) => return ScanResult::error(ScanError::UnhandledChannelType),
+        Err(e) => return ScanResult::error(ScanError::ChannelCreationFailed(e.to_string())),
     };
     let mut capture_options: PacketCaptureOptions = PacketCaptureOptions {
         interface_index: interface.index,
@@ -292,9 +283,10 @@ pub(crate) fn scan_ports(
     send_portscan_packets(
         &mut tx,
         &interface,
-        scan_setting.targets.clone(),
+        &scan_setting.targets,
         ptx,
-        scan_setting.scan_type.clone(),
+        scan_setting.scan_type,
+        scan_setting.send_rate,
     );
     thread::sleep(scan_setting.wait_time);
     // Stop pcap
